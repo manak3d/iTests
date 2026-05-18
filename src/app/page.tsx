@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, User, PenTool, Type, HelpCircle } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, User, PenTool, Type, HelpCircle, FileText } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -27,7 +27,6 @@ export default function ITestApp() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
-  // UI state for creation dialogs
   const [isAddingClass, setIsAddingClass] = useState(false);
   const [newClassName, setNewClassName] = useState('');
 
@@ -37,16 +36,15 @@ export default function ITestApp() {
   const [newStudentPassword, setNewStudentPassword] = useState('');
   const [targetClassId, setTargetClassId] = useState<string | null>(null);
   
-  // Teacher UI state
   const [activeTab, setActiveTab] = useState('classes');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
   
-  // Student UI state
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
+  const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
   const [activeDrawingQuestion, setActiveDrawingQuestion] = useState<string | null>(null);
 
   if (!store.isLoaded) return <div className="h-svh flex items-center justify-center font-headline text-primary animate-pulse">Načítám iTest...</div>;
@@ -142,7 +140,6 @@ export default function ITestApp() {
 
   const currentUser = store.currentUser!;
 
-  // TEACHER DASHBOARD
   if (currentUser.role === 'teacher') {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
     const selectedClass = store.classes.find(c => c.id === selectedClassId);
@@ -291,6 +288,7 @@ export default function ITestApp() {
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
+                          {a.fileUri && <Badge variant="secondary" className="bg-accent/10 text-accent gap-1"><FileText className="w-3 h-3"/> S dokumentem</Badge>}
                           <Badge variant="outline" className="rounded-full">{a.questions.length} Úkolů</Badge>
                           <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-primary" />
                         </div>
@@ -351,6 +349,15 @@ export default function ITestApp() {
                           </div>
                         </CardHeader>
                         <CardContent className="p-8 space-y-12">
+                          {sub.mainWorkDrawing && (
+                            <div className="space-y-4">
+                              <h3 className="font-bold text-xl text-primary flex items-center gap-2"><FileText className="w-5 h-5"/> Vypracovaný dokument</h3>
+                              <div className="border-4 border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+                                <img src={sub.mainWorkDrawing} alt="Vypracovaný dokument" className="w-full h-auto" />
+                              </div>
+                            </div>
+                          )}
+
                           {assignment.questions.map((q, idx) => (
                             <div key={q.id} className="space-y-4 p-6 bg-gray-50 rounded-2xl border">
                               <h6 className="font-bold text-lg flex gap-3">
@@ -443,7 +450,6 @@ export default function ITestApp() {
     );
   }
 
-  // STUDENT DASHBOARD
   if (currentUser.role === 'student') {
     const studentAssignments = store.assignments.filter(a => a.classId === currentUser.classId);
     
@@ -454,7 +460,7 @@ export default function ITestApp() {
         <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 space-y-8">
           {selectedAssignmentId ? (
             <div className="space-y-6">
-              <Button variant="ghost" className="rounded-full" onClick={() => setSelectedAssignmentId(null)}>← Zpět na seznam</Button>
+              <Button variant="ghost" className="rounded-full" onClick={() => { setSelectedAssignmentId(null); setAnswers({}); setQuestionDrawings({}); setMainWorkDrawing(undefined); }}>← Zpět na seznam</Button>
               {(() => {
                 const assignment = store.assignments.find(a => a.id === selectedAssignmentId);
                 const submission = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === currentUser.id);
@@ -490,79 +496,95 @@ export default function ITestApp() {
                         </div>
                       ) : (
                         <div className="space-y-12">
-                          {assignment.questions.map((q, idx) => (
-                            <div key={q.id} className="space-y-5">
-                              <h5 className="font-bold text-2xl flex gap-4">
-                                <span className="bg-accent/10 text-accent w-10 h-10 rounded-xl flex items-center justify-center font-black">{idx + 1}</span>
-                                <span className="pt-1">{q.text}</span>
-                              </h5>
-                              
-                              <div className="ml-14 space-y-4">
-                                {(q.type === 'short_answer' || q.type === 'long_answer') && (
-                                  <div className="space-y-3">
-                                    {q.type === 'short_answer' ? (
-                                      <Input 
-                                        placeholder="Tvá odpověď..." 
-                                        className="h-14 text-lg rounded-xl"
-                                        onChange={e => setAnswers({ ...answers, [q.id]: e.target.value })} 
-                                      />
-                                    ) : (
-                                      <Textarea 
-                                        placeholder="Tvá odpověď..." 
-                                        className="min-h-[140px] text-lg rounded-xl"
-                                        onChange={e => setAnswers({ ...answers, [q.id]: e.target.value })} 
-                                      />
-                                    )}
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="text-accent flex items-center gap-2 hover:bg-accent/5 rounded-full"
-                                      onClick={() => setActiveDrawingQuestion(activeDrawingQuestion === q.id ? null : q.id)}
-                                    >
-                                      <PenTool className="w-4 h-4" /> 
-                                      {activeDrawingQuestion === q.id ? 'Zavřít kreslení' : 'Odpovědět perem / doplnit náčrt'}
-                                    </Button>
-                                  </div>
-                                )}
-
-                                {q.type === 'multiple_choice' && (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {q.options?.map((opt, i) => (
-                                      <button 
-                                        key={i} 
-                                        className={`p-5 rounded-2xl border-2 text-left transition-all ${answers[q.id] === i ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-gray-50/30'}`}
-                                        onClick={() => setAnswers({ ...answers, [q.id]: i })}
-                                      >
-                                        <span className="font-bold text-primary mr-3">{String.fromCharCode(65 + i)}</span>
-                                        <span className="font-medium text-lg">{opt}</span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {q.type === 'true_false' && (
-                                  <div className="flex gap-4 max-w-md">
-                                    <Button 
-                                      variant={answers[q.id] === true ? 'default' : 'outline'} 
-                                      className="flex-1 h-14 rounded-xl"
-                                      onClick={() => setAnswers({ ...answers, [q.id]: true })}
-                                    >Ano / Pravda</Button>
-                                    <Button 
-                                      variant={answers[q.id] === false ? 'default' : 'outline'} 
-                                      className="flex-1 h-14 rounded-xl"
-                                      onClick={() => setAnswers({ ...answers, [q.id]: false })}
-                                    >Ne / Nepravda</Button>
-                                  </div>
-                                )}
-
-                                {(q.type === 'drawing' || activeDrawingQuestion === q.id) && (
-                                  <div className="pt-2 animate-fade-in">
-                                    <DrawingPad onSave={(data) => setQuestionDrawings({ ...questionDrawings, [q.id]: data })} />
-                                  </div>
-                                )}
+                          {assignment.fileUri && (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xl font-headline font-bold text-primary flex items-center gap-2"><PenTool className="w-5 h-5"/> Vypracuj do dokumentu</h4>
+                                <Badge variant="secondary" className="rounded-full">Lze psát perem/prstem</Badge>
                               </div>
+                              <DrawingPad 
+                                backgroundImage={assignment.fileUri} 
+                                onSave={(data) => setMainWorkDrawing(data)} 
+                              />
                             </div>
-                          ))}
+                          )}
+
+                          <div className="space-y-8">
+                            <h4 className="text-xl font-headline font-bold text-primary border-b pb-2">Kontrolní otázky</h4>
+                            {assignment.questions.map((q, idx) => (
+                              <div key={q.id} className="space-y-5">
+                                <h5 className="font-bold text-2xl flex gap-4">
+                                  <span className="bg-accent/10 text-accent w-10 h-10 rounded-xl flex items-center justify-center font-black">{idx + 1}</span>
+                                  <span className="pt-1">{q.text}</span>
+                                </h5>
+                                
+                                <div className="ml-14 space-y-4">
+                                  {(q.type === 'short_answer' || q.type === 'long_answer') && (
+                                    <div className="space-y-3">
+                                      {q.type === 'short_answer' ? (
+                                        <Input 
+                                          placeholder="Tvá odpověď..." 
+                                          className="h-14 text-lg rounded-xl"
+                                          onChange={e => setAnswers({ ...answers, [q.id]: e.target.value })} 
+                                        />
+                                      ) : (
+                                        <Textarea 
+                                          placeholder="Tvá odpověď..." 
+                                          className="min-h-[140px] text-lg rounded-xl"
+                                          onChange={e => setAnswers({ ...answers, [q.id]: e.target.value })} 
+                                        />
+                                      )}
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="text-accent flex items-center gap-2 hover:bg-accent/5 rounded-full"
+                                        onClick={() => setActiveDrawingQuestion(activeDrawingQuestion === q.id ? null : q.id)}
+                                      >
+                                        <PenTool className="w-4 h-4" /> 
+                                        {activeDrawingQuestion === q.id ? 'Zavřít kreslení' : 'Odpovědět perem / doplnit náčrt'}
+                                      </Button>
+                                    </div>
+                                  )}
+
+                                  {q.type === 'multiple_choice' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {q.options?.map((opt, i) => (
+                                        <button 
+                                          key={i} 
+                                          className={`p-5 rounded-2xl border-2 text-left transition-all ${answers[q.id] === i ? 'border-primary bg-primary/5 shadow-md' : 'border-gray-100 bg-gray-50/30'}`}
+                                          onClick={() => setAnswers({ ...answers, [q.id]: i })}
+                                        >
+                                          <span className="font-bold text-primary mr-3">{String.fromCharCode(65 + i)}</span>
+                                          <span className="font-medium text-lg">{opt}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {q.type === 'true_false' && (
+                                    <div className="flex gap-4 max-w-md">
+                                      <Button 
+                                        variant={answers[q.id] === true ? 'default' : 'outline'} 
+                                        className="flex-1 h-14 rounded-xl"
+                                        onClick={() => setAnswers({ ...answers, [q.id]: true })}
+                                      >Ano / Pravda</Button>
+                                      <Button 
+                                        variant={answers[q.id] === false ? 'default' : 'outline'} 
+                                        className="flex-1 h-14 rounded-xl"
+                                        onClick={() => setAnswers({ ...answers, [q.id]: false })}
+                                      >Ne / Nepravda</Button>
+                                    </div>
+                                  )}
+
+                                  {(q.type === 'drawing' || activeDrawingQuestion === q.id) && (
+                                    <div className="pt-2 animate-fade-in">
+                                      <DrawingPad onSave={(data) => setQuestionDrawings({ ...questionDrawings, [q.id]: data })} />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
 
                           <div className="pt-12 flex justify-center border-t">
                             <Button className="px-24 h-16 text-2xl font-headline rounded-full shadow-2xl" onClick={() => {
@@ -571,6 +593,7 @@ export default function ITestApp() {
                                 studentId: currentUser.id,
                                 answers,
                                 questionDrawings,
+                                mainWorkDrawing,
                               });
                               toast({ title: "Odesláno!", description: "Práce byla doručena učiteli." });
                             }}>

@@ -33,14 +33,16 @@ export interface Assignment {
   classId: string;
   questions: Question[];
   dueDate: string;
+  fileUri?: string; // Original document as data URI (PDF snapshot or Image)
 }
 
 export interface Submission {
   id: string;
   assignmentId: string;
   studentId: string;
-  answers: Record<string, any>; // Stores text or drawing data per question ID
-  questionDrawings: Record<string, string>; // Maps questionId to base64 drawing
+  answers: Record<string, any>;
+  questionDrawings: Record<string, string>;
+  mainWorkDrawing?: string; // Drawing on the main document
   submittedAt: string;
   grade?: number; // 1-5
   feedback?: string;

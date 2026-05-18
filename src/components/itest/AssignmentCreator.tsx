@@ -15,6 +15,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [fileUri, setFileUri] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
@@ -45,6 +46,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       const reader = new FileReader();
       reader.onload = async (event) => {
         const dataUri = event.target?.result as string;
+        setFileUri(dataUri); // Store the original file for student annotation
         
         toast({ title: "Zpracovávám dokument", description: "AI čte obsah souboru..." });
         const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: dataUri });
@@ -80,6 +82,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       description,
       classId,
       questions,
+      fileUri,
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     });
   };
@@ -123,6 +126,18 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
               className="min-h-[150px] text-base"
             />
           </div>
+          {fileUri && (
+            <div className="p-4 bg-muted rounded-xl border border-dashed flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 p-2 rounded-lg"><BookOpen className="w-5 h-5 text-primary" /></div>
+                <div>
+                  <p className="text-sm font-bold">Originální dokument připojen</p>
+                  <p className="text-xs text-muted-foreground">Žáci do něj budou moci přímo psát.</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setFileUri(undefined)}><Trash2 className="w-4 h-4" /></Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

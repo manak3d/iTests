@@ -2,9 +2,8 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Eraser, Pencil, RotateCcw, Palette } from 'lucide-react';
+import { Eraser, Pencil, RotateCcw, Palette, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
 
 const PRESET_COLORS = [
   { id: 'black', value: '#000000', label: 'Černá' },
@@ -19,14 +18,22 @@ const SIZES = [
   { id: 'thick', value: 12, label: 'Tlustý', iconSize: 12 },
 ];
 
-export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
+export function DrawingPad({ 
+  onSave, 
+  backgroundImage, 
+  initialDrawing 
+}: { 
+  onSave: (data: string) => void; 
+  backgroundImage?: string;
+  initialDrawing?: string;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#295CA3');
   const [lineWidth, setLineWidth] = useState(3);
   const [isEraser, setIsEraser] = useState(false);
 
-  // Initialize canvas with smooth rendering
+  // Initialize canvas and load background/initial drawing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -35,7 +42,38 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-  }, []);
+
+    const drawBackground = () => {
+      if (backgroundImage) {
+        const img = new Image();
+        img.onload = () => {
+          // Adjust canvas size to background image aspect ratio if possible
+          // For now keep standard size but draw background centered/fitted
+          const hRatio = canvas.width / img.width;
+          const vRatio = canvas.height / img.height;
+          const ratio = Math.min(hRatio, vRatio);
+          const centerShift_x = (canvas.width - img.width * ratio) / 2;
+          const centerShift_y = (canvas.height - img.height * ratio) / 2;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+          
+          // Re-draw initial state if exists
+          if (initialDrawing) {
+            const drawImg = new Image();
+            drawImg.onload = () => ctx.drawImage(drawImg, 0, 0);
+            drawImg.src = initialDrawing;
+          }
+        };
+        img.src = backgroundImage;
+      } else if (initialDrawing) {
+        const drawImg = new Image();
+        drawImg.onload = () => ctx.drawImage(drawImg, 0, 0);
+        drawImg.src = initialDrawing;
+      }
+    };
+
+    drawBackground();
+  }, [backgroundImage, initialDrawing]);
 
   // Update context when tools change
   useEffect(() => {
@@ -55,8 +93,8 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
     
     let clientX, clientY;
     if ('touches' in e) {
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
+      clientX = (e as TouchEvent).touches[0].clientX;
+      clientY = (e as TouchEvent).touches[0].clientY;
     } else {
       clientX = (e as MouseEvent).clientX;
       clientY = (e as MouseEvent).clientY;
@@ -70,7 +108,7 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     setIsDrawing(true);
-    const { x, y } = getCoordinates(e);
+    const { x, y } = getCoordinates(e.nativeEvent);
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
       ctx.beginPath();
@@ -80,7 +118,7 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing) return;
-    const { x, y } = getCoordinates(e);
+    const { x, y } = getCoordinates(e.nativeEvent);
     const ctx = canvasRef.current?.getContext('2d');
     if (ctx) {
       ctx.lineTo(x, y);
@@ -102,7 +140,22 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (backgroundImage) {
+      const img = new Image();
+      img.onload = () => {
+        const hRatio = canvas.width / img.width;
+        const vRatio = canvas.height / img.height;
+        const ratio = Math.min(hRatio, vRatio);
+        const centerShift_x = (canvas.width - img.width * ratio) / 2;
+        const centerShift_y = (canvas.height - img.height * ratio) / 2;
+        ctx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+      };
+      img.src = backgroundImage;
+    }
+    
     onSave('');
   };
 
@@ -160,6 +213,7 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
         </div>
         
         <div className="flex items-center gap-4">
+          {backgroundImage && <div className="text-[10px] font-bold text-primary flex items-center gap-1"><ImageIcon className="w-3 h-3"/> DOKUMENT NA POZADÍ</div>}
           <div className="flex gap-2 items-center bg-gray-50 px-3 py-1 rounded-full border">
             <span className="text-[10px] font-bold text-muted-foreground uppercase mr-2">Tloušťka:</span>
             {SIZES.map((s) => (
@@ -186,11 +240,11 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
         </div>
       </div>
 
-      <div className="relative group overflow-hidden rounded-xl border-4 border-gray-50 bg-white">
+      <div className="relative group overflow-hidden rounded-xl border-4 border-gray-50 bg-white shadow-lg">
         <canvas
           ref={canvasRef}
           width={800}
-          height={400}
+          height={backgroundImage ? 1100 : 400} // Taller for documents
           onMouseDown={startDrawing}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
@@ -198,14 +252,14 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
           onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
           onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
           onTouchMove={(e) => { e.preventDefault(); draw(e); }}
-          className="drawing-canvas w-full h-[300px] md:h-[400px] cursor-crosshair touch-none"
+          className="drawing-canvas w-full cursor-crosshair touch-none bg-white"
         />
         <div className="absolute inset-0 pointer-events-none border-2 border-transparent group-hover:border-primary/20 transition-colors rounded-lg" />
       </div>
       
       <div className="flex justify-center">
-        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">
-          Můžeš psát perem, prstem nebo myší • Vyber si barvu z palety
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full text-center">
+          Piš přímo do dokumentu • Guma maže pouze tvůj zápis, ne podklad
         </p>
       </div>
     </div>
