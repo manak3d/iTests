@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -31,7 +30,10 @@ export function useITestStore() {
     
     // Ensure demo teacher exists if no users found
     if (initialUsers.length === 0) {
-      initialUsers = [{ id: 't1', name: 'Dr. Smith', role: 'teacher', username: 'smith' }];
+      initialUsers = [{ id: 't1', name: 'Dr. Smith', role: 'teacher', username: 'smith', password: 'password' }];
+    } else {
+      // Migrate old users if password missing
+      initialUsers = initialUsers.map(u => u.username === 'smith' && !u.password ? { ...u, password: 'password' } : u);
     }
     setUsers(initialUsers);
 
@@ -59,8 +61,8 @@ export function useITestStore() {
     localStorage.setItem('itest_data', JSON.stringify(data));
   }, [classes, users, assignments, submissions, isLoaded]);
 
-  const login = useCallback((role: Role, username: string) => {
-    const user = users.find(u => u.username === username && u.role === role);
+  const login = useCallback((role: Role, username: string, password?: string) => {
+    const user = users.find(u => u.username === username && u.role === role && u.password === password);
     if (user) {
       setCurrentUser(user);
       sessionStorage.setItem('itest_session', JSON.stringify(user));
@@ -86,9 +88,9 @@ export function useITestStore() {
     return newClass;
   }, [currentUser]);
 
-  const addStudent = useCallback((classId: string, name: string, username: string) => {
+  const addStudent = useCallback((classId: string, name: string, username: string, password?: string) => {
     const studentId = Math.random().toString(36).substring(2, 11);
-    const newUser: User = { id: studentId, name, username, role: 'student', classId };
+    const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
     setUsers(prev => [...prev, newUser]);
     setClasses(prev => prev.map(c => 

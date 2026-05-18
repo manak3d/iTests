@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -18,12 +17,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { GRADES } from '@/lib/types';
 import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ITestApp() {
   const store = useITestStore();
+  const { toast } = useToast();
   const [authView, setAuthView] = useState<'login' | 'dashboard'>('login');
   const [loginRole, setLoginRole] = useState<'teacher' | 'student'>('teacher');
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   
   // UI state for creation dialogs
   const [isAddingClass, setIsAddingClass] = useState(false);
@@ -32,6 +34,7 @@ export default function ITestApp() {
   const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentUsername, setNewStudentUsername] = useState('');
+  const [newStudentPassword, setNewStudentPassword] = useState('');
   const [targetClassId, setTargetClassId] = useState<string | null>(null);
   
   // Teacher UI state
@@ -49,8 +52,14 @@ export default function ITestApp() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (store.login(loginRole, username)) {
+    if (store.login(loginRole, username, password)) {
       setAuthView('dashboard');
+    } else {
+      toast({
+        title: "Login Failed",
+        description: "Invalid username or password.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -63,12 +72,14 @@ export default function ITestApp() {
   };
 
   const handleAddStudent = () => {
-    if (newStudentName.trim() && newStudentUsername.trim() && targetClassId) {
-      store.addStudent(targetClassId, newStudentName, newStudentUsername);
+    if (newStudentName.trim() && newStudentUsername.trim() && newStudentPassword.trim() && targetClassId) {
+      store.addStudent(targetClassId, newStudentName, newStudentUsername, newStudentPassword);
       setNewStudentName('');
       setNewStudentUsername('');
+      setNewStudentPassword('');
       setIsAddingStudent(false);
       setTargetClassId(null);
+      toast({ title: "Student Added", description: `${newStudentName} has been enrolled.` });
     }
   };
 
@@ -99,14 +110,27 @@ export default function ITestApp() {
                   onClick={() => setLoginRole('student')}
                 >Student</button>
               </div>
-              <div className="space-y-2">
-                <Input 
-                  placeholder="Username" 
-                  value={username} 
-                  onChange={e => setUsername(e.target.value)}
-                  className="h-12 border-gray-200"
-                />
-                <p className="text-[10px] text-muted-foreground px-1">Demo Teacher: smith | Demo Student: created after login</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Username</Label>
+                  <Input 
+                    placeholder="Username" 
+                    value={username} 
+                    onChange={e => setUsername(e.target.value)}
+                    className="h-12 border-gray-200"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Password</Label>
+                  <Input 
+                    type="password"
+                    placeholder="••••••••" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)}
+                    className="h-12 border-gray-200"
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground px-1">Demo Teacher: smith / password</p>
               </div>
               <Button type="submit" className="w-full h-12 text-lg font-headline">Enter Platform</Button>
             </form>
@@ -243,12 +267,21 @@ export default function ITestApp() {
                         onChange={(e) => setNewStudentUsername(e.target.value)}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label>Password</Label>
+                      <Input 
+                        type="password"
+                        placeholder="••••••••" 
+                        value={newStudentPassword}
+                        onChange={(e) => setNewStudentPassword(e.target.value)}
+                      />
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsAddingStudent(false)}>Cancel</Button>
                     <Button 
                       onClick={handleAddStudent} 
-                      disabled={!newStudentName.trim() || !newStudentUsername.trim()}
+                      disabled={!newStudentName.trim() || !newStudentUsername.trim() || !newStudentPassword.trim()}
                     >
                       Add Student
                     </Button>
