@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileUp, Plus, Trash2, Wand2, Loader2 } from 'lucide-react';
+import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen } from 'lucide-react';
 import { Question, QuestionType, Assignment } from '@/lib/types';
 import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
 import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
@@ -15,7 +15,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [isDigitizing, setIsDigitizing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
   const addQuestion = (type: QuestionType) => {
@@ -40,37 +40,42 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsDigitizing(true);
+    setIsProcessing(true);
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
         const dataUri = event.target?.result as string;
-        const result = await digitizePdfContentForAssignment({ pdfDataUri: dataUri });
-        setDescription(prev => prev + "\n\nExtracted from PDF:\n" + result.extractedText);
         
-        // Optional: Generate questions automatically
-        const aiQuestions = await generateQuestionsFromExtractedText({ extractedText: result.extractedText });
+        // Step 1: Extract Text
+        toast({ title: "Zpracovávám PDF", description: "Extrahuji text pomocí AI..." });
+        const digitizeResult = await digitizePdfContentForAssignment({ pdfDataUri: dataUri });
+        setDescription(digitizeResult.extractedText);
+        
+        // Step 2: Generate Questions
+        toast({ title: "Generuji otázky", description: "AI navrhuje testové úlohy..." });
+        const aiQuestions = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
+        
         const newQs: Question[] = aiQuestions.questions.map((q: any) => ({
           id: Math.random().toString(36).substr(2, 9),
-          type: q.type,
+          type: q.type as QuestionType,
           text: q.questionText,
           options: q.options,
           correctAnswer: q.correctAnswer ?? q.correctAnswerIndex,
         }));
-        setQuestions([...questions, ...newQs]);
         
-        toast({ title: "PDF Digitized", description: "Text and questions generated successfully." });
+        setQuestions([...questions, ...newQs]);
+        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena z PDF." });
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      toast({ title: "Digitization Failed", variant: "destructive" });
+      toast({ title: "Chyba při zpracování", variant: "destructive" });
     } finally {
-      setIsDigitizing(false);
+      setIsProcessing(false);
     }
   };
 
   const handleSave = () => {
-    if (!title) return toast({ title: "Title is required", variant: "destructive" });
+    if (!title) return toast({ title: "Název je povinný", variant: "destructive" });
     onSave({
       title,
       description,
@@ -82,72 +87,90 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
 
   return (
     <div className="space-y-6">
-      <Card className="border-none shadow-md">
-        <CardHeader className="bg-primary text-white rounded-t-lg">
+      <Card className="border-none shadow-lg overflow-hidden">
+        <CardHeader className="bg-primary text-white">
           <CardTitle className="font-headline text-2xl flex items-center justify-between">
-            <span>Create New Assignment</span>
-            <div className="flex gap-2">
-              <label className="cursor-pointer">
-                <Button variant="secondary" size="sm" asChild disabled={isDigitizing}>
-                  <span>
-                    {isDigitizing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
-                    Upload PDF Digitizer
-                  </span>
-                </Button>
-                <input type="file" className="hidden" accept="application/pdf" onChange={handleFileUpload} />
-              </label>
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-6 h-6" />
+              <span>Nová práce z PDF</span>
             </div>
+            <label className="cursor-pointer">
+              <Button variant="secondary" size="sm" asChild disabled={isProcessing}>
+                <span>
+                  {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
+                  Nahrát PDF & Digitalizovat
+                </span>
+              </Button>
+              <input type="file" className="hidden" accept="application/pdf" onChange={handleFileUpload} />
+            </label>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6 space-y-4">
+        <CardContent className="p-6 space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-semibold">Title</label>
-            <Input placeholder="Enter assignment title" value={title} onChange={e => setTitle(e.target.value)} />
+            <label className="text-sm font-bold text-primary">Název úkolu</label>
+            <Input 
+              placeholder="Např. Prověrka z historie: Baroko" 
+              value={title} 
+              onChange={e => setTitle(e.target.value)}
+              className="h-12 text-lg"
+            />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-semibold">Instructions</label>
+            <label className="text-sm font-bold text-primary">Výchozí text / Instrukce</label>
             <Textarea 
-              placeholder="Provide background info or instructions..." 
+              placeholder="Zde se objeví extrahovaný text z PDF, nebo vložte vlastní..." 
               value={description} 
               onChange={e => setDescription(e.target.value)}
-              className="min-h-[100px]"
+              className="min-h-[200px] text-base"
             />
           </div>
         </CardContent>
       </Card>
 
       <div className="space-y-4">
-        <h3 className="font-headline text-xl text-primary flex items-center gap-2">
-          <Wand2 className="w-5 h-5 text-accent" /> Questions
+        <h3 className="font-headline text-xl text-primary flex items-center gap-2 px-1">
+          <Wand2 className="w-5 h-5 text-accent" /> Otázky a úkoly
         </h3>
         
+        {questions.length === 0 && (
+          <div className="text-center py-12 bg-white/50 border-2 border-dashed rounded-xl">
+            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky. Nahrajte PDF nebo přidejte otázku ručně.</p>
+          </div>
+        )}
+
         {questions.map((q, index) => (
-          <Card key={q.id} className="border-l-4 border-l-accent animate-fade-in">
-            <CardContent className="p-4 space-y-3">
-              <div className="flex justify-between items-start">
-                <span className="text-xs font-bold uppercase text-accent">{q.type.replace('_', ' ')}</span>
-                <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)}>
+          <Card key={q.id} className="border-l-4 border-l-accent animate-fade-in group shadow-sm">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
+                  {q.type.replace('_', ' ')}
+                </span>
+                <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
               </div>
               <Input 
-                placeholder={`Question ${index + 1}`} 
+                placeholder={`Zadejte otázku č. ${index + 1}`} 
                 value={q.text} 
-                onChange={e => updateQuestion(q.id, { text: e.target.value })} 
+                onChange={e => updateQuestion(q.id, { text: e.target.value })}
+                className="font-medium border-none shadow-none focus-visible:ring-0 text-lg px-0"
               />
+              
               {q.type === 'multiple_choice' && (
-                <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                   {q.options?.map((opt, i) => (
-                    <Input 
-                      key={i} 
-                      placeholder={`Option ${i + 1}`} 
-                      value={opt} 
-                      onChange={e => {
-                        const newOpts = [...(q.options || [])];
-                        newOpts[i] = e.target.value;
-                        updateQuestion(q.id, { options: newOpts });
-                      }}
-                    />
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{String.fromCharCode(65 + i)}</div>
+                      <Input 
+                        placeholder={`Možnost ${i + 1}`} 
+                        value={opt} 
+                        onChange={e => {
+                          const newOpts = [...(q.options || [])];
+                          newOpts[i] = e.target.value;
+                          updateQuestion(q.id, { options: newOpts });
+                        }}
+                      />
+                    </div>
                   ))}
                 </div>
               )}
@@ -155,25 +178,25 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           </Card>
         ))}
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={() => addQuestion('short_answer')}>
-            <Plus className="w-4 h-4 mr-2" /> Short Answer
+        <div className="flex flex-wrap gap-2 pt-4 justify-center">
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('short_answer')}>
+            <Plus className="w-4 h-4 mr-2" /> Krátká odpověď
           </Button>
-          <Button variant="outline" size="sm" onClick={() => addQuestion('long_answer')}>
-            <Plus className="w-4 h-4 mr-2" /> Long Answer
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('long_answer')}>
+            <Plus className="w-4 h-4 mr-2" /> Dlouhá odpověď
           </Button>
-          <Button variant="outline" size="sm" onClick={() => addQuestion('multiple_choice')}>
-            <Plus className="w-4 h-4 mr-2" /> Multiple Choice
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('multiple_choice')}>
+            <Plus className="w-4 h-4 mr-2" /> Výběr z možností
           </Button>
-          <Button variant="outline" size="sm" onClick={() => addQuestion('true_false')}>
-            <Plus className="w-4 h-4 mr-2" /> True/False
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('true_false')}>
+            <Plus className="w-4 h-4 mr-2" /> Ano / Ne
           </Button>
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t">
-        <Button size="lg" className="w-full md:w-auto px-12" onClick={handleSave}>
-          Create Assignment
+      <div className="flex justify-end gap-3 pt-8 border-t">
+        <Button size="lg" className="w-full md:w-auto px-16 h-14 text-xl font-headline" onClick={handleSave}>
+          Publikovat pro žáky
         </Button>
       </div>
     </div>

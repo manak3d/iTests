@@ -47,9 +47,9 @@ export interface Submission {
 }
 
 export const GRADES = [
-  { value: 1, label: 'Excellent', emoji: '🤩' },
-  { value: 2, label: 'Very Good', emoji: '😊' },
-  { value: 3, label: 'Good', emoji: '😐' },
-  { value: 4, label: 'Sufficient', emoji: '😟' },
-  { value: 5, label: 'Failed', emoji: '😢' },
+  { value: 1, label: 'Výborně', emoji: '🤩' },
+  { value: 2, label: 'Chvalitebně', emoji: '😊' },
+  { value: 3, label: 'Dobře', emoji: '😐' },
+  { value: 4, label: 'Dostatečně', emoji: '😟' },
+  { value: 5, label: 'Nedostatečně', emoji: '😢' },
 ];
