@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -119,8 +120,9 @@ export function useITestStore() {
       await setDoc(doc(db, 'classes', classId), newClass);
     } catch (e) {
       console.error("Error adding class", e);
+      toast({ title: "Chyba při ukládání třídy", variant: "destructive" });
     }
-  }, [db, currentUser]);
+  }, [db, currentUser, toast]);
 
   const addStudent = useCallback(async (classId: string, name: string, username: string, password?: string) => {
     if (!db) return;
@@ -128,10 +130,7 @@ export function useITestStore() {
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
     try {
-      // 1. Save student to 'users' collection
       await setDoc(doc(db, 'users', studentId), newUser);
-      
-      // 2. Update class metadata with the new student ID
       const cls = classes.find(c => c.id === classId);
       if (cls) {
         await updateDoc(doc(db, 'classes', classId), {
@@ -140,18 +139,30 @@ export function useITestStore() {
       }
     } catch (e) {
       console.error("Error adding student", e);
+      toast({ title: "Chyba při přidávání žáka", variant: "destructive" });
     }
-  }, [db, classes]);
+  }, [db, classes, toast]);
 
   const addAssignment = useCallback(async (assignment: Omit<Assignment, 'id'>) => {
     if (!db) return;
     const id = Math.random().toString(36).substring(2, 11);
     try {
+      // Provedeme kontrolu velikosti před uložením do cloudu
+      const dataStr = JSON.stringify({ ...assignment, id });
+      if (dataStr.length > 1000000) { // Limit Firestore je cca 1MB
+        toast({ 
+          title: "Soubor je příliš velký", 
+          description: "Zkuste nahrát menší dokument nebo PDF s méně stránkami.",
+          variant: "destructive" 
+        });
+        return;
+      }
       await setDoc(doc(db, 'assignments', id), { ...assignment, id });
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error adding assignment", e);
+      toast({ title: "Chyba při publikování práce", description: e.message, variant: "destructive" });
     }
-  }, [db]);
+  }, [db, toast]);
 
   const submitWork = useCallback(async (submission: Omit<Submission, 'id' | 'submittedAt'>) => {
     if (!db) return;
@@ -165,8 +176,9 @@ export function useITestStore() {
       await setDoc(doc(db, 'submissions', id), newSubmission);
     } catch (e) {
       console.error("Error submitting work", e);
+      toast({ title: "Chyba při odevzdávání", variant: "destructive" });
     }
-  }, [db]);
+  }, [db, toast]);
 
   const gradeSubmission = useCallback(async (id: string, grade: number, feedback: string) => {
     if (!db) return;
@@ -174,8 +186,9 @@ export function useITestStore() {
       await updateDoc(doc(db, 'submissions', id), { grade, feedback });
     } catch (e) {
       console.error("Error grading submission", e);
+      toast({ title: "Chyba při ukládání známky", variant: "destructive" });
     }
-  }, [db]);
+  }, [db, toast]);
 
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,

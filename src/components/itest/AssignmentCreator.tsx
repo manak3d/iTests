@@ -27,14 +27,15 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d')!;
         
-        // Max dimensions for background documents to save space
-        const MAX_WIDTH = 1000;
+        // Výrazně snížíme rozlišení pro cloudové úložiště (Firestore limit 1MB)
+        const MAX_WIDTH = 900; 
         const scale = Math.min(1, MAX_WIDTH / img.width);
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
         
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.6));
+        // JPEG s kvalitou 0.5 zajistí, že dokument zabere cca 100-200 KB
+        resolve(canvas.toDataURL('image/jpeg', 0.5));
       };
       img.src = dataUri;
     });
@@ -69,7 +70,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       const rawDataUri = event.target?.result as string;
       
       try {
-        // Compress the image immediately to save localStorage quota
+        // Komprese je klíčová pro uložení do cloudu
         const compressedUri = await compressImage(rawDataUri);
         setFileUri(compressedUri);
         
@@ -81,7 +82,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           toast({ 
             title: isQuota ? "AI limit vyčerpán" : "Chyba AI", 
             description: isQuota 
-              ? "Dosáhli jste limitu bezplatných požadavků. Dokument byl nahrán, ale text a otázky musíte doplnit ručně."
+              ? "Dokument byl nahrán do cloudu, ale text a otázky musíte doplnit ručně kvůli limitům AI."
               : digitizeResult.error,
             variant: "destructive" 
           });
@@ -92,16 +93,10 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         if (digitizeResult.extractedText) {
           setDescription(digitizeResult.extractedText);
           
-          toast({ title: "Generuji otázky", description: "AI navrhuje testové úlohy z textu..." });
+          toast({ title: "Generuji otázky", description: "AI navrhuje úkoly z textu..." });
           const aiQuestionsResult = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
           
-          if (aiQuestionsResult.error) {
-            toast({ 
-              title: "Otázky nebyly vygenerovány", 
-              description: "Text byl úspěšně extrahován, ale otázky musíte vytvořit ručně.",
-              variant: "default" 
-            });
-          } else if (aiQuestionsResult.questions) {
+          if (!aiQuestionsResult.error && aiQuestionsResult.questions) {
             const newQs: Question[] = aiQuestionsResult.questions.map((q: any) => ({
               id: Math.random().toString(36).substr(2, 9),
               type: q.type as QuestionType,
@@ -111,13 +106,13 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             }));
             
             setQuestions(prev => [...prev, ...newQs]);
-            toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena pomocí AI." });
+            toast({ title: "Cloudová synchronizace", description: "Data i otázky jsou připraveny k publikování." });
           }
         }
       } catch (error: any) {
         toast({ 
-          title: "Chyba zpracování", 
-          description: "Nepodařilo se automaticky zpracovat dokument.",
+          title: "Chyba cloudu", 
+          description: "Nepodařilo se dokument připravit pro nahrání.",
           variant: "destructive" 
         });
       } finally {
@@ -147,13 +142,13 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           <CardTitle className="font-headline text-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <BookOpen className="w-6 h-6" />
-              <span>Nová práce z dokumentu</span>
+              <span>Nová práce v cloudu</span>
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <label className="cursor-pointer flex-1 md:flex-none">
                 <div className="bg-white text-primary px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center hover:bg-gray-100 transition-colors h-10 min-w-[150px]">
                   {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
-                  Nahrát PDF / Foto
+                  Nahrát do cloudu
                 </div>
                 <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} disabled={isProcessing} />
               </label>
@@ -164,7 +159,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           <div className="space-y-2">
             <label className="text-sm font-bold text-primary uppercase">Název úkolu</label>
             <Input 
-              placeholder="Např. Prověrka z historie: Baroko" 
+              placeholder="Např. Prověrka z historie" 
               value={title} 
               onChange={e => setTitle(e.target.value)}
               className="h-12 text-lg"
@@ -173,7 +168,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           <div className="space-y-2">
             <label className="text-sm font-bold text-primary uppercase">Výchozí text / Instrukce</label>
             <Textarea 
-              placeholder="Zde se objeví extrahovaný text z dokumentu (nebo jej zadejte ručně)..." 
+              placeholder="Zde se objeví extrahovaný text (bude uložen v cloudu)..." 
               value={description} 
               onChange={e => setDescription(e.target.value)}
               className="min-h-[150px] text-base"
@@ -184,8 +179,8 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
               <div className="flex items-center gap-3">
                 <div className="bg-primary/10 p-2 rounded-lg"><BookOpen className="w-5 h-5 text-primary" /></div>
                 <div>
-                  <p className="text-sm font-bold">Originální dokument připojen</p>
-                  <p className="text-xs text-muted-foreground">Žáci do něj budou moci přímo psát.</p>
+                  <p className="text-sm font-bold">Dokument připraven ke sdílení</p>
+                  <p className="text-xs text-muted-foreground">Velikost optimalizována pro cloudovou databázi.</p>
                 </div>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setFileUri(undefined)} disabled={isProcessing}><Trash2 className="w-4 h-4" /></Button>
@@ -199,19 +194,13 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           <Wand2 className="w-5 h-5 text-accent" /> Otázky a úkoly
         </h3>
         
-        {questions.length === 0 && (
-          <div className="text-center py-12 bg-white/50 border-2 border-dashed rounded-xl">
-            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky.</p>
-          </div>
-        )}
-
         <div className="grid gap-4">
           {questions.map((q, index) => (
             <Card key={q.id} className="border-l-4 border-l-accent animate-fade-in group shadow-sm">
               <CardContent className="p-6 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
-                    {q.type === 'drawing' ? 'Kresba / Ruční zápis' : q.type.replace('_', ' ')}
+                    {q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}
                   </span>
                   <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 className="w-4 h-4 text-destructive" />
@@ -261,14 +250,14 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             <Plus className="w-4 h-4 mr-2" /> Ano / Ne
           </Button>
           <Button variant="secondary" size="sm" className="rounded-full bg-accent/10 text-accent hover:bg-accent/20" onClick={() => addQuestion('drawing')}>
-            <PenTool className="w-4 h-4 mr-2" /> Náčrt / Pero
+            <PenTool className="w-4 h-4 mr-2" /> Kresba
           </Button>
         </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-8 border-t">
         <Button size="lg" className="w-full md:w-auto px-16 h-14 text-xl font-headline" onClick={handleSave} disabled={isProcessing}>
-          Publikovat práci
+          Publikovat a uložit v cloudu
         </Button>
       </div>
     </div>
