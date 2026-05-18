@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen } from 'lucide-react';
+import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, Camera } from 'lucide-react';
 import { Question, QuestionType, Assignment } from '@/lib/types';
 import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
 import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
@@ -47,12 +47,12 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         const dataUri = event.target?.result as string;
         
         // Step 1: Extract Text
-        toast({ title: "Zpracovávám PDF", description: "Extrahuji text pomocí AI..." });
-        const digitizeResult = await digitizePdfContentForAssignment({ pdfDataUri: dataUri });
+        toast({ title: "Zpracovávám dokument", description: "AI čte obsah souboru..." });
+        const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: dataUri });
         setDescription(digitizeResult.extractedText);
         
         // Step 2: Generate Questions
-        toast({ title: "Generuji otázky", description: "AI navrhuje testové úlohy..." });
+        toast({ title: "Generuji otázky", description: "AI navrhuje testové úlohy z textu..." });
         const aiQuestions = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
         
         const newQs: Question[] = aiQuestions.questions.map((q: any) => ({
@@ -64,11 +64,12 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         }));
         
         setQuestions([...questions, ...newQs]);
-        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena z PDF." });
+        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena a otázky vygenerovány." });
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      toast({ title: "Chyba při zpracování", variant: "destructive" });
+      console.error(error);
+      toast({ title: "Chyba při zpracování", description: "Nepodařilo se digitalizovat dokument.", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -89,20 +90,22 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
     <div className="space-y-6">
       <Card className="border-none shadow-lg overflow-hidden">
         <CardHeader className="bg-primary text-white">
-          <CardTitle className="font-headline text-2xl flex items-center justify-between">
+          <CardTitle className="font-headline text-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <BookOpen className="w-6 h-6" />
-              <span>Nová práce z PDF</span>
+              <span>Nová práce z dokumentu</span>
             </div>
-            <label className="cursor-pointer">
-              <Button variant="secondary" size="sm" asChild disabled={isProcessing}>
-                <span>
-                  {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
-                  Nahrát PDF & Digitalizovat
-                </span>
-              </Button>
-              <input type="file" className="hidden" accept="application/pdf" onChange={handleFileUpload} />
-            </label>
+            <div className="flex gap-2 w-full md:w-auto">
+              <label className="cursor-pointer flex-1 md:flex-none">
+                <Button variant="secondary" size="sm" asChild disabled={isProcessing} className="w-full">
+                  <span>
+                    {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
+                    Nahrát PDF / Foto
+                  </span>
+                </Button>
+                <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} />
+              </label>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
@@ -118,7 +121,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           <div className="space-y-2">
             <label className="text-sm font-bold text-primary">Výchozí text / Instrukce</label>
             <Textarea 
-              placeholder="Zde se objeví extrahovaný text z PDF, nebo vložte vlastní..." 
+              placeholder="Zde se objeví extrahovaný text z dokumentu, se kterým můžete dále pracovat..." 
               value={description} 
               onChange={e => setDescription(e.target.value)}
               className="min-h-[200px] text-base"
@@ -134,7 +137,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         
         {questions.length === 0 && (
           <div className="text-center py-12 bg-white/50 border-2 border-dashed rounded-xl">
-            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky. Nahrajte PDF nebo přidejte otázku ručně.</p>
+            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky. Nahrajte soubor nebo přidejte otázku ručně pomocí tlačítek níže.</p>
           </div>
         )}
 
