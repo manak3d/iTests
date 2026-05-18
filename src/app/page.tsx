@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useITestStore } from '@/hooks/use-itest-store';
 import { Navbar } from '@/components/itest/Navbar';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -43,13 +43,14 @@ export default function ITestApp() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
 
+  // 1. Krok: Čekání na synchronizaci s cloudem
   if (!store.isLoaded) {
     return (
       <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="w-12 h-12 text-primary animate-spin" />
         <div className="font-headline text-2xl text-primary font-bold animate-pulse text-center px-4">
           Synchronizace iTest Cloudu...<br/>
-          <span className="text-sm font-normal text-muted-foreground">Stahuji vaše data z cloudu</span>
+          <span className="text-sm font-normal text-muted-foreground">Stahuji vaše data z databáze</span>
         </div>
       </div>
     );
@@ -85,6 +86,7 @@ export default function ITestApp() {
     }
   };
 
+  // 2. Krok: Pokud není uživatel, zobraz přihlášení
   if (!store.currentUser) {
     return (
       <div className="min-h-screen bg-[#EFF3F7] flex items-center justify-center p-4">
@@ -143,6 +145,7 @@ export default function ITestApp() {
 
   const currentUser = store.currentUser;
 
+  // 3. Krok: Vykreslení nástěnky učitele
   if (currentUser.role === 'teacher') {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
     const selectedClass = store.classes.find(c => c.id === selectedClassId);
@@ -194,11 +197,6 @@ export default function ITestApp() {
                   </DialogContent>
                 </Dialog>
               )}
-              {selectedClassId && activeTab === 'assignments' && !isCreatingAssignment && (
-                <Button className="rounded-full shadow-md" onClick={() => setIsCreatingAssignment(true)}>
-                  <Plus className="w-4 h-4 mr-2" /> Vytvořit práci
-                </Button>
-              )}
             </div>
           </div>
 
@@ -212,6 +210,7 @@ export default function ITestApp() {
 
             <TabsContent value="classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {teacherClasses.map(c => {
+                // Dynamické počítání žáků z databáze
                 const classStudentsCount = store.users.filter(u => u.classId === c.id).length;
                 return (
                   <Card 
@@ -229,7 +228,7 @@ export default function ITestApp() {
                     </CardHeader>
                     <CardContent>
                       <div className="flex justify-between items-center">
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-none font-bold">
                           {classStudentsCount} {classStudentsCount === 1 ? 'Žák' : (classStudentsCount > 1 && classStudentsCount < 5 ? 'Žáci' : 'Žáků')}
                         </Badge>
                         <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary rounded-full" onClick={(e) => {
@@ -247,7 +246,7 @@ export default function ITestApp() {
                 <div className="col-span-full py-20 text-center bg-white/30 rounded-3xl border-2 border-dashed border-primary/20">
                   <School className="w-12 h-12 text-primary/20 mx-auto mb-4" />
                   <p className="text-xl font-bold text-primary/60">Zatím nemáte vytvořené žádné třídy.</p>
-                  <p className="text-muted-foreground">Začněte vytvořením své první třídy v cloudu.</p>
+                  <p className="text-muted-foreground">Vytvořte svou první třídu tlačítkem vpravo nahoře.</p>
                 </div>
               )}
 
@@ -290,6 +289,11 @@ export default function ITestApp() {
                 </div>
               ) : (
                 <div className="grid gap-4">
+                  <div className="flex justify-end">
+                    <Button className="rounded-full shadow-md" onClick={() => setIsCreatingAssignment(true)}>
+                      <Plus className="w-4 h-4 mr-2" /> Vytvořit práci
+                    </Button>
+                  </div>
                   {store.assignments.filter(a => a.classId === selectedClassId).map(a => (
                     <Card key={a.id} className="hover:border-primary transition-all border-none shadow-sm group bg-white">
                       <CardContent className="p-5 flex justify-between items-center">
@@ -410,6 +414,7 @@ export default function ITestApp() {
     );
   }
 
+  // 4. Krok: Vykreslení nástěnky studenta
   if (currentUser.role === 'student') {
     const studentAssignments = store.assignments.filter(a => a.classId === currentUser.classId);
     return (

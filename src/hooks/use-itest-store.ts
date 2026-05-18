@@ -4,26 +4,26 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
 import { useFirestore } from '@/firebase/provider';
-import { collection, doc, setDoc, updateDoc, onSnapshot, DocumentData, QuerySnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { FirestorePermissionError } from '@/firebase/errors';
 
-// Pomocná funkce pro odstranění undefined hodnot před uložením do Firestore
+/**
+ * Pomocná funkce pro vyčištění dat před odesláním do Firestore.
+ * Firestore nepodporuje 'undefined' hodnoty.
+ */
 function cleanData(obj: any): any {
   if (obj === null || obj === undefined) return null;
-  
-  if (Array.isArray(obj)) {
-    return obj.map(v => cleanData(v)).filter(v => v !== undefined);
-  }
-  
+  if (Array.isArray(obj)) return obj.map(v => cleanData(v));
   if (typeof obj !== 'object') return obj;
   
   const clean: any = {};
   Object.keys(obj).forEach(key => {
     const val = obj[key];
-    if (val === undefined) return;
-    clean[key] = cleanData(val);
+    if (val !== undefined) {
+      clean[key] = cleanData(val);
+    }
   });
   return clean;
 }
@@ -32,6 +32,7 @@ export function useITestStore() {
   const db = useFirestore();
   const { toast } = useToast();
 
+  // Okamžitá obnova uživatele ze session storage pro plynulý start
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     if (typeof window !== 'undefined') {
       const saved = sessionStorage.getItem('itest_session');
@@ -52,25 +53,19 @@ export function useITestStore() {
     submissions: true
   });
 
+  // Aplikace je plně načtena až po synchronizaci všech kolekcí
   const isLoaded = useMemo(() => {
     return !loadingStates.users && !loadingStates.classes && !loadingStates.assignments && !loadingStates.submissions;
   }, [loadingStates]);
 
-  // Real-time sync s Firestore
+  // Hlavní synchronizační smyčka s cloudem
   useEffect(() => {
     if (!db) return;
 
+    // Listenery pro real-time aktualizace
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const fetchedUsers = snap.docs.map(d => ({ ...d.data(), id: d.id } as User));
       setUsers(fetchedUsers);
-      
-      if (currentUser) {
-        const freshUser = fetchedUsers.find(u => u.id === currentUser.id);
-        if (freshUser) {
-          setCurrentUser(freshUser);
-          sessionStorage.setItem('itest_session', JSON.stringify(freshUser));
-        }
-      }
       setLoadingStates(prev => ({ ...prev, users: false }));
     }, (err) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'users', operation: 'list' }));
@@ -78,7 +73,8 @@ export function useITestStore() {
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
-      setClasses(snap.docs.map(d => ({ ...d.data(), id: d.id } as Class)));
+      const fetchedClasses = snap.docs.map(d => ({ ...d.data(), id: d.id } as Class));
+      setClasses(fetchedClasses);
       setLoadingStates(prev => ({ ...prev, classes: false }));
     }, (err) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'classes', operation: 'list' }));
@@ -107,25 +103,7 @@ export function useITestStore() {
       unsubAssignments();
       unsubSubmissions();
     };
-  }, [db, currentUser?.id]);
-
-  // Automatické vytvoření učitele pokud DB zeje prázdnotou
-  useEffect(() => {
-    if (!db || !isLoaded || users.length > 0) return;
-
-    const defaultTeacherId = 'default-teacher';
-    const defaultTeacher: User = {
-      id: defaultTeacherId,
-      name: 'Hlavní učitel',
-      role: 'teacher',
-      username: 'ucitel',
-      password: '123'
-    };
-    setDoc(doc(db, 'users', defaultTeacherId), cleanData(defaultTeacher))
-      .catch(err => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${defaultTeacherId}`, operation: 'create' }));
-      });
-  }, [db, isLoaded, users.length]);
+  }, [db]);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
@@ -163,9 +141,7 @@ export function useITestStore() {
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
     setDoc(doc(db, 'users', studentId), cleanData(newUser))
-      .then(() => {
-        toast({ title: "Žák zapsán", description: "Účet byl vytvořen v cloudové databázi." });
-      })
+      .then(() => toast({ title: "Žák zapsán", description: "Účet vytvořen v cloudové databázi." }))
       .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${studentId}`, operation: 'create' })));
   }, [db, toast]);
 
