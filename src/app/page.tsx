@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, User, PenTool } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, User, PenTool, Type } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -567,6 +567,13 @@ export default function ITestApp() {
                         </div>
                       ) : (
                         <div className="space-y-12">
+                          <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                            <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
+                              <Type className="w-5 h-5" />
+                            </div>
+                            <p className="text-sm font-medium text-primary">Můžeš odpovídat textem na klávesnici i perem/prstem v náčrtníku dole.</p>
+                          </div>
+
                           {assignment.questions.map((q, idx) => (
                             <div key={q.id} className="space-y-5 animate-fade-in" style={{ animationDelay: `${idx * 100}ms` }}>
                               <h5 className="font-bold text-2xl flex gap-4 items-start text-gray-900">
@@ -630,9 +637,9 @@ export default function ITestApp() {
 
                           <div className="pt-10 border-t space-y-6">
                             <h4 className="font-headline text-2xl text-primary flex items-center gap-3">
-                              <PenTool className="w-7 h-7 text-accent" /> Grafická příloha / Náčrtník
+                              <PenTool className="w-7 h-7 text-accent" /> Grafická příloha / Náčrtník (Pero, Prst, Myš)
                             </h4>
-                            <p className="text-muted-foreground text-sm">Sem můžeš nakreslit odpověď perem, myší nebo nahrát schéma, které vysvětluje tvé myšlenky.</p>
+                            <p className="text-muted-foreground text-sm">Sem můžeš nakreslit odpověď perem, myší nebo prstem. Skvělé pro schémata, grafy nebo ruční poznámky k úkolům.</p>
                             <DrawingPad onSave={setSketch} />
                           </div>
 
