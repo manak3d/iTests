@@ -14,6 +14,7 @@ import { GradePicker } from '@/components/itest/GradePicker';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { GRADES } from '@/lib/types';
 
 export default function ITestApp() {
@@ -21,6 +22,10 @@ export default function ITestApp() {
   const [authView, setAuthView] = useState<'login' | 'dashboard'>('login');
   const [loginRole, setLoginRole] = useState<'teacher' | 'student'>('teacher');
   const [username, setUsername] = useState('');
+  
+  // UI state for creation dialogs
+  const [isAddingClass, setIsAddingClass] = useState(false);
+  const [newClassName, setNewClassName] = useState('');
   
   // Teacher UI state
   const [activeTab, setActiveTab] = useState('classes');
@@ -39,6 +44,14 @@ export default function ITestApp() {
     e.preventDefault();
     if (store.login(loginRole, username)) {
       setAuthView('dashboard');
+    }
+  };
+
+  const handleAddClass = () => {
+    if (newClassName.trim()) {
+      store.addClass(newClassName);
+      setNewClassName('');
+      setIsAddingClass(false);
     }
   };
 
@@ -104,10 +117,7 @@ export default function ITestApp() {
               <p className="text-muted-foreground">Manage your classes, students, and assignments.</p>
             </div>
             {activeTab === 'classes' && !selectedClassId && (
-              <Button onClick={() => {
-                const name = prompt('Enter class name:');
-                if (name) store.addClass(name);
-              }}>
+              <Button onClick={() => setIsAddingClass(true)}>
                 <Plus className="w-4 h-4 mr-2" /> New Class
               </Button>
             )}
@@ -130,6 +140,7 @@ export default function ITestApp() {
                 <div className="col-span-full py-20 text-center space-y-4 bg-white/50 rounded-2xl border-2 border-dashed">
                   <School className="w-12 h-12 text-muted-foreground mx-auto opacity-20" />
                   <p className="text-muted-foreground font-medium">No classes yet. Create your first one to get started.</p>
+                  <Button onClick={() => setIsAddingClass(true)} variant="outline">Create Class</Button>
                 </div>
               ) : (
                 teacherClasses.map(c => (
@@ -297,6 +308,28 @@ export default function ITestApp() {
             </TabsContent>
           </Tabs>
         </main>
+
+        {/* Add Class Dialog */}
+        <Dialog open={isAddingClass} onOpenChange={setIsAddingClass}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Class</DialogTitle>
+              <DialogDescription>Enter a name for your new class. You can add students later.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Input 
+                placeholder="e.g. Mathematics 101" 
+                value={newClassName}
+                onChange={(e) => setNewClassName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddClass()}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddingClass(false)}>Cancel</Button>
+              <Button onClick={handleAddClass} disabled={!newClassName.trim()}>Create Class</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
