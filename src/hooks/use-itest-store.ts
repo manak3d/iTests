@@ -4,8 +4,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
 import { useFirestore } from '@/firebase/provider';
-import { collection, doc, setDoc, updateDoc, onSnapshot, getDocs, query, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, onSnapshot, DocumentData, QuerySnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export function useITestStore() {
   const db = useFirestore();
@@ -25,7 +27,7 @@ export function useITestStore() {
   });
 
   const isLoaded = useMemo(() => {
-    return !Object.values(loadingStates).some(loading => loading);
+    return !loadingStates.users && !loadingStates.classes && !loadingStates.assignments && !loadingStates.submissions;
   }, [loadingStates]);
 
   // Real-time sync with Firestore collections
@@ -49,6 +51,8 @@ export function useITestStore() {
       }
       
       setLoadingStates(prev => ({ ...prev, users: false }));
+    }, (err) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'users', operation: 'list' }));
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
@@ -61,16 +65,22 @@ export function useITestStore() {
         } as Class;
       }));
       setLoadingStates(prev => ({ ...prev, classes: false }));
+    }, (err) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'classes', operation: 'list' }));
     });
 
     const unsubAssignments = onSnapshot(collection(db, 'assignments'), (snap) => {
       setAssignments(snap.docs.map(d => ({ ...d.data(), id: d.id } as Assignment)));
       setLoadingStates(prev => ({ ...prev, assignments: false }));
+    }, (err) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'assignments', operation: 'list' }));
     });
 
     const unsubSubmissions = onSnapshot(collection(db, 'submissions'), (snap) => {
       setSubmissions(snap.docs.map(d => ({ ...d.data(), id: d.id } as Submission)));
       setLoadingStates(prev => ({ ...prev, submissions: false }));
+    }, (err) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'submissions', operation: 'list' }));
     });
 
     return () => {
@@ -81,34 +91,24 @@ export function useITestStore() {
     };
   }, [db]);
 
-  // Initial session restoration (immediate)
-  useEffect(() => {
-    const sessionUser = sessionStorage.getItem('itest_session');
-    if (sessionUser) {
-      try {
-        setCurrentUser(JSON.parse(sessionUser));
-      } catch (e) {}
-    }
-  }, []);
-
-  // Seeding initial teacher if DB is empty
+  // Seeding initial teacher if DB is empty (only if confirmed empty after load)
   useEffect(() => {
     if (!db || !isLoaded) return;
 
-    const seedData = async () => {
-      if (users.length === 0) {
-        const defaultTeacher: User = {
-          id: 'default-teacher',
-          name: 'Hlavní učitel',
-          role: 'teacher',
-          username: 'ucitel',
-          password: '123'
-        };
-        await setDoc(doc(db, 'users', defaultTeacher.id), defaultTeacher);
-      }
-    };
-
-    seedData();
+    if (users.length === 0) {
+      const defaultTeacherId = 'default-teacher';
+      const defaultTeacher: User = {
+        id: defaultTeacherId,
+        name: 'Hlavní učitel',
+        role: 'teacher',
+        username: 'ucitel',
+        password: '123'
+      };
+      setDoc(doc(db, 'users', defaultTeacherId), defaultTeacher)
+        .catch(async (err) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${defaultTeacherId}`, operation: 'create', requestResourceData: defaultTeacher }));
+        });
+    }
   }, [db, isLoaded, users.length]);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
@@ -126,7 +126,7 @@ export function useITestStore() {
     sessionStorage.removeItem('itest_session');
   }, []);
 
-  const addClass = useCallback(async (name: string) => {
+  const addClass = useCallback((name: string) => {
     if (!db || !currentUser) return;
     const classId = Math.random().toString(36).substring(2, 11);
     const newClass: Class = { 
@@ -135,47 +135,52 @@ export function useITestStore() {
       teacherId: currentUser.id, 
       studentIds: [] 
     };
-    try {
-      await setDoc(doc(db, 'classes', classId), newClass);
-      toast({ title: "Třída vytvořena", description: "Třída byla uložena do cloudu." });
-    } catch (e) {
-      console.error("Error adding class", e);
-      toast({ title: "Chyba při ukládání třídy", variant: "destructive" });
-    }
+    
+    setDoc(doc(db, 'classes', classId), newClass)
+      .then(() => {
+        toast({ title: "Třída vytvořena", description: "Třída byla uložena do cloudu." });
+      })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `classes/${classId}`, operation: 'create', requestResourceData: newClass }));
+      });
   }, [db, currentUser, toast]);
 
-  const addStudent = useCallback(async (classId: string, name: string, username: string, password?: string) => {
+  const addStudent = useCallback((classId: string, name: string, username: string, password?: string) => {
     if (!db) return;
     const studentId = Math.random().toString(36).substring(2, 11);
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
-    try {
-      await setDoc(doc(db, 'users', studentId), newUser);
-      const cls = classes.find(c => c.id === classId);
-      if (cls) {
-        await updateDoc(doc(db, 'classes', classId), {
-          studentIds: [...(cls.studentIds || []), studentId]
-        });
-      }
-    } catch (e) {
-      console.error("Error adding student", e);
-      toast({ title: "Chyba při přidávání žáka", variant: "destructive" });
-    }
-  }, [db, classes, toast]);
+    setDoc(doc(db, 'users', studentId), newUser)
+      .then(() => {
+        const cls = classes.find(c => c.id === classId);
+        if (cls) {
+          updateDoc(doc(db, 'classes', classId), {
+            studentIds: [...(cls.studentIds || []), studentId]
+          }).catch(async (err) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `classes/${classId}`, operation: 'update' }));
+          });
+        }
+      })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${studentId}`, operation: 'create', requestResourceData: newUser }));
+      });
+  }, [db, classes]);
 
-  const addAssignment = useCallback(async (assignment: Omit<Assignment, 'id'>) => {
+  const addAssignment = useCallback((assignment: Omit<Assignment, 'id'>) => {
     if (!db) return;
     const id = Math.random().toString(36).substring(2, 11);
-    try {
-      await setDoc(doc(db, 'assignments', id), { ...assignment, id });
-      toast({ title: "Práce publikována", description: "Úkol je nyní dostupný pro žáky v cloudu." });
-    } catch (e: any) {
-      console.error("Error adding assignment", e);
-      toast({ title: "Chyba při publikování práce", description: e.message, variant: "destructive" });
-    }
+    const newAssignment = { ...assignment, id };
+    
+    setDoc(doc(db, 'assignments', id), newAssignment)
+      .then(() => {
+        toast({ title: "Práce publikována", description: "Úkol je nyní dostupný pro žáky v cloudu." });
+      })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `assignments/${id}`, operation: 'create', requestResourceData: newAssignment }));
+      });
   }, [db, toast]);
 
-  const submitWork = useCallback(async (submission: Omit<Submission, 'id' | 'submittedAt'>) => {
+  const submitWork = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'>) => {
     if (!db) return;
     const id = Math.random().toString(36).substring(2, 11);
     const newSubmission = { 
@@ -183,24 +188,25 @@ export function useITestStore() {
       id,
       submittedAt: new Date().toISOString()
     };
-    try {
-      await setDoc(doc(db, 'submissions', id), newSubmission);
-      toast({ title: "Odevzdáno", description: "Vaše práce byla uložena do cloudu." });
-    } catch (e) {
-      console.error("Error submitting work", e);
-      toast({ title: "Chyba při odevzdávání", variant: "destructive" });
-    }
+    
+    setDoc(doc(db, 'submissions', id), newSubmission)
+      .then(() => {
+        toast({ title: "Odevzdáno", description: "Vaše práce byla uložena do cloudu." });
+      })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `submissions/${id}`, operation: 'create', requestResourceData: newSubmission }));
+      });
   }, [db, toast]);
 
-  const gradeSubmission = useCallback(async (id: string, grade: number, feedback: string) => {
+  const gradeSubmission = useCallback((id: string, grade: number, feedback: string) => {
     if (!db) return;
-    try {
-      await updateDoc(doc(db, 'submissions', id), { grade, feedback });
-      toast({ title: "Oznámkováno", description: "Hodnocení bylo uloženo v cloudu." });
-    } catch (e) {
-      console.error("Error grading submission", e);
-      toast({ title: "Chyba při ukládání známky", variant: "destructive" });
-    }
+    updateDoc(doc(db, 'submissions', id), { grade, feedback })
+      .then(() => {
+        toast({ title: "Oznámkováno", description: "Hodnocení bylo uloženo v cloudu." });
+      })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `submissions/${id}`, operation: 'update' }));
+      });
   }, [db, toast]);
 
   return {
