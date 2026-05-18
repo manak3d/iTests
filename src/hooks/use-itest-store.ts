@@ -9,6 +9,20 @@ import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
+// Pomocná funkce pro odstranění undefined hodnot před uložením do Firestore
+function cleanData(obj: any): any {
+  const clean: any = Array.isArray(obj) ? [] : {};
+  Object.keys(obj).forEach(key => {
+    if (obj[key] === undefined) return;
+    if (obj[key] !== null && typeof obj[key] === 'object') {
+      clean[key] = cleanData(obj[key]);
+    } else {
+      clean[key] = obj[key];
+    }
+  });
+  return clean;
+}
+
 export function useITestStore() {
   const db = useFirestore();
   const { toast } = useToast();
@@ -30,7 +44,7 @@ export function useITestStore() {
     return !loadingStates.users && !loadingStates.classes && !loadingStates.assignments && !loadingStates.submissions;
   }, [loadingStates]);
 
-  // Real-time sync with Firestore collections
+  // Real-time sync s Firestore
   useEffect(() => {
     if (!db) return;
 
@@ -38,7 +52,6 @@ export function useITestStore() {
       const fetchedUsers = snap.docs.map(d => ({ ...d.data(), id: d.id } as User));
       setUsers(fetchedUsers);
       
-      // Sync currentUser if already logged in via session
       const sessionUserStr = sessionStorage.getItem('itest_session');
       if (sessionUserStr) {
         try {
@@ -91,7 +104,7 @@ export function useITestStore() {
     };
   }, [db]);
 
-  // Seeding initial teacher if DB is empty (only if confirmed empty after load)
+  // Prvotní nasazení učitele
   useEffect(() => {
     if (!db || !isLoaded) return;
 
@@ -104,7 +117,7 @@ export function useITestStore() {
         username: 'ucitel',
         password: '123'
       };
-      setDoc(doc(db, 'users', defaultTeacherId), defaultTeacher)
+      setDoc(doc(db, 'users', defaultTeacherId), cleanData(defaultTeacher))
         .catch(async (err) => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${defaultTeacherId}`, operation: 'create', requestResourceData: defaultTeacher }));
         });
@@ -136,7 +149,7 @@ export function useITestStore() {
       studentIds: [] 
     };
     
-    setDoc(doc(db, 'classes', classId), newClass)
+    setDoc(doc(db, 'classes', classId), cleanData(newClass))
       .then(() => {
         toast({ title: "Třída vytvořena", description: "Třída byla uložena do cloudu." });
       })
@@ -150,7 +163,7 @@ export function useITestStore() {
     const studentId = Math.random().toString(36).substring(2, 11);
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
-    setDoc(doc(db, 'users', studentId), newUser)
+    setDoc(doc(db, 'users', studentId), cleanData(newUser))
       .then(() => {
         const cls = classes.find(c => c.id === classId);
         if (cls) {
@@ -171,11 +184,13 @@ export function useITestStore() {
     const id = Math.random().toString(36).substring(2, 11);
     const newAssignment = { ...assignment, id };
     
-    setDoc(doc(db, 'assignments', id), newAssignment)
+    // Použití cleanData pro jistotu, že neposíláme undefined do Firestore
+    setDoc(doc(db, 'assignments', id), cleanData(newAssignment))
       .then(() => {
         toast({ title: "Práce publikována", description: "Úkol je nyní dostupný pro žáky v cloudu." });
       })
       .catch(async (err) => {
+        console.error("Firebase Error:", err);
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `assignments/${id}`, operation: 'create', requestResourceData: newAssignment }));
       });
   }, [db, toast]);
@@ -189,7 +204,7 @@ export function useITestStore() {
       submittedAt: new Date().toISOString()
     };
     
-    setDoc(doc(db, 'submissions', id), newSubmission)
+    setDoc(doc(db, 'submissions', id), cleanData(newSubmission))
       .then(() => {
         toast({ title: "Odevzdáno", description: "Vaše práce byla uložena do cloudu." });
       })
@@ -200,7 +215,7 @@ export function useITestStore() {
 
   const gradeSubmission = useCallback((id: string, grade: number, feedback: string) => {
     if (!db) return;
-    updateDoc(doc(db, 'submissions', id), { grade, feedback })
+    updateDoc(doc(db, 'submissions', id), cleanData({ grade, feedback }))
       .then(() => {
         toast({ title: "Oznámkováno", description: "Hodnocení bylo uloženo v cloudu." });
       })
