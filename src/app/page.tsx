@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, User } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -116,21 +116,26 @@ export default function ITestApp() {
     );
   }
 
-  const user = store.currentUser!;
+  const currentUser = store.currentUser!;
 
   // TEACHER DASHBOARD
-  if (user.role === 'teacher') {
-    const teacherClasses = store.classes.filter(c => c.teacherId === user.id);
+  if (currentUser.role === 'teacher') {
+    const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
+    const selectedClass = store.classes.find(c => c.id === selectedClassId);
 
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar user={user} onLogout={() => { store.logout(); setAuthView('login'); }} />
+        <Navbar user={currentUser} onLogout={() => { store.logout(); setAuthView('login'); }} />
         
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-3xl font-headline font-bold text-primary">Teacher Dashboard</h1>
-              <p className="text-muted-foreground">Manage your classes, students, and assignments.</p>
+              <h1 className="text-3xl font-headline font-bold text-primary">
+                {selectedClass ? `${selectedClass.name}` : 'Teacher Dashboard'}
+              </h1>
+              <p className="text-muted-foreground">
+                {selectedClass ? 'Manage assignments and view students.' : 'Manage your classes, students, and assignments.'}
+              </p>
             </div>
             <div className="flex gap-2">
               {selectedClassId && (
@@ -177,6 +182,7 @@ export default function ITestApp() {
             <TabsList className="bg-white/50 border shadow-sm">
               <TabsTrigger value="classes" className="data-[state=active]:bg-primary data-[state=active]:text-white">Classes</TabsTrigger>
               <TabsTrigger value="assignments" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white">Assignments</TabsTrigger>
+              <TabsTrigger value="students" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white">Students</TabsTrigger>
               <TabsTrigger value="submissions" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white">Submissions</TabsTrigger>
             </TabsList>
 
@@ -191,7 +197,10 @@ export default function ITestApp() {
                   <Card 
                     key={c.id} 
                     className={`cursor-pointer transition-all hover:shadow-lg ${selectedClassId === c.id ? 'ring-2 ring-primary bg-primary/5' : ''}`} 
-                    onClick={() => { setSelectedClassId(c.id); }}
+                    onClick={() => { 
+                      setSelectedClassId(c.id); 
+                      setActiveTab('assignments');
+                    }}
                   >
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="font-headline text-xl">{c.name}</CardTitle>
@@ -262,19 +271,60 @@ export default function ITestApp() {
                   {store.assignments.filter(a => a.classId === selectedClassId).map(a => (
                     <Card key={a.id} className="hover:border-primary transition-colors">
                       <CardContent className="p-4 flex justify-between items-center">
-                        <div>
-                          <h4 className="font-bold text-lg">{a.title}</h4>
-                          <p className="text-sm text-muted-foreground">Due: {new Date(a.dueDate).toLocaleDateString()}</p>
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                            <ClipboardList className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-lg">{a.title}</h4>
+                            <p className="text-sm text-muted-foreground">Due: {new Date(a.dueDate).toLocaleDateString()}</p>
+                          </div>
                         </div>
                         <Badge variant="outline">{a.questions.length} Questions</Badge>
                       </CardContent>
                     </Card>
                   ))}
                   {store.assignments.filter(a => a.classId === selectedClassId).length === 0 && (
-                     <p className="text-center py-10 text-muted-foreground">No assignments for this class.</p>
+                     <div className="text-center py-20 bg-white/50 border-2 border-dashed rounded-xl">
+                       <p className="text-muted-foreground">No assignments for this class yet.</p>
+                       <Button variant="link" onClick={() => setIsCreatingAssignment(true)} className="mt-2">Create your first assignment</Button>
+                     </div>
                   )}
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="students">
+               <Card>
+                 <CardHeader>
+                   <CardTitle className="text-xl font-headline">Class Students</CardTitle>
+                   <CardDescription>All students currently enrolled in {selectedClass?.name}.</CardDescription>
+                 </CardHeader>
+                 <CardContent>
+                   <div className="divide-y">
+                     {store.users.filter(u => u.classId === selectedClassId).map(student => (
+                       <div key={student.id} className="py-4 flex items-center justify-between">
+                         <div className="flex items-center gap-3">
+                           <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent">
+                             <GraduationCap className="w-5 h-5" />
+                           </div>
+                           <div>
+                             <p className="font-medium">{student.name}</p>
+                             <p className="text-xs text-muted-foreground">Username: {student.username}</p>
+                           </div>
+                         </div>
+                         <Button variant="ghost" size="sm" className="text-muted-foreground">View Progress</Button>
+                       </div>
+                     ))}
+                     {store.users.filter(u => u.classId === selectedClassId).length === 0 && (
+                        <p className="text-center py-10 text-muted-foreground italic">No students added yet.</p>
+                     )}
+                   </div>
+                   <Button className="w-full mt-6" variant="outline" onClick={() => { setTargetClassId(selectedClassId); setIsAddingStudent(true); }}>
+                     <Plus className="w-4 h-4 mr-2" /> Add More Students
+                   </Button>
+                 </CardContent>
+               </Card>
             </TabsContent>
 
             <TabsContent value="submissions">
@@ -396,12 +446,12 @@ export default function ITestApp() {
   }
 
   // STUDENT DASHBOARD
-  if (user.role === 'student') {
-    const studentAssignments = store.assignments.filter(a => a.classId === user.classId);
+  if (currentUser.role === 'student') {
+    const studentAssignments = store.assignments.filter(a => a.classId === currentUser.classId);
     
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar user={user} onLogout={() => { store.logout(); setAuthView('login'); }} />
+        <Navbar user={currentUser} onLogout={() => { store.logout(); setAuthView('login'); }} />
         
         <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 space-y-8">
           {selectedAssignmentId ? (
@@ -409,7 +459,7 @@ export default function ITestApp() {
               <Button variant="ghost" onClick={() => setSelectedAssignmentId(null)}>← Back to Assignments</Button>
               {(() => {
                 const assignment = store.assignments.find(a => a.id === selectedAssignmentId);
-                const submission = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === user.id);
+                const submission = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === currentUser.id);
                 if (!assignment) return null;
                 
                 return (
@@ -506,7 +556,7 @@ export default function ITestApp() {
                             <Button className="w-full md:w-auto px-20 h-14 text-xl font-headline" onClick={() => {
                               store.submitWork({
                                 assignmentId: selectedAssignmentId!,
-                                studentId: user.id,
+                                studentId: currentUser.id,
                                 answers,
                                 drawings: sketch ? [sketch] : [],
                               });
@@ -537,7 +587,7 @@ export default function ITestApp() {
                   </div>
                 ) : (
                   studentAssignments.map(a => {
-                    const submission = store.submissions.find(s => s.assignmentId === a.id && s.studentId === user.id);
+                    const submission = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id);
                     return (
                       <Card key={a.id} className="cursor-pointer hover:shadow-md transition-all border-none" onClick={() => setSelectedAssignmentId(a.id)}>
                         <CardContent className="p-6 flex items-center justify-between">
