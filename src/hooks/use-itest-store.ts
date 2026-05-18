@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
 import { useFirestore } from '@/firebase/provider';
-import { collection, doc, setDoc, updateDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -32,11 +32,11 @@ export function useITestStore() {
   const db = useFirestore();
   const { toast } = useToast();
 
-  // Okamžitá obnova uživatele ze session storage pro plynulý start
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+  // Ukládáme pouze ID aktuálního uživatele, abychom objekt mohli vždy najít v čerstvých datech z DB
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
-      const saved = sessionStorage.getItem('itest_session');
-      return saved ? JSON.parse(saved) : null;
+      const saved = sessionStorage.getItem('itest_user_id');
+      return saved || null;
     }
     return null;
   });
@@ -58,11 +58,16 @@ export function useITestStore() {
     return !loadingStates.users && !loadingStates.classes && !loadingStates.assignments && !loadingStates.submissions;
   }, [loadingStates]);
 
+  // Dynamicky najdeme aktuálního uživatele v poli načtených uživatelů
+  const currentUser = useMemo(() => {
+    if (!currentUserId) return null;
+    return users.find(u => u.id === currentUserId) || null;
+  }, [currentUserId, users]);
+
   // Hlavní synchronizační smyčka s cloudem
   useEffect(() => {
     if (!db) return;
 
-    // Listenery pro real-time aktualizace
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const fetchedUsers = snap.docs.map(d => ({ ...d.data(), id: d.id } as User));
       setUsers(fetchedUsers);
@@ -108,16 +113,16 @@ export function useITestStore() {
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
     if (user) {
-      setCurrentUser(user);
-      sessionStorage.setItem('itest_session', JSON.stringify(user));
+      setCurrentUserId(user.id);
+      sessionStorage.setItem('itest_user_id', user.id);
       return true;
     }
     return false;
   }, [users]);
 
   const logout = useCallback(() => {
-    setCurrentUser(null);
-    sessionStorage.removeItem('itest_session');
+    setCurrentUserId(null);
+    sessionStorage.removeItem('itest_user_id');
   }, []);
 
   const addClass = useCallback((name: string) => {
