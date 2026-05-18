@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -18,6 +19,26 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
   const [fileUri, setFileUri] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  const compressImage = (dataUri: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        
+        // Max dimensions for background documents to save space
+        const MAX_WIDTH = 1000;
+        const scale = Math.min(1, MAX_WIDTH / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.src = dataUri;
+    });
+  };
 
   const addQuestion = (type: QuestionType) => {
     const newQuestion: Question = {
@@ -45,12 +66,15 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
     const reader = new FileReader();
     
     reader.onload = async (event) => {
-      const dataUri = event.target?.result as string;
-      setFileUri(dataUri);
+      const rawDataUri = event.target?.result as string;
       
       try {
+        // Compress the image immediately to save localStorage quota
+        const compressedUri = await compressImage(rawDataUri);
+        setFileUri(compressedUri);
+        
         toast({ title: "Zpracovávám dokument", description: "AI čte obsah souboru..." });
-        const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: dataUri });
+        const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: compressedUri });
         
         if (digitizeResult.error) {
           const isQuota = digitizeResult.error.includes('429') || digitizeResult.error.includes('RESOURCE_EXHAUSTED');
@@ -72,10 +96,9 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           const aiQuestionsResult = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
           
           if (aiQuestionsResult.error) {
-            console.warn("Question generation failed but text was extracted", aiQuestionsResult.error);
             toast({ 
               title: "Otázky nebyly vygenerovány", 
-              description: "Text byl úspěšně extrahován, ale otázky musíte vytvořit ručně kvůli limitům AI.",
+              description: "Text byl úspěšně extrahován, ale otázky musíte vytvořit ručně.",
               variant: "default" 
             });
           } else if (aiQuestionsResult.questions) {
@@ -92,10 +115,9 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           }
         }
       } catch (error: any) {
-        console.error("Critical AI Processing Error:", error);
         toast({ 
           title: "Chyba zpracování", 
-          description: "Nepodařilo se automaticky zpracovat dokument. Dokument je připojen jako podklad, zbytek zadejte ručně.",
+          description: "Nepodařilo se automaticky zpracovat dokument.",
           variant: "destructive" 
         });
       } finally {
@@ -103,11 +125,6 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       }
     };
     
-    reader.onerror = () => {
-      toast({ title: "Chyba při čtení souboru", variant: "destructive" });
-      setIsProcessing(false);
-    };
-
     reader.readAsDataURL(file);
   };
 
@@ -184,7 +201,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         
         {questions.length === 0 && (
           <div className="text-center py-12 bg-white/50 border-2 border-dashed rounded-xl">
-            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky. Můžete je přidat tlačítky níže.</p>
+            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky.</p>
           </div>
         )}
 

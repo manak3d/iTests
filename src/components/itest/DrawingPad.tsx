@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useRef, useState, useEffect } from 'react';
@@ -33,7 +34,6 @@ export function DrawingPad({
   const [lineWidth, setLineWidth] = useState(3);
   const [isEraser, setIsEraser] = useState(false);
 
-  // Initialize canvas and load background/initial drawing
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -47,17 +47,15 @@ export function DrawingPad({
       if (backgroundImage) {
         const img = new Image();
         img.onload = () => {
-          // Adjust canvas size to background image aspect ratio if possible
-          // For now keep standard size but draw background centered/fitted
           const hRatio = canvas.width / img.width;
           const vRatio = canvas.height / img.height;
           const ratio = Math.min(hRatio, vRatio);
           const centerShift_x = (canvas.width - img.width * ratio) / 2;
           const centerShift_y = (canvas.height - img.height * ratio) / 2;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
           
-          // Re-draw initial state if exists
           if (initialDrawing) {
             const drawImg = new Image();
             drawImg.onload = () => ctx.drawImage(drawImg, 0, 0);
@@ -65,17 +63,20 @@ export function DrawingPad({
           }
         };
         img.src = backgroundImage;
-      } else if (initialDrawing) {
-        const drawImg = new Image();
-        drawImg.onload = () => ctx.drawImage(drawImg, 0, 0);
-        drawImg.src = initialDrawing;
+      } else {
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (initialDrawing) {
+          const drawImg = new Image();
+          drawImg.onload = () => ctx.drawImage(drawImg, 0, 0);
+          drawImg.src = initialDrawing;
+        }
       }
     };
 
     drawBackground();
   }, [backgroundImage, initialDrawing]);
 
-  // Update context when tools change
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -131,7 +132,8 @@ export function DrawingPad({
     setIsDrawing(false);
     const canvas = canvasRef.current;
     if (canvas) {
-      onSave(canvas.toDataURL('image/png'));
+      // Use JPEG with 0.6 quality to significantly reduce localStorage usage
+      onSave(canvas.toDataURL('image/jpeg', 0.6));
     }
   };
 
@@ -141,7 +143,8 @@ export function DrawingPad({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     if (backgroundImage) {
       const img = new Image();
@@ -244,7 +247,7 @@ export function DrawingPad({
         <canvas
           ref={canvasRef}
           width={800}
-          height={backgroundImage ? 1100 : 400} // Taller for documents
+          height={backgroundImage ? 1100 : 400}
           onMouseDown={startDrawing}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}

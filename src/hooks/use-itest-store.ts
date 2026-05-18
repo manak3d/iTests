@@ -1,7 +1,9 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 export function useITestStore() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -10,8 +12,8 @@ export function useITestStore() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const { toast } = useToast();
 
-  // Initial load from localStorage
   useEffect(() => {
     const savedData = localStorage.getItem('itest_data');
     let initialUsers: User[] = [];
@@ -45,12 +47,22 @@ export function useITestStore() {
     setIsLoaded(true);
   }, []);
 
-  // Persistent sync
   useEffect(() => {
     if (!isLoaded) return;
-    const data = { classes, users, assignments, submissions };
-    localStorage.setItem('itest_data', JSON.stringify(data));
-  }, [classes, users, assignments, submissions, isLoaded]);
+    try {
+      const data = { classes, users, assignments, submissions };
+      localStorage.setItem('itest_data', JSON.stringify(data));
+    } catch (e) {
+      if (e instanceof Error && e.name === 'QuotaExceededError') {
+        toast({
+          title: "Paměť prohlížeče je plná",
+          description: "Nepodařilo se uložit změny. Smažte prosím staré úkoly nebo odevzdané práce.",
+          variant: "destructive"
+        });
+      }
+      console.error("LocalStorage sync failed", e);
+    }
+  }, [classes, users, assignments, submissions, isLoaded, toast]);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
