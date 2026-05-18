@@ -17,7 +17,7 @@ export function useITestStore() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load session from sessionStorage for faster UI
+  // Load session from sessionStorage for faster UI (only for the current logged-in user)
   useEffect(() => {
     const sessionUser = sessionStorage.getItem('itest_session');
     if (sessionUser) {
@@ -29,29 +29,33 @@ export function useITestStore() {
     }
   }, []);
 
-  // Seeding initial data if empty
+  // Seeding initial data if empty - Creates the main teacher account
   useEffect(() => {
     if (!db) return;
 
     const seedData = async () => {
-      const usersSnap = await getDocs(query(collection(db, 'users'), limit(1)));
-      if (usersSnap.empty) {
-        const defaultTeacher: User = {
-          id: 'default-teacher',
-          name: 'Hlavní učitel',
-          role: 'teacher',
-          username: 'ucitel',
-          password: '123'
-        };
-        await setDoc(doc(db, 'users', defaultTeacher.id), defaultTeacher);
-        console.log("Database seeded with default teacher account.");
+      try {
+        const usersSnap = await getDocs(query(collection(db, 'users'), limit(1)));
+        if (usersSnap.empty) {
+          const defaultTeacher: User = {
+            id: 'default-teacher',
+            name: 'Hlavní učitel',
+            role: 'teacher',
+            username: 'ucitel',
+            password: '123'
+          };
+          await setDoc(doc(db, 'users', defaultTeacher.id), defaultTeacher);
+          console.log("Database seeded with default teacher account.");
+        }
+      } catch (error) {
+        console.error("Error seeding data:", error);
       }
     };
 
     seedData();
   }, [db]);
 
-  // Real-time sync with Firestore
+  // Real-time sync with Firestore collections
   useEffect(() => {
     if (!db) return;
 
@@ -124,8 +128,10 @@ export function useITestStore() {
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
     try {
+      // 1. Save student to 'users' collection
       await setDoc(doc(db, 'users', studentId), newUser);
       
+      // 2. Update class metadata with the new student ID
       const cls = classes.find(c => c.id === classId);
       if (cls) {
         await updateDoc(doc(db, 'classes', classId), {
