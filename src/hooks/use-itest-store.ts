@@ -147,16 +147,6 @@ export function useITestStore() {
     if (!db) return;
     const id = Math.random().toString(36).substring(2, 11);
     try {
-      // Provedeme kontrolu velikosti před uložením do cloudu
-      const dataStr = JSON.stringify({ ...assignment, id });
-      if (dataStr.length > 1000000) { // Limit Firestore je cca 1MB
-        toast({ 
-          title: "Soubor je příliš velký", 
-          description: "Zkuste nahrát menší dokument nebo PDF s méně stránkami.",
-          variant: "destructive" 
-        });
-        return;
-      }
       await setDoc(doc(db, 'assignments', id), { ...assignment, id });
     } catch (e: any) {
       console.error("Error adding assignment", e);
