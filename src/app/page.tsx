@@ -17,6 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { GRADES } from '@/lib/types';
+import { Label } from '@/components/ui/label';
 
 export default function ITestApp() {
   const store = useITestStore();
@@ -27,6 +28,11 @@ export default function ITestApp() {
   // UI state for creation dialogs
   const [isAddingClass, setIsAddingClass] = useState(false);
   const [newClassName, setNewClassName] = useState('');
+
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentUsername, setNewStudentUsername] = useState('');
+  const [targetClassId, setTargetClassId] = useState<string | null>(null);
   
   // Teacher UI state
   const [activeTab, setActiveTab] = useState('classes');
@@ -53,6 +59,16 @@ export default function ITestApp() {
       store.addClass(newClassName);
       setNewClassName('');
       setIsAddingClass(false);
+    }
+  };
+
+  const handleAddStudent = () => {
+    if (newStudentName.trim() && newStudentUsername.trim() && targetClassId) {
+      store.addStudent(targetClassId, newStudentName, newStudentUsername);
+      setNewStudentName('');
+      setNewStudentUsername('');
+      setIsAddingStudent(false);
+      setTargetClassId(null);
     }
   };
 
@@ -186,15 +202,50 @@ export default function ITestApp() {
                         <span className="text-sm text-muted-foreground">{c.studentIds.length} Students</span>
                         <Button variant="ghost" size="sm" onClick={(e) => {
                           e.stopPropagation();
-                          const name = prompt('Student Name:');
-                          const username = prompt('Username:');
-                          if (name && username) store.addStudent(c.id, name, username);
+                          setTargetClassId(c.id);
+                          setIsAddingStudent(true);
                         }}>Add Student</Button>
                       </div>
                     </CardContent>
                   </Card>
                 ))
               )}
+
+              <Dialog open={isAddingStudent} onOpenChange={setIsAddingStudent}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Student to Class</DialogTitle>
+                    <DialogDescription>Create a new student account for this class.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Student Full Name</Label>
+                      <Input 
+                        placeholder="e.g. John Doe" 
+                        value={newStudentName}
+                        onChange={(e) => setNewStudentName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Username (for login)</Label>
+                      <Input 
+                        placeholder="e.g. john.doe" 
+                        value={newStudentUsername}
+                        onChange={(e) => setNewStudentUsername(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddingStudent(false)}>Cancel</Button>
+                    <Button 
+                      onClick={handleAddStudent} 
+                      disabled={!newStudentName.trim() || !newStudentUsername.trim()}
+                    >
+                      Add Student
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             <TabsContent value="assignments">
