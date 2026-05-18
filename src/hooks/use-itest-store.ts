@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -82,6 +83,7 @@ export function useITestStore() {
       studentIds: [] 
     };
     setClasses(prev => [...prev, newClass]);
+    return newClass;
   }, [currentUser]);
 
   const addStudent = useCallback((classId: string, name: string, username: string) => {
