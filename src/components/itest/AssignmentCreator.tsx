@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, Camera } from 'lucide-react';
+import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool } from 'lucide-react';
 import { Question, QuestionType, Assignment } from '@/lib/types';
 import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
 import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
@@ -46,12 +46,10 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       reader.onload = async (event) => {
         const dataUri = event.target?.result as string;
         
-        // Step 1: Extract Text
         toast({ title: "Zpracovávám dokument", description: "AI čte obsah souboru..." });
         const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: dataUri });
         setDescription(digitizeResult.extractedText);
         
-        // Step 2: Generate Questions
         toast({ title: "Generuji otázky", description: "AI navrhuje testové úlohy z textu..." });
         const aiQuestions = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
         
@@ -64,7 +62,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         }));
         
         setQuestions([...questions, ...newQs]);
-        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena a otázky vygenerovány." });
+        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena." });
       };
       reader.readAsDataURL(file);
     } catch (error) {
@@ -97,12 +95,10 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <label className="cursor-pointer flex-1 md:flex-none">
-                <Button variant="secondary" size="sm" asChild disabled={isProcessing} className="w-full">
-                  <span>
-                    {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
-                    Nahrát PDF / Foto
-                  </span>
-                </Button>
+                <div className="bg-white text-primary px-4 py-2 rounded-md text-sm font-bold flex items-center hover:bg-gray-100 transition-colors">
+                  {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
+                  Nahrát PDF / Foto
+                </div>
                 <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} />
               </label>
             </div>
@@ -121,10 +117,10 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           <div className="space-y-2">
             <label className="text-sm font-bold text-primary">Výchozí text / Instrukce</label>
             <Textarea 
-              placeholder="Zde se objeví extrahovaný text z dokumentu, se kterým můžete dále pracovat..." 
+              placeholder="Zde se objeví extrahovaný text z dokumentu..." 
               value={description} 
               onChange={e => setDescription(e.target.value)}
-              className="min-h-[200px] text-base"
+              className="min-h-[150px] text-base"
             />
           </div>
         </CardContent>
@@ -137,7 +133,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         
         {questions.length === 0 && (
           <div className="text-center py-12 bg-white/50 border-2 border-dashed rounded-xl">
-            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky. Nahrajte soubor nebo přidejte otázku ručně pomocí tlačítek níže.</p>
+            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky.</p>
           </div>
         )}
 
@@ -146,7 +142,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             <CardContent className="p-6 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
-                  {q.type.replace('_', ' ')}
+                  {q.type === 'drawing' ? 'Kresba / Ruční zápis' : q.type.replace('_', ' ')}
                 </span>
                 <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
                   <Trash2 className="w-4 h-4 text-destructive" />
@@ -183,23 +179,26 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
 
         <div className="flex flex-wrap gap-2 pt-4 justify-center">
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('short_answer')}>
-            <Plus className="w-4 h-4 mr-2" /> Krátká odpověď
+            <Plus className="w-4 h-4 mr-2" /> Krátká odp.
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('long_answer')}>
-            <Plus className="w-4 h-4 mr-2" /> Dlouhá odpověď
+            <Plus className="w-4 h-4 mr-2" /> Dlouhá odp.
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('multiple_choice')}>
-            <Plus className="w-4 h-4 mr-2" /> Výběr z možností
+            <Plus className="w-4 h-4 mr-2" /> Výběr (A-D)
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('true_false')}>
             <Plus className="w-4 h-4 mr-2" /> Ano / Ne
+          </Button>
+          <Button variant="secondary" size="sm" className="rounded-full bg-accent/10 text-accent hover:bg-accent/20" onClick={() => addQuestion('drawing')}>
+            <PenTool className="w-4 h-4 mr-2" /> Náčrt / Pero
           </Button>
         </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-8 border-t">
         <Button size="lg" className="w-full md:w-auto px-16 h-14 text-xl font-headline" onClick={handleSave}>
-          Publikovat pro žáky
+          Publikovat práci
         </Button>
       </div>
     </div>

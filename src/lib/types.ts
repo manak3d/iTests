@@ -16,7 +16,7 @@ export interface Class {
   studentIds: string[];
 }
 
-export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'true_false';
+export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'true_false' | 'drawing';
 
 export interface Question {
   id: string;
@@ -39,8 +39,8 @@ export interface Submission {
   id: string;
   assignmentId: string;
   studentId: string;
-  answers: Record<string, any>;
-  drawings?: string[]; // Base64 canvas data
+  answers: Record<string, any>; // Stores text or drawing data per question ID
+  questionDrawings: Record<string, string>; // Maps questionId to base64 drawing
   submittedAt: string;
   grade?: number; // 1-5
   feedback?: string;

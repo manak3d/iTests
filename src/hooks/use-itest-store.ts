@@ -28,12 +28,8 @@ export function useITestStore() {
       }
     }
     
-    // Ensure demo teacher exists if no users found
     if (initialUsers.length === 0) {
       initialUsers = [{ id: 't1', name: 'Dr. Smith', role: 'teacher', username: 'smith', password: 'password' }];
-    } else {
-      // Migrate old users if password missing
-      initialUsers = initialUsers.map(u => u.username === 'smith' && !u.password ? { ...u, password: 'password' } : u);
     }
     setUsers(initialUsers);
 
@@ -49,15 +45,10 @@ export function useITestStore() {
     setIsLoaded(true);
   }, []);
 
-  // Persistent sync to localStorage whenever data changes
+  // Persistent sync
   useEffect(() => {
     if (!isLoaded) return;
-    const data = {
-      classes,
-      users,
-      assignments,
-      submissions
-    };
+    const data = { classes, users, assignments, submissions };
     localStorage.setItem('itest_data', JSON.stringify(data));
   }, [classes, users, assignments, submissions, isLoaded]);
 
@@ -117,18 +108,7 @@ export function useITestStore() {
   }, []);
 
   return {
-    isLoaded,
-    currentUser,
-    classes,
-    users,
-    assignments,
-    submissions,
-    login,
-    logout,
-    addClass,
-    addStudent,
-    addAssignment,
-    submitWork,
-    gradeSubmission
+    isLoaded, currentUser, classes, users, assignments, submissions,
+    login, logout, addClass, addStudent, addAssignment, submitWork, gradeSubmission
   };
 }
