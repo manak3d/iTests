@@ -53,7 +53,16 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: dataUri });
         
         if (digitizeResult.error) {
-          throw new Error(digitizeResult.error);
+          const isQuota = digitizeResult.error.includes('429') || digitizeResult.error.includes('RESOURCE_EXHAUSTED');
+          toast({ 
+            title: isQuota ? "AI limit vyčerpán" : "Chyba AI", 
+            description: isQuota 
+              ? "Dosáhli jste limitu bezplatných požadavků. Dokument byl nahrán, ale text a otázky musíte doplnit ručně."
+              : digitizeResult.error,
+            variant: "destructive" 
+          });
+          setIsProcessing(false);
+          return;
         }
 
         if (digitizeResult.extractedText) {
@@ -63,10 +72,13 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           const aiQuestionsResult = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
           
           if (aiQuestionsResult.error) {
-            throw new Error(aiQuestionsResult.error);
-          }
-
-          if (aiQuestionsResult.questions) {
+            console.warn("Question generation failed but text was extracted", aiQuestionsResult.error);
+            toast({ 
+              title: "Otázky nebyly vygenerovány", 
+              description: "Text byl úspěšně extrahován, ale otázky musíte vytvořit ručně kvůli limitům AI.",
+              variant: "default" 
+            });
+          } else if (aiQuestionsResult.questions) {
             const newQs: Question[] = aiQuestionsResult.questions.map((q: any) => ({
               id: Math.random().toString(36).substr(2, 9),
               type: q.type as QuestionType,
@@ -76,18 +88,14 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             }));
             
             setQuestions(prev => [...prev, ...newQs]);
+            toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena pomocí AI." });
           }
-          toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena pomocí AI." });
         }
       } catch (error: any) {
-        console.error("AI Processing Error:", error);
-        const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
-        
+        console.error("Critical AI Processing Error:", error);
         toast({ 
-          title: "AI není momentálně k dispozici", 
-          description: isQuotaError 
-            ? "Byla vyčerpána kvóta pro bezplatné AI požadavky. Dokument byl nahrán, ale text a otázky musíte doplnit ručně." 
-            : "Nepodařilo se automaticky zpracovat dokument. Můžete jej však použít jako podklad a otázky dopsat ručně.",
+          title: "Chyba zpracování", 
+          description: "Nepodařilo se automaticky zpracovat dokument. Dokument je připojen jako podklad, zbytek zadejte ručně.",
           variant: "destructive" 
         });
       } finally {
