@@ -864,15 +864,57 @@ export default function ITestApp() {
                               }
                               const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
                               return (
-                                <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4 text-center space-y-2">
-                                  <div className="text-4xl font-black text-primary">Známka: {submission.grade || 'Nehodnoceno'}</div>
-                                  <div className="text-lg font-bold text-muted-foreground">Celkové body: {earned} / {totalMax} ({pct} %)</div>
-                                  {submission.feedback && (
-                                    <div className="mt-4 p-3 bg-white rounded-xl border border-primary/10 italic text-muted-foreground">
-                                      Odpověď učitele: "{submission.feedback}"
-                                    </div>
-                                  )}
-                                </div>
+                                  <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4 text-center space-y-4">
+                                    <div className="text-4xl font-black text-primary">Známka: {submission.grade || 'Nehodnoceno'}</div>
+                                    <div className="text-lg font-bold text-muted-foreground">Celkové body: {earned} / {totalMax} ({pct} %)</div>
+                                    
+                                    {submission.grade && (
+                                      <div className="flex flex-wrap gap-4 justify-center pt-2">
+                                        {[1, 2, 3, 4, 5].map((g) => {
+                                          const isActive = Number(submission.grade) === g;
+                                          const emoji = g === 1 ? '🤩' : g === 2 ? '😊' : g === 3 ? '😐' : g === 4 ? '😟' : '😢';
+                                          
+                                          const activeClass = g === 1 ? 'border-amber-400 bg-amber-50/50 text-amber-600 hover:border-amber-500 shadow-sm'
+                                                            : g === 2 ? 'border-green-400 bg-green-50/50 text-green-600 hover:border-green-500 shadow-sm'
+                                                            : g === 3 ? 'border-blue-400 bg-blue-50/50 text-blue-600 hover:border-blue-500 shadow-sm'
+                                                            : g === 4 ? 'border-orange-400 bg-orange-50/50 text-orange-600 hover:border-orange-500 shadow-sm'
+                                                            : 'border-primary bg-primary text-white shadow-lg';
+                                          
+                                          const textClass = isActive
+                                            ? (g === 5 ? 'text-white' : g === 1 ? 'text-amber-700' : g === 2 ? 'text-green-700' : g === 3 ? 'text-blue-700' : 'text-orange-700')
+                                            : 'text-muted-foreground';
+
+                                          const badgeBg = g === 1 ? 'bg-amber-400' : g === 2 ? 'bg-green-400' : g === 3 ? 'bg-blue-400' : g === 4 ? 'bg-orange-400' : 'bg-red-500';
+
+                                          return (
+                                            <button
+                                              key={g}
+                                              type="button"
+                                              className={`flex flex-col items-center gap-2 p-4 min-w-[80px] rounded-2xl border-2 transition-all hover:scale-105 active:scale-95 relative ${
+                                                isActive 
+                                                  ? activeClass 
+                                                  : 'border-gray-100 bg-white hover:border-primary/20 text-gray-400'
+                                              }`}
+                                            >
+                                              {isActive && (
+                                                <span className={`absolute -top-2.5 ${badgeBg} text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full shadow-sm tracking-widest animate-bounce`}>
+                                                  Tvoje Známka
+                                                </span>
+                                              )}
+                                              <span className="text-4xl">{emoji}</span>
+                                              <span className={`text-sm font-bold uppercase tracking-tighter ${textClass}`}>{g}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+
+                                    {submission.feedback && (
+                                      <div className="mt-4 p-3 bg-white rounded-xl border border-primary/10 italic text-muted-foreground">
+                                        Odpověď učitele: "{submission.feedback}"
+                                      </div>
+                                    )}
+                                  </div>
                               );
                             })()}
                           </div>
