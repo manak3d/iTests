@@ -17,7 +17,6 @@ export function useITestStore() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   
-  // Track loading state for each collection to ensure everything is ready
   const [loadingStates, setLoadingStates] = useState({
     users: true,
     classes: true,
@@ -29,49 +28,26 @@ export function useITestStore() {
     return !Object.values(loadingStates).some(loading => loading);
   }, [loadingStates]);
 
-  // Load session from sessionStorage
-  useEffect(() => {
-    const sessionUser = sessionStorage.getItem('itest_session');
-    if (sessionUser) {
-      try {
-        setCurrentUser(JSON.parse(sessionUser));
-      } catch (e) {
-        console.error("Session parse error", e);
-      }
-    }
-  }, []);
-
-  // Seeding initial data if empty
-  useEffect(() => {
-    if (!db) return;
-
-    const seedData = async () => {
-      try {
-        const usersSnap = await getDocs(query(collection(db, 'users'), limit(1)));
-        if (usersSnap.empty) {
-          const defaultTeacher: User = {
-            id: 'default-teacher',
-            name: 'Hlavní učitel',
-            role: 'teacher',
-            username: 'ucitel',
-            password: '123'
-          };
-          await setDoc(doc(db, 'users', defaultTeacher.id), defaultTeacher);
-        }
-      } catch (error) {
-        console.error("Error seeding data:", error);
-      }
-    };
-
-    seedData();
-  }, [db]);
-
   // Real-time sync with Firestore collections
   useEffect(() => {
     if (!db) return;
 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User)));
+      const fetchedUsers = snap.docs.map(d => ({ ...d.data(), id: d.id } as User));
+      setUsers(fetchedUsers);
+      
+      // Sync currentUser if already logged in via session
+      const sessionUserStr = sessionStorage.getItem('itest_session');
+      if (sessionUserStr) {
+        try {
+          const sessionUser = JSON.parse(sessionUserStr);
+          const freshUser = fetchedUsers.find(u => u.id === sessionUser.id);
+          if (freshUser) {
+            setCurrentUser(freshUser);
+          }
+        } catch (e) {}
+      }
+      
       setLoadingStates(prev => ({ ...prev, users: false }));
     });
 
@@ -104,6 +80,36 @@ export function useITestStore() {
       unsubSubmissions();
     };
   }, [db]);
+
+  // Initial session restoration (immediate)
+  useEffect(() => {
+    const sessionUser = sessionStorage.getItem('itest_session');
+    if (sessionUser) {
+      try {
+        setCurrentUser(JSON.parse(sessionUser));
+      } catch (e) {}
+    }
+  }, []);
+
+  // Seeding initial teacher if DB is empty
+  useEffect(() => {
+    if (!db || !isLoaded) return;
+
+    const seedData = async () => {
+      if (users.length === 0) {
+        const defaultTeacher: User = {
+          id: 'default-teacher',
+          name: 'Hlavní učitel',
+          role: 'teacher',
+          username: 'ucitel',
+          password: '123'
+        };
+        await setDoc(doc(db, 'users', defaultTeacher.id), defaultTeacher);
+      }
+    };
+
+    seedData();
+  }, [db, isLoaded, users.length]);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
