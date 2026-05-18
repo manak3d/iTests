@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
 
 export function useITestStore() {
@@ -11,36 +12,48 @@ export function useITestStore() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // Initial load
   useEffect(() => {
     const savedData = localStorage.getItem('itest_data');
     if (savedData) {
-      const parsed = JSON.parse(savedData);
-      setClasses(parsed.classes || []);
-      setUsers(parsed.users || []);
-      setAssignments(parsed.assignments || []);
-      setSubmissions(parsed.submissions || []);
-      
-      const sessionUser = sessionStorage.getItem('itest_session');
-      if (sessionUser) setCurrentUser(JSON.parse(sessionUser));
+      try {
+        const parsed = JSON.parse(savedData);
+        setClasses(parsed.classes || []);
+        setUsers(parsed.users || []);
+        setAssignments(parsed.assignments || []);
+        setSubmissions(parsed.submissions || []);
+      } catch (e) {
+        console.error("Failed to parse itest_data", e);
+      }
     } else {
       // Seed initial data for demo
       const demoTeacher = { id: 't1', name: 'Dr. Smith', role: 'teacher' as Role, username: 'smith' };
       setUsers([demoTeacher]);
-      localStorage.setItem('itest_data', JSON.stringify({ users: [demoTeacher], classes: [], assignments: [], submissions: [] }));
     }
+
+    const sessionUser = sessionStorage.getItem('itest_session');
+    if (sessionUser) {
+      try {
+        setCurrentUser(JSON.parse(sessionUser));
+      } catch (e) {
+        console.error("Failed to parse itest_session", e);
+      }
+    }
+    
     setIsLoaded(true);
   }, []);
 
-  const saveData = (updates: any) => {
+  // Persistent sync to localStorage whenever data changes
+  useEffect(() => {
+    if (!isLoaded) return;
     const data = {
       classes,
       users,
       assignments,
-      submissions,
-      ...updates
+      submissions
     };
     localStorage.setItem('itest_data', JSON.stringify(data));
-  };
+  }, [classes, users, assignments, submissions, isLoaded]);
 
   const login = (role: Role, username: string) => {
     const user = users.find(u => u.username === username && u.role === role);
@@ -59,29 +72,28 @@ export function useITestStore() {
 
   const addClass = (name: string) => {
     if (!currentUser) return;
-    const newClass: Class = { id: Math.random().toString(36).substr(2, 9), name, teacherId: currentUser.id, studentIds: [] };
-    const updated = [...classes, newClass];
-    setClasses(updated);
-    saveData({ classes: updated });
+    const newClass: Class = { 
+      id: Math.random().toString(36).substr(2, 9), 
+      name, 
+      teacherId: currentUser.id, 
+      studentIds: [] 
+    };
+    setClasses(prev => [...prev, newClass]);
   };
 
   const addStudent = (classId: string, name: string, username: string) => {
     const studentId = Math.random().toString(36).substr(2, 9);
     const newUser: User = { id: studentId, name, username, role: 'student', classId };
-    const updatedUsers = [...users, newUser];
-    const updatedClasses = classes.map(c => 
+    
+    setUsers(prev => [...prev, newUser]);
+    setClasses(prev => prev.map(c => 
       c.id === classId ? { ...c, studentIds: [...c.studentIds, studentId] } : c
-    );
-    setUsers(updatedUsers);
-    setClasses(updatedClasses);
-    saveData({ users: updatedUsers, classes: updatedClasses });
+    ));
   };
 
   const addAssignment = (assignment: Omit<Assignment, 'id'>) => {
     const newAssignment = { ...assignment, id: Math.random().toString(36).substr(2, 9) };
-    const updated = [...assignments, newAssignment];
-    setAssignments(updated);
-    saveData({ assignments: updated });
+    setAssignments(prev => [...prev, newAssignment]);
   };
 
   const submitWork = (submission: Omit<Submission, 'id' | 'submittedAt'>) => {
@@ -90,15 +102,11 @@ export function useITestStore() {
       id: Math.random().toString(36).substr(2, 9),
       submittedAt: new Date().toISOString()
     };
-    const updated = [...submissions, newSubmission];
-    setSubmissions(updated);
-    saveData({ submissions: updated });
+    setSubmissions(prev => [...prev, newSubmission]);
   };
 
   const gradeSubmission = (id: string, grade: number, feedback: string) => {
-    const updated = submissions.map(s => s.id === id ? { ...s, grade, feedback } : s);
-    setSubmissions(updated);
-    saveData({ submissions: updated });
+    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, grade, feedback } : s));
   };
 
   return {
