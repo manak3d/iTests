@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -42,12 +43,13 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
     if (!file) return;
 
     setIsProcessing(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const dataUri = event.target?.result as string;
-        setFileUri(dataUri); // Store the original file for student annotation
-        
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      const dataUri = event.target?.result as string;
+      setFileUri(dataUri); // Uložíme dokument pro vizuální podklad
+      
+      try {
         toast({ title: "Zpracovávám dokument", description: "AI čte obsah souboru..." });
         const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: dataUri });
         setDescription(digitizeResult.extractedText);
@@ -64,15 +66,29 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         }));
         
         setQuestions([...questions, ...newQs]);
-        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena." });
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Chyba při zpracování", description: "Nepodařilo se digitalizovat dokument.", variant: "destructive" });
-    } finally {
+        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena pomocí AI." });
+      } catch (error: any) {
+        console.error("AI Processing Error:", error);
+        const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
+        
+        toast({ 
+          title: "AI není momentálně k dispozici", 
+          description: isQuotaError 
+            ? "Byla vyčerpána kvóta pro bezplatné AI požadavky. Dokument byl nahrán, ale text a otázky musíte doplnit ručně." 
+            : "Nepodařilo se automaticky zpracovat dokument. Můžete jej však použít jako podklad a otázky dopsat ručně.",
+          variant: "destructive" 
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+    
+    reader.onerror = () => {
+      toast({ title: "Chyba při čtení souboru", variant: "destructive" });
       setIsProcessing(false);
-    }
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const handleSave = () => {
@@ -120,7 +136,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           <div className="space-y-2">
             <label className="text-sm font-bold text-primary">Výchozí text / Instrukce</label>
             <Textarea 
-              placeholder="Zde se objeví extrahovaný text z dokumentu..." 
+              placeholder="Zde se objeví extrahovaný text z dokumentu (nebo jej zadejte ručně)..." 
               value={description} 
               onChange={e => setDescription(e.target.value)}
               className="min-h-[150px] text-base"
@@ -148,7 +164,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
         
         {questions.length === 0 && (
           <div className="text-center py-12 bg-white/50 border-2 border-dashed rounded-xl">
-            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky.</p>
+            <p className="text-muted-foreground italic">Zatím nebyly přidány žádné otázky. Můžete je přidat tlačítky níže.</p>
           </div>
         )}
 
