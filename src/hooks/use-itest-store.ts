@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -62,7 +61,14 @@ export function useITestStore() {
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
-      setClasses(snap.docs.map(d => ({ ...d.data(), id: d.id } as Class)));
+      setClasses(snap.docs.map(d => {
+        const data = d.data();
+        return { 
+          ...data, 
+          id: d.id, 
+          studentIds: data.studentIds || [] 
+        } as Class;
+      }));
     });
 
     const unsubAssignments = onSnapshot(collection(db, 'assignments'), (snap) => {
@@ -123,7 +129,7 @@ export function useITestStore() {
       const cls = classes.find(c => c.id === classId);
       if (cls) {
         await updateDoc(doc(db, 'classes', classId), {
-          studentIds: [...cls.studentIds, studentId]
+          studentIds: [...(cls.studentIds || []), studentId]
         });
       }
     } catch (e) {

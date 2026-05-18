@@ -208,32 +208,37 @@ export default function ITestApp() {
             </TabsList>
 
             <TabsContent value="classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {teacherClasses.map(c => (
-                <Card 
-                  key={c.id} 
-                  className={`cursor-pointer transition-all hover:shadow-xl group overflow-hidden border-none ${selectedClassId === c.id ? 'ring-2 ring-primary bg-primary/5 shadow-inner' : 'bg-white'}`} 
-                  onClick={() => { 
-                    setSelectedClassId(c.id); 
-                    setActiveTab('assignments');
-                  }}
-                >
-                  <div className="h-2 bg-accent/20 w-full" />
-                  <CardHeader className="flex flex-row items-center justify-between pb-4">
-                    <CardTitle className="font-headline text-2xl group-hover:text-primary transition-colors">{c.name}</CardTitle>
-                    <Users className="w-6 h-6 text-accent opacity-40" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex justify-between items-center">
-                      <Badge variant="secondary" className="bg-primary/10 text-primary border-none">{c.studentIds.length} Žáků</Badge>
-                      <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary rounded-full" onClick={(e) => {
-                        e.stopPropagation();
-                        setTargetClassId(c.id);
-                        setIsAddingStudent(true);
-                      }}>Přidat žáka</Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {teacherClasses.map(c => {
+                const classStudents = store.users.filter(u => u.classId === c.id);
+                return (
+                  <Card 
+                    key={c.id} 
+                    className={`cursor-pointer transition-all hover:shadow-xl group overflow-hidden border-none ${selectedClassId === c.id ? 'ring-2 ring-primary bg-primary/5 shadow-inner' : 'bg-white'}`} 
+                    onClick={() => { 
+                      setSelectedClassId(c.id); 
+                      setActiveTab('assignments');
+                    }}
+                  >
+                    <div className="h-2 bg-accent/20 w-full" />
+                    <CardHeader className="flex flex-row items-center justify-between pb-4">
+                      <CardTitle className="font-headline text-2xl group-hover:text-primary transition-colors">{c.name}</CardTitle>
+                      <Users className="w-6 h-6 text-accent opacity-40" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex justify-between items-center">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
+                          {classStudents.length} {classStudents.length === 1 ? 'Žák' : (classStudents.length > 1 && classStudents.length < 5 ? 'Žáci' : 'Žáků')}
+                        </Badge>
+                        <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary rounded-full" onClick={(e) => {
+                          e.stopPropagation();
+                          setTargetClassId(c.id);
+                          setIsAddingStudent(true);
+                        }}>Přidat žáka</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
 
               <Dialog open={isAddingStudent} onOpenChange={setIsAddingStudent}>
                 <DialogContent>
