@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
 import { useFirestore } from '@/firebase/provider';
-import { collection, doc, setDoc, updateDoc, addDoc, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, onSnapshot, getDocs, query, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export function useITestStore() {
@@ -30,25 +30,47 @@ export function useITestStore() {
     }
   }, []);
 
+  // Seeding initial data if empty
+  useEffect(() => {
+    if (!db) return;
+
+    const seedData = async () => {
+      const usersSnap = await getDocs(query(collection(db, 'users'), limit(1)));
+      if (usersSnap.empty) {
+        const defaultTeacher: User = {
+          id: 'default-teacher',
+          name: 'Hlavní učitel',
+          role: 'teacher',
+          username: 'ucitel',
+          password: '123'
+        };
+        await setDoc(doc(db, 'users', defaultTeacher.id), defaultTeacher);
+        console.log("Database seeded with default teacher account.");
+      }
+    };
+
+    seedData();
+  }, [db]);
+
   // Real-time sync with Firestore
   useEffect(() => {
     if (!db) return;
 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
+      setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User)));
       setIsLoaded(true);
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
-      setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Class)));
+      setClasses(snap.docs.map(d => ({ ...d.data(), id: d.id } as Class)));
     });
 
     const unsubAssignments = onSnapshot(collection(db, 'assignments'), (snap) => {
-      setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Assignment)));
+      setAssignments(snap.docs.map(d => ({ ...d.data(), id: d.id } as Assignment)));
     });
 
     const unsubSubmissions = onSnapshot(collection(db, 'submissions'), (snap) => {
-      setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
+      setSubmissions(snap.docs.map(d => ({ ...d.data(), id: d.id } as Submission)));
     });
 
     return () => {
@@ -83,7 +105,11 @@ export function useITestStore() {
       teacherId: currentUser.id, 
       studentIds: [] 
     };
-    setDoc(doc(db, 'classes', classId), newClass);
+    try {
+      await setDoc(doc(db, 'classes', classId), newClass);
+    } catch (e) {
+      console.error("Error adding class", e);
+    }
   }, [db, currentUser]);
 
   const addStudent = useCallback(async (classId: string, name: string, username: string, password?: string) => {
@@ -91,20 +117,28 @@ export function useITestStore() {
     const studentId = Math.random().toString(36).substring(2, 11);
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
-    setDoc(doc(db, 'users', studentId), newUser);
-    
-    const cls = classes.find(c => c.id === classId);
-    if (cls) {
-      updateDoc(doc(db, 'classes', classId), {
-        studentIds: [...cls.studentIds, studentId]
-      });
+    try {
+      await setDoc(doc(db, 'users', studentId), newUser);
+      
+      const cls = classes.find(c => c.id === classId);
+      if (cls) {
+        await updateDoc(doc(db, 'classes', classId), {
+          studentIds: [...cls.studentIds, studentId]
+        });
+      }
+    } catch (e) {
+      console.error("Error adding student", e);
     }
   }, [db, classes]);
 
   const addAssignment = useCallback(async (assignment: Omit<Assignment, 'id'>) => {
     if (!db) return;
     const id = Math.random().toString(36).substring(2, 11);
-    setDoc(doc(db, 'assignments', id), { ...assignment, id });
+    try {
+      await setDoc(doc(db, 'assignments', id), { ...assignment, id });
+    } catch (e) {
+      console.error("Error adding assignment", e);
+    }
   }, [db]);
 
   const submitWork = useCallback(async (submission: Omit<Submission, 'id' | 'submittedAt'>) => {
@@ -115,12 +149,20 @@ export function useITestStore() {
       id,
       submittedAt: new Date().toISOString()
     };
-    setDoc(doc(db, 'submissions', id), newSubmission);
+    try {
+      await setDoc(doc(db, 'submissions', id), newSubmission);
+    } catch (e) {
+      console.error("Error submitting work", e);
+    }
   }, [db]);
 
   const gradeSubmission = useCallback(async (id: string, grade: number, feedback: string) => {
     if (!db) return;
-    updateDoc(doc(db, 'submissions', id), { grade, feedback });
+    try {
+      await updateDoc(doc(db, 'submissions', id), { grade, feedback });
+    } catch (e) {
+      console.error("Error grading submission", e);
+    }
   }, [db]);
 
   return {
