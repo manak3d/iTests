@@ -34,7 +34,6 @@ const prompt = ai.definePrompt({
   name: 'digitizePdfContentForAssignmentPrompt',
   input: {schema: DigitizePdfContentForAssignmentInputSchema},
   output: {schema: DigitizePdfContentForAssignmentOutputSchema},
-  model: 'googleai/gemini-1.5-flash',
   prompt: `You are an expert OCR and document analysis assistant. 
 Extract all text content from the provided document (PDF or Image). 
 Preserve the logical structure of the text but return it as a clean, plain, editable text suitable for creating educational assignments.
