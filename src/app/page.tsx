@@ -41,6 +41,9 @@ export default function ITestApp() {
 
   const [studentActionType, setStudentActionType] = useState<'create' | 'select'>('create');
   const [selectedExistingStudentId, setSelectedExistingStudentId] = useState('');
+
+  const [classSearch, setClassSearch] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
   
   const [activeTab, setActiveTab] = useState('classes');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -331,6 +334,7 @@ export default function ITestApp() {
                     setClassActionType('create');
                     setNewClassName('');
                     setSelectedExistingClassId('');
+                    setClassSearch('');
                   }
                 }}>
                   <DialogTrigger asChild>
@@ -363,10 +367,20 @@ export default function ITestApp() {
                     ) : (
                       <div className="py-4 space-y-2">
                         <Label className="text-sm text-muted-foreground">Vyberte třídu z databáze:</Label>
+                        <Input 
+                          placeholder="🔍 Vyhledat třídu..." 
+                          value={classSearch} 
+                          onChange={(e) => setClassSearch(e.target.value)} 
+                          className="mb-2"
+                        />
                         {(() => {
                           const availableClasses = store.classes.filter(c => c.teacherId !== currentUser.id);
                           if (availableClasses.length === 0) {
                             return <p className="text-sm text-amber-600 font-semibold py-2">Žádné další třídy nebyly v systému nalezeny.</p>;
+                          }
+                          const filtered = availableClasses.filter(c => c.name.toLowerCase().includes(classSearch.toLowerCase()));
+                          if (filtered.length === 0) {
+                            return <p className="text-sm text-amber-600 font-semibold py-2">Žádná třída neodpovídá vyhledávání.</p>;
                           }
                           return (
                             <select
@@ -374,8 +388,8 @@ export default function ITestApp() {
                               onChange={(e) => setSelectedExistingClassId(e.target.value)}
                               className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             >
-                              <option value="">-- Vyberte třídu --</option>
-                              {availableClasses.map(c => (
+                              <option value="">-- Vyberte třídu ({filtered.length}) --</option>
+                              {filtered.map(c => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                               ))}
                             </select>
@@ -725,6 +739,7 @@ export default function ITestApp() {
               setNewStudentUsername('');
               setNewStudentPassword('');
               setSelectedExistingStudentId('');
+              setStudentSearch('');
             }
           }}>
             <DialogContent aria-describedby={undefined}>
@@ -752,10 +767,23 @@ export default function ITestApp() {
               ) : (
                 <div className="py-4 space-y-2">
                   <Label className="text-sm text-muted-foreground">Vyberte žáka ze systému:</Label>
+                  <Input 
+                    placeholder="🔍 Vyhledat žáka podle jména nebo loginu..." 
+                    value={studentSearch} 
+                    onChange={(e) => setStudentSearch(e.target.value)} 
+                    className="mb-2"
+                  />
                   {(() => {
                     const availableStudents = store.users.filter(u => u.role === 'student' && u.classId !== targetClassId);
                     if (availableStudents.length === 0) {
                       return <p className="text-sm text-amber-600 font-semibold py-2">Žádní další žáci nebyli v systému nalezeni.</p>;
+                    }
+                    const filtered = availableStudents.filter(u => 
+                      u.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+                      u.username.toLowerCase().includes(studentSearch.toLowerCase())
+                    );
+                    if (filtered.length === 0) {
+                      return <p className="text-sm text-amber-600 font-semibold py-2">Žádný žák neodpovídá vyhledávání.</p>;
                     }
                     return (
                       <select
@@ -763,8 +791,8 @@ export default function ITestApp() {
                         onChange={(e) => setSelectedExistingStudentId(e.target.value)}
                         className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
-                        <option value="">-- Vyberte žáka --</option>
-                        {availableStudents.map(u => (
+                        <option value="">-- Vyberte žáka ({filtered.length}) --</option>
+                        {filtered.map(u => (
                           <option key={u.id} value={u.id}>{u.name} ({u.username})</option>
                         ))}
                       </select>
