@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
 import { useFirestore } from '@/firebase/provider';
 import { collection, doc, setDoc, updateDoc, onSnapshot, getDocs, query, limit } from 'firebase/firestore';
@@ -16,9 +16,20 @@ export function useITestStore() {
   const [users, setUsers] = useState<User[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  
+  // Track loading state for each collection to ensure everything is ready
+  const [loadingStates, setLoadingStates] = useState({
+    users: true,
+    classes: true,
+    assignments: true,
+    submissions: true
+  });
 
-  // Load session from sessionStorage for faster UI (only for the current logged-in user)
+  const isLoaded = useMemo(() => {
+    return !Object.values(loadingStates).some(loading => loading);
+  }, [loadingStates]);
+
+  // Load session from sessionStorage
   useEffect(() => {
     const sessionUser = sessionStorage.getItem('itest_session');
     if (sessionUser) {
@@ -30,7 +41,7 @@ export function useITestStore() {
     }
   }, []);
 
-  // Seeding initial data if empty - Creates the main teacher account
+  // Seeding initial data if empty
   useEffect(() => {
     if (!db) return;
 
@@ -46,7 +57,6 @@ export function useITestStore() {
             password: '123'
           };
           await setDoc(doc(db, 'users', defaultTeacher.id), defaultTeacher);
-          console.log("Database seeded with default teacher account.");
         }
       } catch (error) {
         console.error("Error seeding data:", error);
@@ -62,7 +72,7 @@ export function useITestStore() {
 
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User)));
-      setIsLoaded(true);
+      setLoadingStates(prev => ({ ...prev, users: false }));
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
@@ -74,14 +84,17 @@ export function useITestStore() {
           studentIds: data.studentIds || [] 
         } as Class;
       }));
+      setLoadingStates(prev => ({ ...prev, classes: false }));
     });
 
     const unsubAssignments = onSnapshot(collection(db, 'assignments'), (snap) => {
       setAssignments(snap.docs.map(d => ({ ...d.data(), id: d.id } as Assignment)));
+      setLoadingStates(prev => ({ ...prev, assignments: false }));
     });
 
     const unsubSubmissions = onSnapshot(collection(db, 'submissions'), (snap) => {
       setSubmissions(snap.docs.map(d => ({ ...d.data(), id: d.id } as Submission)));
+      setLoadingStates(prev => ({ ...prev, submissions: false }));
     });
 
     return () => {
@@ -118,6 +131,7 @@ export function useITestStore() {
     };
     try {
       await setDoc(doc(db, 'classes', classId), newClass);
+      toast({ title: "Třída vytvořena", description: "Třída byla uložena do cloudu." });
     } catch (e) {
       console.error("Error adding class", e);
       toast({ title: "Chyba při ukládání třídy", variant: "destructive" });
@@ -148,6 +162,7 @@ export function useITestStore() {
     const id = Math.random().toString(36).substring(2, 11);
     try {
       await setDoc(doc(db, 'assignments', id), { ...assignment, id });
+      toast({ title: "Práce publikována", description: "Úkol je nyní dostupný pro žáky v cloudu." });
     } catch (e: any) {
       console.error("Error adding assignment", e);
       toast({ title: "Chyba při publikování práce", description: e.message, variant: "destructive" });
@@ -164,6 +179,7 @@ export function useITestStore() {
     };
     try {
       await setDoc(doc(db, 'submissions', id), newSubmission);
+      toast({ title: "Odevzdáno", description: "Vaše práce byla uložena do cloudu." });
     } catch (e) {
       console.error("Error submitting work", e);
       toast({ title: "Chyba při odevzdávání", variant: "destructive" });
@@ -174,6 +190,7 @@ export function useITestStore() {
     if (!db) return;
     try {
       await updateDoc(doc(db, 'submissions', id), { grade, feedback });
+      toast({ title: "Oznámkováno", description: "Hodnocení bylo uloženo v cloudu." });
     } catch (e) {
       console.error("Error grading submission", e);
       toast({ title: "Chyba při ukládání známky", variant: "destructive" });

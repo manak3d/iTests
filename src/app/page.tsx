@@ -1,27 +1,27 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useITestStore } from '@/hooks/use-itest-store';
 import { Navbar } from '@/components/itest/Navbar';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, PenTool, FileText } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, PenTool, FileText, Loader2 } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
-import { GRADES } from '@/lib/types';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ITestApp() {
   const store = useITestStore();
   const { toast } = useToast();
+  
   const [authView, setAuthView] = useState<'login' | 'dashboard'>('login');
   const [loginRole, setLoginRole] = useState<'teacher' | 'student'>('teacher');
   const [username, setUsername] = useState('');
@@ -42,12 +42,25 @@ export default function ITestApp() {
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
   
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
-  const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
-  const [activeDrawingQuestion, setActiveDrawingQuestion] = useState<string | null>(null);
 
-  if (!store.isLoaded) return <div className="h-svh flex items-center justify-center font-headline text-primary animate-pulse">Načítám iTest v cloudu...</div>;
+  // Ensure authView stays in sync with store.currentUser upon reload
+  useEffect(() => {
+    if (store.isLoaded && store.currentUser) {
+      setAuthView('dashboard');
+    }
+  }, [store.isLoaded, store.currentUser]);
+
+  if (!store.isLoaded) {
+    return (
+      <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <div className="font-headline text-2xl text-primary font-bold animate-pulse">
+          Synchronizace iTest Cloudu...
+        </div>
+      </div>
+    );
+  }
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,7 +281,6 @@ export default function ITestApp() {
               </Dialog>
             </TabsContent>
 
-            {/* Zbytek obsahu tabů zůstává funkční... */}
             <TabsContent value="assignments">
               {isCreatingAssignment ? (
                 <div className="space-y-4">
@@ -296,6 +308,9 @@ export default function ITestApp() {
                       </CardContent>
                     </Card>
                   ))}
+                  {store.assignments.filter(a => a.classId === selectedClassId).length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground">Dosud nebyly vytvořeny žádné úkoly.</div>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -315,6 +330,9 @@ export default function ITestApp() {
                          <p className="text-xs text-muted-foreground">Login: {student.username}</p>
                        </div>
                      ))}
+                     {store.users.filter(u => u.classId === selectedClassId).length === 0 && (
+                       <div className="py-8 text-center text-muted-foreground">Třída zatím nemá žádné žáky.</div>
+                     )}
                    </div>
                  </CardContent>
                </Card>
@@ -336,15 +354,22 @@ export default function ITestApp() {
                            <CardDescription>Odevzdal: {student.name}</CardDescription>
                         </CardHeader>
                         <CardContent className="p-8 space-y-8">
-                          {sub.mainWorkDrawing && <img src={sub.mainWorkDrawing} className="w-full border rounded-2xl" />}
+                          {sub.mainWorkDrawing && (
+                            <div className="space-y-2">
+                              <label className="text-sm font-bold uppercase text-primary">Vypracovaný dokument</label>
+                              <img src={sub.mainWorkDrawing} className="w-full border rounded-2xl shadow-inner" />
+                            </div>
+                          )}
                           <div className="space-y-4">
+                            <label className="text-sm font-bold uppercase text-primary">Hodnocení učitele</label>
                             <GradePicker selected={sub.grade} onSelect={(v) => store.gradeSubmission(sub.id, v, sub.feedback || '')} />
                             <Textarea 
                                 placeholder="Slovní hodnocení..." 
                                 value={sub.feedback || ''}
                                 onChange={(e) => store.gradeSubmission(sub.id, sub.grade || 0, e.target.value)}
+                                className="min-h-[100px]"
                             />
-                            <Button className="w-full" onClick={() => setViewingSubmission(null)}>Uložit hodnocení</Button>
+                            <Button className="w-full h-12" onClick={() => setViewingSubmission(null)}>Uložit hodnocení v cloudu</Button>
                           </div>
                         </CardContent>
                       </Card>
@@ -360,12 +385,24 @@ export default function ITestApp() {
                     const student = store.users.find(u => u.id === s.studentId);
                     const assignment = store.assignments.find(a => a.id === s.assignmentId);
                     return (
-                      <div key={s.id} onClick={() => setViewingSubmission(s.id)} className="p-6 bg-white shadow-sm rounded-2xl flex items-center justify-between hover:shadow-lg cursor-pointer">
-                        <p className="font-bold">{student?.name} - {assignment?.title}</p>
-                        {s.grade ? <Badge>Známka: {s.grade}</Badge> : <Badge variant="secondary">Neopraveno</Badge>}
+                      <div key={s.id} onClick={() => setViewingSubmission(s.id)} className="p-6 bg-white shadow-sm rounded-2xl flex items-center justify-between hover:shadow-lg cursor-pointer transition-shadow">
+                        <div>
+                          <p className="font-bold text-lg">{student?.name}</p>
+                          <p className="text-sm text-muted-foreground">{assignment?.title}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {s.grade ? <Badge className="h-8 px-4 text-sm">Známka: {s.grade}</Badge> : <Badge variant="secondary" className="h-8 px-4 text-sm">Neopraveno</Badge>}
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </div>
                       </div>
                     );
                   })}
+                  {store.submissions.filter(s => {
+                    const a = store.assignments.find(as => as.id === s.assignmentId);
+                    return a?.classId === selectedClassId;
+                  }).length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground">Zatím nebyly odevzdány žádné práce.</div>
+                  )}
                 </div>
               )}
             </TabsContent>
@@ -375,7 +412,6 @@ export default function ITestApp() {
     );
   }
 
-  // Student view remains largely same but synchronized via Firestore
   if (currentUser.role === 'student') {
     const studentAssignments = store.assignments.filter(a => a.classId === currentUser.classId);
     return (
@@ -399,12 +435,23 @@ export default function ITestApp() {
                         <div className="text-center py-12 space-y-4">
                           <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
                           <h3 className="text-2xl font-bold">Práce byla odevzdána</h3>
-                          {submission.grade && <div className="text-4xl font-black text-primary">Známka: {submission.grade}</div>}
+                          {submission.grade && (
+                            <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4">
+                              <div className="text-4xl font-black text-primary">Známka: {submission.grade}</div>
+                              {submission.feedback && <p className="mt-4 text-muted-foreground italic">"{submission.feedback}"</p>}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-8">
-                          {a.fileUri && <DrawingPad backgroundImage={a.fileUri} onSave={setMainWorkDrawing} />}
-                          <Button className="w-full h-14 text-xl" onClick={() => {
+                          {a.fileUri ? (
+                            <DrawingPad backgroundImage={a.fileUri} onSave={setMainWorkDrawing} />
+                          ) : (
+                            <div className="p-12 text-center border-2 border-dashed rounded-3xl text-muted-foreground">
+                              Zadání neobsahuje vizuální podklad.
+                            </div>
+                          )}
+                          <Button className="w-full h-14 text-xl shadow-lg" onClick={() => {
                             store.submitWork({
                                 assignmentId: selectedAssignmentId,
                                 studentId: currentUser.id,
@@ -412,7 +459,7 @@ export default function ITestApp() {
                                 questionDrawings: {},
                                 mainWorkDrawing,
                             });
-                          }}>Odevzdat do cloudu</Button>
+                          }}>Odevzdat do iTest Cloudu</Button>
                         </div>
                       )}
                     </CardContent>
@@ -424,14 +471,23 @@ export default function ITestApp() {
             <div className="space-y-6">
               <h2 className="text-3xl font-headline font-bold text-primary">Moje cloudové úkoly</h2>
               <div className="grid gap-4">
-                {studentAssignments.map(a => (
-                  <Card key={a.id} className="cursor-pointer hover:shadow-lg" onClick={() => setSelectedAssignmentId(a.id)}>
-                    <CardContent className="p-6 flex justify-between items-center">
-                      <p className="font-bold text-xl">{a.title}</p>
-                      <ChevronRight className="w-6 h-6 text-gray-300" />
-                    </CardContent>
-                  </Card>
-                ))}
+                {studentAssignments.map(a => {
+                  const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id);
+                  return (
+                    <Card key={a.id} className="cursor-pointer hover:shadow-lg transition-all" onClick={() => setSelectedAssignmentId(a.id)}>
+                      <CardContent className="p-6 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-xl">{a.title}</p>
+                          {sub && <Badge variant={sub.grade ? "default" : "secondary"} className="mt-1">{sub.grade ? `Známka: ${sub.grade}` : 'Odevzdáno'}</Badge>}
+                        </div>
+                        <ChevronRight className="w-6 h-6 text-gray-300" />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {studentAssignments.length === 0 && (
+                  <div className="text-center py-24 bg-white rounded-3xl shadow-sm text-muted-foreground">Zatím nemáte zadané žádné úkoly.</div>
+                )}
               </div>
             </div>
           )}
