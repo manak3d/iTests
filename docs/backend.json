@@ -1,0 +1,82 @@
+
+{
+  "entities": {
+    "User": {
+      "title": "Uživatel",
+      "description": "Profil učitele nebo žáka v systému iTest.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["teacher", "student"] },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "classId": { "type": "string", "description": "ID třídy pro studenty" }
+      },
+      "required": ["id", "name", "role", "username"]
+    },
+    "Class": {
+      "title": "Třída",
+      "description": "Školní třída spravovaná učitelem.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "studentIds": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "name", "teacherId"]
+    },
+    "Assignment": {
+      "title": "Úkol",
+      "description": "Práce zadaná učitelem pro celou třídu.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "classId": { "type": "string" },
+        "questions": { "type": "array" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "fileUri": { "type": "string", "description": "Base64 dokumentu" }
+      },
+      "required": ["id", "title", "classId", "questions"]
+    },
+    "Submission": {
+      "title": "Odevzdání",
+      "description": "Vypracovaný úkol od studenta.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "mainWorkDrawing": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "grade": { "type": "number" },
+        "feedback": { "type": "string" }
+      },
+      "required": ["id", "assignmentId", "studentId", "submittedAt"]
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "#/entities/User",
+      "description": "Profily uživatelů"
+    },
+    "/classes/{classId}": {
+      "schema": "#/entities/Class",
+      "description": "Seznam tříd"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": "#/entities/Assignment",
+      "description": "Zadané úkoly"
+    },
+    "/submissions/{submissionId}": {
+      "schema": "#/entities/Submission",
+      "description": "Odevzdané práce"
+    }
+  }
+}

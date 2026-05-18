@@ -44,14 +44,16 @@ export default function ITestApp() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
 
-  // Synchronizace zobrazení s přihlášeným uživatelem
+  // Synchronizace zobrazení s přihlášeným uživatelem a čekání na plné načtení
   useEffect(() => {
-    if (store.currentUser) {
-      setAuthView('dashboard');
-    } else {
-      setAuthView('login');
+    if (store.isLoaded) {
+      if (store.currentUser) {
+        setAuthView('dashboard');
+      } else {
+        setAuthView('login');
+      }
     }
-  }, [store.currentUser]);
+  }, [store.currentUser, store.isLoaded]);
 
   if (!store.isLoaded) {
     return (
