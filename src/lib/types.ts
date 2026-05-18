@@ -24,6 +24,7 @@ export interface Question {
   text: string;
   options?: string[];
   correctAnswer?: string | number | boolean;
+  points?: number; // Body za otázku
 }
 
 export interface Assignment {
@@ -46,6 +47,7 @@ export interface Submission {
   submittedAt: string;
   grade?: number; // 1-5
   feedback?: string;
+  questionScores?: Record<string, number>; // Udelené body učiteľom
 }
 
 export const GRADES = [

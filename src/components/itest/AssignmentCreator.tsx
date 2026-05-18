@@ -6,10 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool } from 'lucide-react';
+import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera } from 'lucide-react';
 import { Question, QuestionType, Assignment } from '@/lib/types';
-import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
-import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
 import { useToast } from '@/hooks/use-toast';
 
 export function AssignmentCreator({ classId, onSave }: { classId: string; onSave: (a: Omit<Assignment, 'id'>) => void }) {
@@ -46,6 +44,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       id: Math.random().toString(36).substr(2, 9),
       type,
       text: '',
+      points: 1,
       options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
     };
     setQuestions([...questions, newQuestion]);
@@ -70,45 +69,11 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       const rawDataUri = event.target?.result as string;
       
       try {
-        // Komprese je klíčová pro uložení do cloudu
+        // Komprese obrazku
         const compressedUri = await compressImage(rawDataUri);
         setFileUri(compressedUri);
         
-        toast({ title: "Zpracovávám dokument", description: "AI čte obsah souboru..." });
-        const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: compressedUri });
-        
-        if (digitizeResult.error) {
-          const isQuota = digitizeResult.error.includes('429') || digitizeResult.error.includes('RESOURCE_EXHAUSTED');
-          toast({ 
-            title: isQuota ? "AI limit vyčerpán" : "Chyba AI", 
-            description: isQuota 
-              ? "Dokument byl nahrán do cloudu, ale text a otázky musíte doplnit ručně kvůli limitům AI."
-              : digitizeResult.error,
-            variant: "destructive" 
-          });
-          setIsProcessing(false);
-          return;
-        }
-
-        if (digitizeResult.extractedText) {
-          setDescription(digitizeResult.extractedText);
-          
-          toast({ title: "Generuji otázky", description: "AI navrhuje úkoly z textu..." });
-          const aiQuestionsResult = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
-          
-          if (!aiQuestionsResult.error && aiQuestionsResult.questions) {
-            const newQs: Question[] = aiQuestionsResult.questions.map((q: any) => ({
-              id: Math.random().toString(36).substr(2, 9),
-              type: q.type as QuestionType,
-              text: q.questionText,
-              options: q.options,
-              correctAnswer: q.correctAnswer ?? q.correctAnswerIndex,
-            }));
-            
-            setQuestions(prev => [...prev, ...newQs]);
-            toast({ title: "Cloudová synchronizace", description: "Data i otázky jsou připraveny k publikování." });
-          }
-        }
+        toast({ title: "Dokument připraven", description: "Soubor byl úspěšně připojen k úkolu." });
       } catch (error: any) {
         toast({ 
           title: "Chyba cloudu", 
@@ -148,9 +113,16 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
               <label className="cursor-pointer flex-1 md:flex-none">
                 <div className="bg-white text-primary px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center hover:bg-gray-100 transition-colors h-10 min-w-[150px]">
                   {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
-                  Nahrát do cloudu
+                  Nahrát soubor
                 </div>
                 <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} disabled={isProcessing} />
+              </label>
+              <label className="cursor-pointer flex-1 md:flex-none">
+                <div className="bg-white/20 text-white border border-white/40 px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center hover:bg-white/30 transition-colors h-10 min-w-[150px]">
+                  {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                  📸 Vyfotit dokument
+                </div>
+                <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleFileUpload} disabled={isProcessing} />
               </label>
             </div>
           </CardTitle>
@@ -199,9 +171,22 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             <Card key={q.id} className="border-l-4 border-l-accent animate-fade-in group shadow-sm">
               <CardContent className="p-6 space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
-                    {q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
+                      {q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-gray-50 border px-2 py-1 rounded-md">
+                      <span className="font-semibold">Body:</span>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="100" 
+                        value={q.points || 1} 
+                        onChange={e => updateQuestion(q.id, { points: parseInt(e.target.value) || 1 })}
+                        className="w-12 h-5 bg-transparent border-none text-center font-bold text-primary focus:outline-none p-0"
+                      />
+                    </div>
+                  </div>
                   <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>

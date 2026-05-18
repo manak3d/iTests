@@ -22,17 +22,23 @@ const SIZES = [
 export function DrawingPad({ 
   onSave, 
   backgroundImage, 
-  initialDrawing 
+  initialDrawing,
+  compact = false
 }: { 
   onSave: (data: string) => void; 
   backgroundImage?: string;
   initialDrawing?: string;
+  compact?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgImageRef = useRef<HTMLImageElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#295CA3');
-  const [lineWidth, setLineWidth] = useState(3);
+  const [lineWidth, setLineWidth] = useState(compact ? 2 : 3);
   const [isEraser, setIsEraser] = useState(false);
+
+  const canvasWidth = 800;
+  const canvasHeight = compact ? 250 : (backgroundImage ? 1100 : 400);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,17 +50,13 @@ export function DrawingPad({
     ctx.lineJoin = 'round';
 
     const drawBackground = () => {
+      // Vyčistíme canvas na plne transparentný
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
       if (backgroundImage) {
         const img = new Image();
         img.onload = () => {
-          const hRatio = canvas.width / img.width;
-          const vRatio = canvas.height / img.height;
-          const ratio = Math.min(hRatio, vRatio);
-          const centerShift_x = (canvas.width - img.width * ratio) / 2;
-          const centerShift_y = (canvas.height - img.height * ratio) / 2;
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+          bgImageRef.current = img; // Uložíme do referencie pre export
           
           if (initialDrawing) {
             const drawImg = new Image();
@@ -64,8 +66,6 @@ export function DrawingPad({
         };
         img.src = backgroundImage;
       } else {
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
         if (initialDrawing) {
           const drawImg = new Image();
           drawImg.onload = () => ctx.drawImage(drawImg, 0, 0);
@@ -83,9 +83,10 @@ export function DrawingPad({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.strokeStyle = isEraser ? '#FFFFFF' : color;
-    ctx.lineWidth = isEraser ? 30 : lineWidth;
-  }, [color, lineWidth, isEraser]);
+    ctx.strokeStyle = isEraser ? 'rgba(0,0,0,1)' : color;
+    ctx.lineWidth = isEraser ? (compact ? 20 : 30) : lineWidth;
+    ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
+  }, [color, lineWidth, isEraser, compact]);
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
     const canvas = canvasRef.current;
@@ -132,8 +133,34 @@ export function DrawingPad({
     setIsDrawing(false);
     const canvas = canvasRef.current;
     if (canvas) {
-      // Use JPEG with 0.6 quality to significantly reduce localStorage usage
-      onSave(canvas.toDataURL('image/jpeg', 0.6));
+      // Vytvoríme pomocné offscreen canvas na zlúčenie kresby s pozadím na biely podklad
+      const offscreen = document.createElement('canvas');
+      offscreen.width = canvas.width;
+      offscreen.height = canvas.height;
+      const oCtx = offscreen.getContext('2d');
+      if (oCtx) {
+        // 1. Vyplníme na bielo
+        oCtx.fillStyle = "#FFFFFF";
+        oCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+        
+        // 2. Ak máme pozadie, nakreslíme ho
+        if (backgroundImage && bgImageRef.current) {
+          const img = bgImageRef.current;
+          const hRatio = offscreen.width / img.width;
+          const vRatio = offscreen.height / img.height;
+          const ratio = Math.min(hRatio, vRatio);
+          const centerShift_x = (offscreen.width - img.width * ratio) / 2;
+          const centerShift_y = (offscreen.height - img.height * ratio) / 2;
+          oCtx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
+        }
+        
+        // 3. Nakreslíme kresbu na vrch
+        oCtx.drawImage(canvas, 0, 0);
+        
+        onSave(offscreen.toDataURL('image/jpeg', 0.6));
+      } else {
+        onSave(canvas.toDataURL('image/jpeg', 0.6));
+      }
     }
   };
 
@@ -143,25 +170,83 @@ export function DrawingPad({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    if (backgroundImage) {
-      const img = new Image();
-      img.onload = () => {
-        const hRatio = canvas.width / img.width;
-        const vRatio = canvas.height / img.height;
-        const ratio = Math.min(hRatio, vRatio);
-        const centerShift_x = (canvas.width - img.width * ratio) / 2;
-        const centerShift_y = (canvas.height - img.height * ratio) / 2;
-        ctx.drawImage(img, 0, 0, img.width, img.height, centerShift_x, centerShift_y, img.width * ratio, img.height * ratio);
-      };
-      img.src = backgroundImage;
-    }
-    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     onSave('');
   };
 
+  // === COMPACT MODE (mini kreslicí plocha pro otázky) ===
+  if (compact) {
+    return (
+      <div className="space-y-2 bg-gray-50 p-3 rounded-xl border border-dashed border-primary/20">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex gap-0.5 p-0.5 bg-white rounded-md border">
+              <button
+                type="button"
+                onClick={() => setIsEraser(false)}
+                className={cn(
+                  "px-2 py-1 rounded text-xs font-medium transition-all",
+                  !isEraser ? "bg-primary text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                )}
+              >
+                <Pencil className="w-3 h-3 inline mr-1" />Pero
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEraser(true)}
+                className={cn(
+                  "px-2 py-1 rounded text-xs font-medium transition-all",
+                  isEraser ? "bg-primary text-white shadow-sm" : "text-gray-500 hover:bg-gray-50"
+                )}
+              >
+                <Eraser className="w-3 h-3 inline mr-1" />Guma
+              </button>
+            </div>
+            <div className="flex gap-1">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => { setColor(c.value); setIsEraser(false); }}
+                  className={cn(
+                    "w-5 h-5 rounded-full border transition-transform hover:scale-110",
+                    color === c.value && !isEraser ? "border-primary scale-110 ring-1 ring-primary" : "border-gray-200"
+                  )}
+                  style={{ backgroundColor: c.value }}
+                  title={c.label}
+                />
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={clear}
+            className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" /> Smazat
+          </button>
+        </div>
+
+        <div className="relative overflow-hidden rounded-lg border-2 border-gray-100 bg-white shadow-sm">
+          <canvas
+            ref={canvasRef}
+            width={canvasWidth}
+            height={canvasHeight}
+            onMouseDown={startDrawing}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onMouseMove={draw}
+            onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
+            onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
+            onTouchMove={(e) => { e.preventDefault(); draw(e); }}
+            className="w-full cursor-crosshair touch-none bg-white"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // === FULL MODE (plnohodnotná kreslicí plocha) ===
   return (
     <div className="space-y-4 bg-white p-6 rounded-2xl border-2 border-primary/10 shadow-inner">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6">
@@ -243,11 +328,18 @@ export function DrawingPad({
         </div>
       </div>
 
-      <div className="relative group overflow-hidden rounded-xl border-4 border-gray-50 bg-white shadow-lg">
+      <div className="relative group overflow-hidden rounded-xl border-4 border-gray-50 bg-white shadow-lg flex items-center justify-center" style={{ minHeight: backgroundImage ? undefined : canvasHeight }}>
+        {backgroundImage && (
+          <img 
+            src={backgroundImage} 
+            alt="Podklad" 
+            className="absolute top-0 left-0 w-full h-full object-contain pointer-events-none"
+          />
+        )}
         <canvas
           ref={canvasRef}
-          width={800}
-          height={backgroundImage ? 1100 : 400}
+          width={canvasWidth}
+          height={canvasHeight}
           onMouseDown={startDrawing}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
@@ -255,9 +347,9 @@ export function DrawingPad({
           onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
           onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
           onTouchMove={(e) => { e.preventDefault(); draw(e); }}
-          className="drawing-canvas w-full cursor-crosshair touch-none bg-white"
+          className="drawing-canvas w-full cursor-crosshair touch-none bg-transparent relative z-10"
         />
-        <div className="absolute inset-0 pointer-events-none border-2 border-transparent group-hover:border-primary/20 transition-colors rounded-lg" />
+        <div className="absolute inset-0 pointer-events-none border-2 border-transparent group-hover:border-primary/20 transition-colors rounded-lg z-20" />
       </div>
       
       <div className="flex justify-center">

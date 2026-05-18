@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useITestStore } from '@/hooks/use-itest-store';
 import { Navbar } from '@/components/itest/Navbar';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2 } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -39,10 +39,63 @@ export default function ITestApp() {
   const [activeTab, setActiveTab] = useState('classes');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
+  const [viewingAssignment, setViewingAssignment] = useState<string | null>(null);
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
-  
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
+  const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
+  const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
+  const [questionDrawingOpen, setQuestionDrawingOpen] = useState<Record<string, boolean>>({});
+  
+  const [evalGrade, setEvalGrade] = useState<number | undefined>();
+  const [evalFeedback, setEvalFeedback] = useState<string>('');
+  const [evalScores, setEvalScores] = useState<Record<string, number>>({});
+  const [isGradeManuallySet, setIsGradeManuallySet] = useState(false);
+
+  useEffect(() => {
+    if (viewingSubmission) {
+      const sub = store.submissions.find(s => s.id === viewingSubmission);
+      if (sub) {
+        setEvalGrade(sub.grade);
+        setEvalFeedback(sub.feedback || '');
+        setIsGradeManuallySet(!!sub.grade);
+        
+        let scores: Record<string, number> = {};
+        if (sub.questionScores) {
+          if (sub.questionScores instanceof Map) {
+            sub.questionScores.forEach((val, key) => {
+              scores[key] = val;
+            });
+          } else {
+            scores = { ...sub.questionScores };
+          }
+        }
+        setEvalScores(scores);
+      }
+    }
+  }, [viewingSubmission, store.submissions]);
+
+  // Live výpočet a pre-selekcia navrhovanej známky podľa bodového zisku
+  useEffect(() => {
+    if (!viewingSubmission) return;
+    const sub = store.submissions.find(s => s.id === viewingSubmission);
+    const assignment = store.assignments.find(a => a.id === sub?.assignmentId);
+    if (!assignment) return;
+
+    const totalMax = assignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+    const totalEarned = assignment.questions?.reduce((acc, q) => acc + (evalScores[q.id] || 0), 0) || 0;
+    const pct = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
+
+    let suggested = 5;
+    if (pct >= 85) suggested = 1;
+    else if (pct >= 65) suggested = 2;
+    else if (pct >= 45) suggested = 3;
+    else if (pct >= 25) suggested = 4;
+
+    if (!isGradeManuallySet) {
+      setEvalGrade(suggested);
+    }
+  }, [evalScores, isGradeManuallySet, viewingSubmission, store.submissions, store.assignments]);
 
   if (!store.isLoaded) {
     return (
@@ -56,17 +109,69 @@ export default function ITestApp() {
     );
   }
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authMode === 'login') {
-      if (!store.login(loginRole, username, password)) {
-        toast({ title: "Přihlášení se nezdařilo", variant: "destructive" });
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, role: loginRole })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          toast({ title: "Úspěšně přihlášeno", description: "Vítejte zpět!" });
+          // Zde proběhne synchronizace stavu pro aplikaci - použijeme forceLogin z hooku
+          store.forceLogin(data.user.id, data.user.role, data.user.username, data.user.name, data.user.classId);
+        } else {
+          // Fallback na Firebase pokud selže MongoDB
+          if (!store.login(loginRole, username, password)) {
+            toast({ title: "Přihlášení se nezdařilo", description: data.error, variant: "destructive" });
+          } else {
+            toast({ title: "Přihlášeno přes starý systém", description: "Doporučujeme vytvořit nový účet v DB." });
+          }
+        }
+      } catch (error) {
+        toast({ title: "Chyba serveru", variant: "destructive" });
       }
     } else {
       if (name && username && password) {
-        store.register(name, username, password);
-        setAuthMode('login');
-        toast({ title: "Registrace úspěšná", description: "Nyní se můžete přihlásit." });
+        try {
+          const nameParts = name.split(' ');
+          const firstName = nameParts[0] || 'Neznámé';
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
+          
+          const response = await fetch('/api/teachers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              firstName,
+              lastName,
+              email: `${username}@skola.cz`,
+              username,
+              password,
+              subjects: []
+            })
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            toast({ title: "Registrace selhala", description: data.error || "Chyba databáze", variant: "destructive" });
+            return; // Nepokračujeme dál
+          }
+
+          // Pokud MongoDB projde, uložíme i do lokálního Firebase store pro kompatibilitu
+          store.register(name, username, password);
+          setAuthMode('login');
+          toast({ title: "Registrace úspěšná", description: "Účet byl vytvořen, můžete se přihlásit." });
+
+        } catch (error) {
+          console.error("Chyba při zápisu do MongoDB:", error);
+          toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+        }
       }
     }
   };
@@ -79,9 +184,37 @@ export default function ITestApp() {
     }
   };
 
-  const handleAddStudent = () => {
-    if (newStudentName.trim() && newStudentUsername.trim() && newStudentPassword.trim() && targetClassId) {
+  const handleAddStudent = async () => {
+    if (!newStudentName.trim() || !newStudentUsername.trim() || !newStudentPassword.trim()) {
+      toast({ title: "Chyba", description: "Musíte vyplnit všechna pole (jméno, login i heslo).", variant: "destructive" });
+      return;
+    }
+    
+    if (targetClassId) {
+      // 1. Uložení do Firebase (původní)
       store.addStudent(targetClassId, newStudentName, newStudentUsername, newStudentPassword);
+      
+      // 2. Uložení do MongoDB
+      try {
+        const nameParts = newStudentName.split(' ');
+        const firstName = nameParts[0] || 'Neznámé';
+        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
+
+        await fetch('/api/students', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            username: newStudentUsername,
+            password: newStudentPassword,
+            classroomId: targetClassId // Pozn.: Musí se shodovat s formátem ObjectID v MongoDB!
+          })
+        });
+      } catch (error) {
+        console.error("Chyba při zápisu žáka do MongoDB:", error);
+      }
+
       setNewStudentName('');
       setNewStudentUsername('');
       setNewStudentPassword('');
@@ -192,7 +325,7 @@ export default function ITestApp() {
                       <Plus className="w-4 h-4 mr-2" /> Nová třída
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent aria-describedby={undefined}>
                     <DialogHeader>
                       <DialogTitle>Vytvořit novou třídu</DialogTitle>
                     </DialogHeader>
@@ -245,7 +378,42 @@ export default function ITestApp() {
 
             {/* Zbytek obsahu Tabs zůstává zachován */}
             <TabsContent value="assignments">
-              {isCreatingAssignment ? (
+              {viewingAssignment ? (
+                <div className="space-y-4">
+                  <Button variant="ghost" className="rounded-full" onClick={() => setViewingAssignment(null)}>← Zpět</Button>
+                  {(() => {
+                    const a = store.assignments.find(x => x.id === viewingAssignment);
+                    if (!a) return null;
+                    return (
+                      <Card className="border-none shadow-xl bg-white p-8">
+                        <h2 className="text-3xl font-headline font-bold text-primary">{a.title}</h2>
+                        <p className="text-muted-foreground mt-2 text-lg">{a.description}</p>
+                        
+                        {a.questions && a.questions.length > 0 && (
+                          <div className="mt-8">
+                            <h3 className="font-semibold text-xl mb-4">Otázky v testu:</h3>
+                            <div className="space-y-3">
+                              {a.questions.map(q => (
+                                <div key={q.id} className="p-4 bg-gray-50 rounded-lg flex justify-between items-center">
+                                  <span className="font-medium">{q.text}</span>
+                                  <Badge variant="outline">{q.type}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {a.fileUri && (
+                           <div className="mt-8">
+                              <h3 className="font-semibold text-xl mb-4">Připojený dokument / Nákres:</h3>
+                              <img src={a.fileUri} className="w-full max-w-3xl border shadow-sm rounded-xl" />
+                           </div>
+                        )}
+                      </Card>
+                    );
+                  })()}
+                </div>
+              ) : isCreatingAssignment ? (
                 <div className="space-y-4">
                   <Button variant="ghost" className="rounded-full" onClick={() => setIsCreatingAssignment(false)}>← Zpět</Button>
                   <AssignmentCreator classId={selectedClassId!} onSave={(a) => {
@@ -261,13 +429,28 @@ export default function ITestApp() {
                     </Button>
                   </div>
                   {store.assignments.filter(a => a.classId === selectedClassId).map(a => (
-                    <Card key={a.id} className="hover:border-primary transition-all border-none shadow-sm bg-white">
+                    <Card key={a.id} className="hover:border-primary cursor-pointer transition-all border-none shadow-sm bg-white" onClick={() => setViewingAssignment(a.id)}>
                       <CardContent className="p-5 flex justify-between items-center">
                         <div className="flex items-center gap-5">
                           <ClipboardList className="w-6 h-6 text-primary" />
                           <h4 className="font-bold text-xl">{a.title}</h4>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-gray-300" />
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Opravdu chcete smazat úkol "${a.title}"? Tím smažete i všechny odevzdané práce žáků.`)) {
+                                store.deleteAssignment(a.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </Button>
+                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
@@ -309,20 +492,122 @@ export default function ITestApp() {
                            <CardDescription>Odevzdal: {student.name}</CardDescription>
                         </CardHeader>
                         <CardContent className="p-8 space-y-8">
+                          {assignment.questions && assignment.questions.length > 0 && (
+                            <div className="space-y-4">
+                              <label className="text-sm font-bold uppercase text-primary">Odpovědi na otázky</label>
+                              <div className="space-y-4">
+                                {assignment.questions.map((q, index) => {
+                                  const answer = sub.answers?.[q.id];
+                                  const drawing = sub.questionDrawings?.[q.id];
+                                  return (
+                                    <div key={q.id} className="p-4 bg-gray-50 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                      <div className="flex-1 space-y-2">
+                                        <div className="flex justify-between items-start mb-2">
+                                          <p className="font-semibold">{index + 1}. {q.text}</p>
+                                          <Badge variant="outline">{q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}</Badge>
+                                        </div>
+                                        
+                                        {q.type !== 'drawing' && (
+                                          <div className="mt-2">
+                                            <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
+                                            {answer === undefined || answer === null || answer === '' ? (
+                                              <span className="italic text-gray-400">Neodpovězeno</span>
+                                            ) : q.type === 'multiple_choice' ? (
+                                              <span className="font-bold">{String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}</span>
+                                            ) : q.type === 'true_false' ? (
+                                              <span className="font-bold">{answer ? '✓ Ano' : '✗ Ne'}</span>
+                                            ) : (
+                                              <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {drawing && (
+                                          <div className="mt-3">
+                                            <span className="text-sm font-medium text-muted-foreground block mb-1">Přiložená kresba:</span>
+                                            <img src={drawing} className="border rounded-xl max-w-full max-h-64 object-contain bg-white" />
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Points Picker */}
+                                      <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border self-stretch md:self-auto justify-center md:justify-start">
+                                        <span className="text-sm font-bold text-muted-foreground">Body:</span>
+                                        <input 
+                                          type="number"
+                                          min="0"
+                                          max={q.points || 1}
+                                          value={evalScores[q.id] !== undefined ? evalScores[q.id] : 0}
+                                          onChange={(e) => {
+                                            const val = Math.min(q.points || 1, Math.max(0, parseInt(e.target.value) || 0));
+                                            setEvalScores(prev => ({ ...prev, [q.id]: val }));
+                                          }}
+                                          className="w-12 text-center font-bold text-primary border bg-gray-50 rounded p-1"
+                                        />
+                                        <span className="text-sm font-bold text-muted-foreground">/ {q.points || 1}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
                           {sub.mainWorkDrawing && (
                             <div className="space-y-2">
                               <label className="text-sm font-bold uppercase text-primary">Vypracovaný dokument</label>
                               <img src={sub.mainWorkDrawing} className="w-full border rounded-2xl" />
                             </div>
                           )}
-                          <div className="space-y-4">
-                            <GradePicker selected={sub.grade} onSelect={(v) => store.gradeSubmission(sub.id, v, sub.feedback || '')} />
+
+                          {(() => {
+                            const totalMax = assignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                            const totalEarned = assignment.questions?.reduce((acc, q) => acc + (evalScores[q.id] || 0), 0) || 0;
+                            const pct = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
+                            
+                            let suggestedGrade = 5;
+                            if (pct >= 85) suggestedGrade = 1;
+                            else if (pct >= 65) suggestedGrade = 2;
+                            else if (pct >= 45) suggestedGrade = 3;
+                            else if (pct >= 25) suggestedGrade = 4;
+
+                            return (
+                              <div className="space-y-6">
+                                <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 flex justify-between items-center animate-fade-in">
+                                  <span className="font-bold text-primary">Celkové skóre:</span>
+                                  <span className="text-2xl font-black text-primary">{totalEarned} / {totalMax} bodů ({pct} %)</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex justify-between items-end">
+                                    <label className="text-sm font-bold uppercase text-primary">Hodnocení (Známka)</label>
+                                    <span className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                                      Návrh: známka {suggestedGrade} ({pct} %)
+                                    </span>
+                                  </div>
+                                  <GradePicker 
+                                    selected={evalGrade} 
+                                    suggested={suggestedGrade}
+                                    onSelect={(v) => {
+                                      setEvalGrade(v);
+                                      setIsGradeManuallySet(true);
+                                    }} 
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          <div className="space-y-4 pt-4">
                             <Textarea 
                                 placeholder="Slovní hodnocení..." 
-                                value={sub.feedback || ''}
-                                onChange={(e) => store.gradeSubmission(sub.id, sub.grade || 0, e.target.value)}
+                                value={evalFeedback}
+                                onChange={(e) => setEvalFeedback(e.target.value)}
                             />
-                            <Button className="w-full h-12" onClick={() => setViewingSubmission(null)}>Uložit v cloudu</Button>
+                            <Button className="w-full h-12 rounded-full font-bold shadow-md" onClick={() => {
+                              store.gradeSubmission(sub.id, evalGrade || 0, evalFeedback, evalScores);
+                              setViewingSubmission(null);
+                            }}>Uložit hodnocení v cloudu</Button>
                           </div>
                         </CardContent>
                       </Card>
@@ -337,13 +622,28 @@ export default function ITestApp() {
                   }).map(s => {
                     const student = store.users.find(u => u.id === s.studentId);
                     const assignment = store.assignments.find(a => a.id === s.assignmentId);
+                    
+                    const totalMax = assignment?.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                    
+                    let earned = 0;
+                    if (s.questionScores) {
+                      if (s.questionScores instanceof Map) {
+                        s.questionScores.forEach(val => { earned += val; });
+                      } else {
+                        Object.values(s.questionScores).forEach(val => { earned += val as number; });
+                      }
+                    }
+                    const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+
                     return (
-                      <div key={s.id} onClick={() => setViewingSubmission(s.id)} className="p-6 bg-white shadow-sm rounded-2xl flex items-center justify-between hover:shadow-lg cursor-pointer">
+                      <div key={s.id} onClick={() => setViewingSubmission(s.id)} className="p-6 bg-white shadow-sm rounded-2xl flex items-center justify-between hover:shadow-lg cursor-pointer transition-all">
                         <div>
                           <p className="font-bold text-lg">{student?.name}</p>
                           <p className="text-sm text-muted-foreground">{assignment?.title}</p>
                         </div>
-                        <Badge variant={s.grade ? "default" : "secondary"}>{s.grade ? `Známka: ${s.grade}` : 'Neopraveno'}</Badge>
+                        <Badge variant={s.grade ? "default" : "secondary"}>
+                          {s.grade ? `Známka: ${s.grade} (${earned} / ${totalMax} b - ${pct} %)` : 'Neopraveno'}
+                        </Badge>
                       </div>
                     );
                   })}
@@ -353,7 +653,7 @@ export default function ITestApp() {
           </Tabs>
 
           <Dialog open={isAddingStudent} onOpenChange={setIsAddingStudent}>
-            <DialogContent>
+            <DialogContent aria-describedby={undefined}>
               <DialogHeader><DialogTitle>Zapsat žáka</DialogTitle></DialogHeader>
               <div className="space-y-4 py-4">
                 <Input placeholder="Jméno žáka" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} />
@@ -393,22 +693,165 @@ export default function ITestApp() {
                         <div className="text-center py-12 space-y-4">
                           <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
                           <h3 className="text-2xl font-bold">Odevzdáno</h3>
-                          {submission.grade && (
-                            <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4">
-                              <div className="text-4xl font-black text-primary">Známka: {submission.grade}</div>
-                              {submission.feedback && <p className="mt-4 text-muted-foreground italic">"{submission.feedback}"</p>}
-                            </div>
-                          )}
+                          {submission.grade && (() => {
+                            const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                            let earned = 0;
+                            if (submission.questionScores) {
+                              if (submission.questionScores instanceof Map) {
+                                submission.questionScores.forEach(val => { earned += val; });
+                              } else {
+                                Object.values(submission.questionScores).forEach(val => { earned += val as number; });
+                              }
+                            }
+                            const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+                            return (
+                              <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4 text-center">
+                                <div className="text-4xl font-black text-primary">Známka: {submission.grade}</div>
+                                <div className="text-lg font-bold text-muted-foreground mt-1">Celkové body: {earned} / {totalMax} ({pct} %)</div>
+                                {submission.feedback && <p className="mt-4 text-muted-foreground italic">"{submission.feedback}"</p>}
+                              </div>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <div className="space-y-8">
-                          {a.fileUri ? (
-                            <DrawingPad backgroundImage={a.fileUri} onSave={setMainWorkDrawing} />
-                          ) : (
-                            <div className="p-12 text-center border-2 border-dashed rounded-3xl text-muted-foreground">Bez vizuálního podkladu.</div>
+                          {/* Popis úkolu */}
+                          {a.description && (
+                            <div className="p-4 bg-gray-50 rounded-xl">
+                              <p className="text-muted-foreground whitespace-pre-wrap">{a.description}</p>
+                            </div>
                           )}
+
+                          {/* Otázky */}
+                          {a.questions && a.questions.length > 0 && (
+                            <div className="space-y-6">
+                              <h3 className="font-headline text-xl font-bold text-primary">Otázky ({a.questions.length})</h3>
+                              {a.questions.map((q, index) => (
+                                <div key={q.id} className="p-5 bg-gray-50 rounded-xl border space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="bg-primary/10 text-primary font-bold">{index + 1}</Badge>
+                                      <p className="font-semibold text-lg">{q.text}</p>
+                                    </div>
+                                    <Badge variant="secondary" className="text-[10px] uppercase">{q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}</Badge>
+                                  </div>
+
+                                  {/* Textový vstup pro všechny typy kromě drawing */}
+                                  {q.type === 'short_answer' && (
+                                    <Input
+                                      placeholder="Vaše odpověď..."
+                                      value={studentAnswers[q.id] || ''}
+                                      onChange={(e) => setStudentAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                    />
+                                  )}
+
+                                  {q.type === 'long_answer' && (
+                                    <Textarea
+                                      placeholder="Vaše odpověď..."
+                                      className="min-h-[100px]"
+                                      value={studentAnswers[q.id] || ''}
+                                      onChange={(e) => setStudentAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                    />
+                                  )}
+
+                                  {q.type === 'multiple_choice' && q.options && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      {q.options.map((opt, i) => (
+                                        <button
+                                          key={i}
+                                          type="button"
+                                          className={`p-3 rounded-lg border text-left transition-all ${
+                                            studentAnswers[q.id] === i
+                                              ? 'bg-primary text-white border-primary shadow-md'
+                                              : 'bg-white hover:bg-gray-100'
+                                          }`}
+                                          onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: i }))}
+                                        >
+                                          <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                                          {opt}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {q.type === 'true_false' && (
+                                    <div className="flex gap-3">
+                                      <button
+                                        type="button"
+                                        className={`flex-1 p-3 rounded-lg border text-center font-bold transition-all ${
+                                          studentAnswers[q.id] === true
+                                            ? 'bg-green-500 text-white border-green-500'
+                                            : 'bg-white hover:bg-green-50'
+                                        }`}
+                                        onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: true }))}
+                                      >
+                                        ✓ Ano
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`flex-1 p-3 rounded-lg border text-center font-bold transition-all ${
+                                          studentAnswers[q.id] === false
+                                            ? 'bg-red-500 text-white border-red-500'
+                                            : 'bg-white hover:bg-red-50'
+                                        }`}
+                                        onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: false }))}
+                                      >
+                                        ✗ Ne
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* Kresba pro typ drawing — vždy otevřená */}
+                                  {q.type === 'drawing' && (
+                                    <DrawingPad
+                                      compact
+                                      onSave={(data) => setQuestionDrawings(prev => ({ ...prev, [q.id]: data }))}
+                                    />
+                                  )}
+
+                                  {/* Toggle: Dokreslit perem (pro všechny typy kromě drawing) */}
+                                  {q.type !== 'drawing' && (
+                                    <div className="pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setQuestionDrawingOpen(prev => ({ ...prev, [q.id]: !prev[q.id] }))}
+                                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-all ${
+                                          questionDrawingOpen[q.id]
+                                            ? 'bg-primary/10 text-primary border-primary/30'
+                                            : 'text-muted-foreground hover:text-primary hover:border-primary/20 border-transparent'
+                                        }`}
+                                      >
+                                        <PenTool className="w-3 h-3" />
+                                        {questionDrawingOpen[q.id] ? 'Skrýt kreslicí plochu' : '✏️ Dokreslit perem'}
+                                        {questionDrawings[q.id] && !questionDrawingOpen[q.id] && (
+                                          <span className="ml-1 w-2 h-2 rounded-full bg-green-500 inline-block" title="Kresba přiložena" />
+                                        )}
+                                      </button>
+                                      {questionDrawingOpen[q.id] && (
+                                        <div className="mt-2 animate-fade-in">
+                                          <DrawingPad
+                                            compact
+                                            onSave={(data) => setQuestionDrawings(prev => ({ ...prev, [q.id]: data }))}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Podklad / kresba na hlavním dokumentu */}
+                          {a.fileUri ? (
+                            <div className="space-y-2">
+                              <h3 className="font-headline text-xl font-bold text-primary">Pracovní dokument</h3>
+                              <p className="text-sm text-muted-foreground">Piš perem přímo do dokumentu nebo ho nech prázdný.</p>
+                              <DrawingPad backgroundImage={a.fileUri} onSave={setMainWorkDrawing} />
+                            </div>
+                          ) : null}
                           <Button className="w-full h-14 text-xl shadow-lg" onClick={() => {
-                            store.submitWork({ assignmentId: selectedAssignmentId, studentId: currentUser.id, answers: {}, questionDrawings: {}, mainWorkDrawing });
+                            store.submitWork({ assignmentId: selectedAssignmentId, studentId: currentUser.id, answers: studentAnswers, questionDrawings, mainWorkDrawing });
                           }}>Odevzdat v cloudu</Button>
                         </div>
                       )}
@@ -423,12 +866,27 @@ export default function ITestApp() {
               <div className="grid gap-4">
                 {studentAssignments.map(a => {
                   const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id);
+                  
+                  let badgeText = 'Odevzdáno';
+                  if (sub && sub.grade) {
+                    const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                    let earned = 0;
+                    if (sub.questionScores) {
+                      if (sub.questionScores instanceof Map) {
+                        sub.questionScores.forEach(val => { earned += val; });
+                      } else {
+                        Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                      }
+                    }
+                    badgeText = `Známka: ${sub.grade} (Body: ${earned} / ${totalMax})`;
+                  }
+
                   return (
                     <Card key={a.id} className="cursor-pointer hover:shadow-lg transition-all bg-white" onClick={() => setSelectedAssignmentId(a.id)}>
                       <CardContent className="p-6 flex justify-between items-center">
                         <div>
                           <p className="font-bold text-xl">{a.title}</p>
-                          {sub && <Badge variant={sub.grade ? "default" : "secondary"} className="mt-1">{sub.grade ? `Známka: ${sub.grade}` : 'Odevzdáno'}</Badge>}
+                          {sub && <Badge variant={sub.grade ? "default" : "secondary"} className="mt-1">{badgeText}</Badge>}
                         </div>
                         <ChevronRight className="w-6 h-6 text-gray-300" />
                       </CardContent>

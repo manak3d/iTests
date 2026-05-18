@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
 import { useFirestore } from '@/firebase/provider';
-import { collection, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -34,6 +34,14 @@ export function useITestStore() {
     return null;
   });
   
+  const [mongoUser, setMongoUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('itest_mongo_user');
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });
+  
   const [classes, setClasses] = useState<Class[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -52,39 +60,30 @@ export function useITestStore() {
 
   const currentUser = useMemo(() => {
     if (!currentUserId) return null;
-    return users.find(u => u.id === currentUserId) || null;
-  }, [currentUserId, users]);
+    return users.find(u => u.id === currentUserId) || mongoUser || null;
+  }, [currentUserId, users, mongoUser]);
 
   useEffect(() => {
-    if (!db) return;
-
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      setUsers(snap.docs.map(d => ({ ...d.data(), id: d.id } as User)));
-      setLoadingStates(prev => ({ ...prev, users: false }));
-    }, () => setLoadingStates(prev => ({ ...prev, users: false })));
-
-    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
-      setClasses(snap.docs.map(d => ({ ...d.data(), id: d.id } as Class)));
-      setLoadingStates(prev => ({ ...prev, classes: false }));
-    }, () => setLoadingStates(prev => ({ ...prev, classes: false })));
-
-    const unsubAssignments = onSnapshot(collection(db, 'assignments'), (snap) => {
-      setAssignments(snap.docs.map(d => ({ ...d.data(), id: d.id } as Assignment)));
-      setLoadingStates(prev => ({ ...prev, assignments: false }));
-    }, () => setLoadingStates(prev => ({ ...prev, assignments: false })));
-
-    const unsubSubmissions = onSnapshot(collection(db, 'submissions'), (snap) => {
-      setSubmissions(snap.docs.map(d => ({ ...d.data(), id: d.id } as Submission)));
-      setLoadingStates(prev => ({ ...prev, submissions: false }));
-    }, () => setLoadingStates(prev => ({ ...prev, submissions: false })));
-
-    return () => {
-      unsubUsers();
-      unsubClasses();
-      unsubAssignments();
-      unsubSubmissions();
-    };
-  }, [db]);
+    fetch('/api/sync')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setUsers(data.users);
+          setClasses(data.classes);
+          setAssignments(data.assignments);
+          setSubmissions(data.submissions);
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        setLoadingStates({
+          users: false,
+          classes: false,
+          assignments: false,
+          submissions: false
+        });
+      });
+  }, []);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
@@ -95,6 +94,15 @@ export function useITestStore() {
     }
     return false;
   }, [users]);
+
+  // Speciální funkce pro vynucené přihlášení, když proběhlo přes MongoDB
+  const forceLogin = useCallback((userId: string, role: Role, username: string, name: string, classId?: string) => {
+    const u: User = { id: userId, username, role, name, classId };
+    setMongoUser(u);
+    setCurrentUserId(userId);
+    sessionStorage.setItem('itest_user_id', userId);
+    sessionStorage.setItem('itest_mongo_user', JSON.stringify(u));
+  }, []);
 
   const register = useCallback((name: string, username: string, password?: string) => {
     if (!db) return;
@@ -110,58 +118,150 @@ export function useITestStore() {
 
   const logout = useCallback(() => {
     setCurrentUserId(null);
+    setMongoUser(null);
     sessionStorage.removeItem('itest_user_id');
+    sessionStorage.removeItem('itest_mongo_user');
   }, []);
 
   const addClass = useCallback((name: string) => {
-    if (!db || !currentUser) return;
+    if (!currentUser) return;
     const classId = Math.random().toString(36).substring(2, 11);
     const newClass: Class = { id: classId, name, teacherId: currentUser.id, studentIds: [] };
     
-    setDoc(doc(db, 'classes', classId), cleanData(newClass))
-      .then(() => toast({ title: "Třída vytvořena", description: "Data synchronizována." }))
-      .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `classes/${classId}`, operation: 'create' })));
+    // Zápis do MongoDB
+    fetch('/api/classrooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: classId,
+        name: name,
+        teacherId: currentUser.id
+      })
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Třída vytvořena", description: "Zapsáno do databáze." });
+        setClasses(prev => [...prev, newClass]);
+        
+        // Pokus o zálohu do Firebase (neblokující)
+        if (db) {
+          setDoc(doc(db, 'classes', classId), cleanData(newClass)).catch(console.error);
+        }
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se vytvořit třídu.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
   }, [db, currentUser, toast]);
 
   const addStudent = useCallback((classId: string, name: string, username: string, password?: string) => {
-    if (!db) return;
     const studentId = Math.random().toString(36).substring(2, 11);
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
-    setDoc(doc(db, 'users', studentId), cleanData(newUser))
-      .then(() => toast({ title: "Žák zapsán", description: "Účet vytvořen v cloudu." }))
-      .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${studentId}`, operation: 'create' })));
+    // O samotný zápis studenta do MongoDB se teď stará funkce v page.tsx, 
+    // zde už jen zkusíme zálohu do Firebase a upravíme lokální stav.
+    setUsers(prev => [...prev, newUser]);
+    
+    if (db) {
+      setDoc(doc(db, 'users', studentId), cleanData(newUser)).catch(console.error);
+    }
   }, [db, toast]);
 
   const addAssignment = useCallback((assignment: Omit<Assignment, 'id'>) => {
-    if (!db) return;
     const id = Math.random().toString(36).substring(2, 11);
     const newAssignment = { ...assignment, id };
     
-    setDoc(doc(db, 'assignments', id), cleanData(newAssignment))
-      .then(() => toast({ title: "Práce publikována", description: "Úkol nahrán do cloudu." }))
-      .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `assignments/${id}`, operation: 'create' })));
+    // Zápis do MongoDB primárně
+    fetch('/api/assignments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newAssignment)
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Práce publikována", description: "Úkol byl úspěšně uložen." });
+        setAssignments(prev => [...prev, newAssignment]);
+        
+        // Firebase záloha
+        if (db) {
+          setDoc(doc(db, 'assignments', id), cleanData(newAssignment)).catch(console.error);
+        }
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se uložit zadání.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
+  }, [db, toast]);
+
+  const deleteAssignment = useCallback((id: string) => {
+    fetch(`/api/assignments?id=${id}`, {
+      method: 'DELETE'
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Smazáno", description: "Zadání i odevzdané práce byly smazány." });
+        setAssignments(prev => prev.filter(a => a.id !== id));
+        setSubmissions(prev => prev.filter(s => s.assignmentId !== id));
+        
+        if (db) {
+          deleteDoc(doc(db, 'assignments', id)).catch(console.error);
+        }
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se smazat zadání.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
   }, [db, toast]);
 
   const submitWork = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'>) => {
-    if (!db) return;
     const id = Math.random().toString(36).substring(2, 11);
     const newSubmission = { ...submission, id, submittedAt: new Date().toISOString() };
     
-    setDoc(doc(db, 'submissions', id), cleanData(newSubmission))
-      .then(() => toast({ title: "Odevzdáno", description: "Práce nahrána do cloudu." }))
-      .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `submissions/${id}`, operation: 'create' })));
+    // Zápis do MongoDB primárně
+    fetch('/api/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSubmission)
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Odevzdáno", description: "Práce byla úspěšně nahrána." });
+        setSubmissions(prev => [...prev, newSubmission as Submission]);
+        
+        if (db) {
+          setDoc(doc(db, 'submissions', id), cleanData(newSubmission)).catch(console.error);
+        }
+      } else {
+        toast({ title: "Chyba", description: "Odevzdání selhalo.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
   }, [db, toast]);
 
-  const gradeSubmission = useCallback((id: string, grade: number, feedback: string) => {
-    if (!db) return;
-    updateDoc(doc(db, 'submissions', id), cleanData({ grade, feedback }))
-      .then(() => toast({ title: "Oznámkováno", description: "Hodnocení uloženo." }))
-      .catch(err => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `submissions/${id}`, operation: 'update' })));
+  const gradeSubmission = useCallback((id: string, grade: number, feedback: string, questionScores?: Record<string, number>) => {
+    // Aktualizace v MongoDB primárně
+    fetch('/api/submissions', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, grade, feedback, questionScores })
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Oznámkováno", description: "Hodnocení uloženo." });
+        setSubmissions(prev => prev.map(s => s.id === id ? { ...s, grade, feedback, questionScores } : s));
+        
+        if (db) {
+          updateDoc(doc(db, 'submissions', id), cleanData({ grade, feedback, questionScores })).catch(console.error);
+        }
+      } else {
+        toast({ title: "Chyba", description: "Uložení hodnocení selhalo.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
   }, [db, toast]);
 
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
-    login, register, logout, addClass, addStudent, addAssignment, submitWork, gradeSubmission
+    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, submitWork, gradeSubmission
   };
 }
