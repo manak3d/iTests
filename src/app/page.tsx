@@ -844,28 +844,135 @@ export default function ITestApp() {
                     </CardHeader>
                     <CardContent className="p-8 space-y-8 bg-white">
                       {submission ? (
-                        <div className="text-center py-12 space-y-4">
-                          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
-                          <h3 className="text-2xl font-bold">Odevzdáno</h3>
-                          {submission.grade && (() => {
-                            const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                            let earned = 0;
-                            if (submission.questionScores) {
-                              if (submission.questionScores instanceof Map) {
-                                submission.questionScores.forEach(val => { earned += val; });
-                              } else {
-                                Object.values(submission.questionScores).forEach(val => { earned += val as number; });
+                        <div className="space-y-8">
+                          {/* Výsledková karta žáka */}
+                          <div className="text-center py-6 space-y-4">
+                            <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
+                            <h3 className="text-2xl font-bold">Práce byla odevzdána</h3>
+                            
+                            {(() => {
+                              const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                              let earned = 0;
+                              if (submission.questionScores) {
+                                if (submission.questionScores instanceof Map) {
+                                  submission.questionScores.forEach(val => { earned += val; });
+                                } else {
+                                  Object.values(submission.questionScores).forEach(val => { earned += val as number; });
+                                }
                               }
-                            }
-                            const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
-                            return (
-                              <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4 text-center">
-                                <div className="text-4xl font-black text-primary">Známka: {submission.grade}</div>
-                                <div className="text-lg font-bold text-muted-foreground mt-1">Celkové body: {earned} / {totalMax} ({pct} %)</div>
-                                {submission.feedback && <p className="mt-4 text-muted-foreground italic">"{submission.feedback}"</p>}
+                              const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+                              return (
+                                <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4 text-center space-y-2">
+                                  <div className="text-4xl font-black text-primary">Známka: {submission.grade || 'Nehodnoceno'}</div>
+                                  <div className="text-lg font-bold text-muted-foreground">Celkové body: {earned} / {totalMax} ({pct} %)</div>
+                                  {submission.feedback && (
+                                    <div className="mt-4 p-3 bg-white rounded-xl border border-primary/10 italic text-muted-foreground">
+                                      Odpověď učitele: "{submission.feedback}"
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Seznam otázek a vyhodnocení */}
+                          {a.questions && a.questions.length > 0 && (
+                            <div className="space-y-6">
+                              <h3 className="font-headline text-xl font-bold text-primary border-b pb-2">Vyhodnocení jednotlivých otázek</h3>
+                              <div className="space-y-4">
+                                {a.questions.map((q, index) => {
+                                  const answer = submission.answers?.[q.id];
+                                  const drawing = submission.questionDrawings?.[q.id];
+                                  const maxPoints = q.points || 1;
+                                  const score = submission.questionScores 
+                                    ? (submission.questionScores instanceof Map 
+                                        ? (submission.questionScores.get(q.id) ?? 0) 
+                                        : ((submission.questionScores as Record<string, number>)[q.id] ?? 0)
+                                      ) 
+                                    : 0;
+                                  
+                                  const isCorrect = score === maxPoints;
+
+                                  return (
+                                    <div 
+                                      key={q.id} 
+                                      className={`p-5 rounded-2xl border transition-all ${
+                                        isCorrect 
+                                          ? 'bg-green-50/30 border-green-200' 
+                                          : 'bg-red-50/30 border-red-200 shadow-sm'
+                                      }`}
+                                    >
+                                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
+                                        <div className="flex items-center gap-2">
+                                          <Badge className={`font-bold ${isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                            {index + 1}
+                                          </Badge>
+                                          <p className="font-bold text-lg text-gray-800">{q.text}</p>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-2">
+                                          {!isCorrect && (
+                                            <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold text-xs uppercase px-2.5 py-0.5">
+                                              Chyba
+                                            </Badge>
+                                          )}
+                                          <Badge variant="outline" className={`font-bold border px-3 py-1 ${
+                                            isCorrect 
+                                              ? 'bg-green-100/50 text-green-800 border-green-300' 
+                                              : 'bg-red-100/50 text-red-800 border-red-300'
+                                          }`}>
+                                            Body: {score} / {maxPoints} b
+                                          </Badge>
+                                        </div>
+                                      </div>
+
+                                      {/* Odpověď */}
+                                      {q.type !== 'drawing' && (
+                                        <div className="bg-white/80 p-3.5 rounded-xl border border-gray-100 space-y-1">
+                                          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moje odpověď:</span>
+                                          <div>
+                                            {answer === undefined || answer === null || answer === '' ? (
+                                              <span className="italic text-gray-400">Neodpovězeno</span>
+                                            ) : q.type === 'multiple_choice' ? (
+                                              <span className="font-semibold text-gray-800">
+                                                {String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}
+                                              </span>
+                                            ) : q.type === 'true_false' ? (
+                                              <span className="font-semibold text-gray-800">
+                                                {answer ? '✓ Ano' : '✗ Ne'}
+                                              </span>
+                                            ) : (
+                                              <span className="font-semibold text-gray-800 whitespace-pre-wrap">
+                                                {String(answer)}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Kresba k otázce */}
+                                      {drawing && (
+                                        <div className="mt-3 bg-white p-3 rounded-xl border">
+                                          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">Moje přiložená kresba:</span>
+                                          <img src={drawing} className="border rounded-lg max-w-full max-h-60 object-contain bg-white" alt="Kresba k otázce" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            );
-                          })()}
+                            </div>
+                          )}
+
+                          {/* Hlavní odevzdaný dokument */}
+                          {submission.mainWorkDrawing && (
+                            <div className="space-y-3">
+                              <h3 className="font-headline text-xl font-bold text-primary border-b pb-2">Vypracovaný dokument</h3>
+                              <div className="bg-gray-50 p-4 rounded-2xl border">
+                                <img src={submission.mainWorkDrawing} className="w-full border rounded-xl bg-white shadow-sm" alt="Vypracovaný dokument" />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-8">
