@@ -45,6 +45,7 @@ export default function ITestApp() {
   const [classSearch, setClassSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
   const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState('classes');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -1122,20 +1123,142 @@ export default function ITestApp() {
                 );
               })()}
             </div>
-          ) : (
-            <div className="space-y-10">
-              {/* Sekce 1: Předměty a vyplněné testy */}
-              <div className="space-y-6">
-                <h2 className="text-3xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-3">
-                  <BookOpen className="w-8 h-8 text-accent" /> Moje předměty a vyplněné testy
+          ) : selectedSubject ? (
+            <div className="space-y-8 animate-fade-in">
+              {/* Back button & Title */}
+              <div className="flex flex-col gap-4">
+                <Button variant="ghost" className="self-start rounded-full" onClick={() => setSelectedSubject(null)}>← Zpět na předměty</Button>
+                <div className="flex items-center gap-3 bg-primary/5 p-6 rounded-3xl border border-primary/20">
+                  <div className="bg-primary/10 p-3 rounded-2xl text-primary">
+                    <BookOpen className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Předmět</span>
+                    <h1 className="text-3xl font-headline font-black text-primary">{selectedSubject}</h1>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section A: Zadané úkoly k vypracování */}
+              <div className="space-y-4">
+                <h2 className="text-2xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-2">
+                  <ClipboardList className="w-6 h-6 text-accent" /> Úkoly k vypracování (To Do)
                 </h2>
                 {(() => {
-                  // Získáme pouze odevzdané úkoly
-                  const submittedAssignments = studentAssignments.filter(a =>
+                  const pending = studentAssignments.filter(a =>
+                    (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
+                    !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
+                  );
+
+                  if (pending.length === 0) {
+                    return (
+                      <Card className="border-none shadow-sm bg-white p-8 text-center space-y-2">
+                        <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto animate-pulse" />
+                        <h3 className="text-lg font-bold text-gray-800">Skvělé! Všechny úkoly máš hotové.</h3>
+                        <p className="text-sm text-muted-foreground">V tomto předmětu nemáš žádné úkoly k odevzdání.</p>
+                      </Card>
+                    );
+                  }
+
+                  return (
+                    <div className="grid gap-4">
+                      {pending.map(a => (
+                        <Card 
+                          key={a.id} 
+                          className="cursor-pointer hover:shadow-md transition-all border-none bg-white shadow-sm overflow-hidden" 
+                          onClick={() => setSelectedAssignmentId(a.id)}
+                        >
+                          <div className="h-1 bg-accent/30 w-full" />
+                          <CardContent className="p-5 flex justify-between items-center">
+                            <div>
+                              <p className="font-bold text-lg text-gray-800">{a.title}</p>
+                              {a.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full">Vypracovat úkol</span>
+                              <ChevronRight className="w-5 h-5 text-gray-300" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Section B: Dokončené a opravené testy */}
+              <div className="space-y-4">
+                <h2 className="text-2xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-2">
+                  <CheckCircle2 className="w-6 h-6 text-green-500" /> Dokončené testy (Done)
+                </h2>
+                {(() => {
+                  const completed = studentAssignments.filter(a =>
+                    (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
                     store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
                   );
 
-                  // Definujeme předdefinované předměty
+                  if (completed.length === 0) {
+                    return (
+                      <Card className="border-none shadow-sm bg-white p-8 text-center space-y-2">
+                        <span className="text-3xl block">💤</span>
+                        <h3 className="text-lg font-bold text-gray-800">Žádné dokončené testy</h3>
+                        <p className="text-sm text-muted-foreground">V tomto předmětu jsi ještě nevyplnil žádné testy.</p>
+                      </Card>
+                    );
+                  }
+
+                  return (
+                    <div className="grid gap-4">
+                      {completed.map(a => {
+                        const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
+                        const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                        
+                        let earned = 0;
+                        if (sub.questionScores) {
+                          if (sub.questionScores instanceof Map) {
+                            sub.questionScores.forEach(val => { earned += val; });
+                          } else {
+                            Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                          }
+                        }
+                        
+                        let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
+
+                        return (
+                          <Card 
+                            key={a.id} 
+                            className="cursor-pointer hover:shadow-md transition-all border-none bg-white shadow-sm overflow-hidden" 
+                            onClick={() => setSelectedAssignmentId(a.id)}
+                          >
+                            <CardContent className="p-5 flex justify-between items-center">
+                              <div>
+                                <p className="font-bold text-lg text-gray-800">{a.title}</p>
+                                <div className="mt-1 flex gap-2">
+                                  <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
+                                    {badgeText}
+                                  </Badge>
+                                </div>
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-gray-300" />
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-10">
+              {/* Sekce 1: Předměty */}
+              <div className="space-y-6">
+                <h2 className="text-3xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-3">
+                  <BookOpen className="w-8 h-8 text-accent" /> Moje předměty
+                </h2>
+                {(() => {
                   const predefinedSubjects = [
                     'Matematika',
                     'Český jazyk',
@@ -1149,146 +1272,60 @@ export default function ITestApp() {
                     'Jiný'
                   ];
 
-                  // Inicializujeme seskupení s prázdnými poli pro každý předdefinovaný předmět
-                  const grouped: Record<string, typeof submittedAssignments> = {};
-                  predefinedSubjects.forEach(sub => {
-                    grouped[sub] = [];
-                  });
-
-                  // Seskupíme odevzdané úkoly podle předmětu
-                  submittedAssignments.forEach(a => {
-                    const subject = a.subject || 'Jiný';
-                    if (!grouped[subject]) {
-                      grouped[subject] = [];
-                    }
-                    grouped[subject].push(a);
-                  });
-
                   return (
-                    <div className="space-y-4">
-                      {Object.entries(grouped).map(([subjectName, list]) => {
-                        const isExpanded = !!expandedSubjects[subjectName];
+                    <div className="space-y-4 animate-fade-in">
+                      {predefinedSubjects.map(subjectName => {
                         return (
-                          <div key={subjectName} className="border border-gray-200/80 bg-white rounded-2xl shadow-sm overflow-hidden transition-all duration-200">
-                            {/* Horizontal Header (Interactive button) */}
-                            <button
-                              type="button"
-                              onClick={() => setExpandedSubjects(prev => ({ ...prev, [subjectName]: !isExpanded }))}
-                              className="w-full flex items-center justify-between p-5 bg-gray-50/50 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="bg-primary/10 p-2.5 rounded-xl text-primary">
-                                  <BookOpen className="w-5 h-5" />
-                                </div>
-                                <span className="font-headline text-xl text-primary font-bold">{subjectName}</span>
+                          <button
+                            key={subjectName}
+                            type="button"
+                            onClick={() => setSelectedSubject(subjectName)}
+                            className="w-full flex items-center justify-between p-5 bg-white hover:bg-gray-50/80 active:bg-gray-100 border border-gray-200/80 rounded-2xl shadow-sm transition-all text-left"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="bg-primary/10 p-2.5 rounded-xl text-primary">
+                                <BookOpen className="w-5 h-5" />
                               </div>
+                              <span className="font-headline text-xl text-primary font-bold">{subjectName}</span>
+                            </div>
 
-                              <div className="flex items-center gap-3">
-                                <Badge variant={list.length > 0 ? "default" : "secondary"} className="font-semibold text-xs px-2.5 py-0.5">
-                                  {list.length > 0 ? `${list.length} dokončených testů` : 'Bez testů'}
-                                </Badge>
-                                <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-                              </div>
-                            </button>
-
-                            {/* Collapsible Content */}
-                            {isExpanded && (
-                              <div className="border-t divide-y p-4 bg-white animate-fade-in">
-                                {list.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground py-3 px-2 italic text-center">Žádné dokončené testy v tomto předmětu</p>
-                                ) : (
-                                  list.map(a => {
-                                    const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
-                                    const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                                    
-                                    let earned = 0;
-                                    if (sub.questionScores) {
-                                      if (sub.questionScores instanceof Map) {
-                                        sub.questionScores.forEach(val => { earned += val; });
-                                      } else {
-                                        Object.values(sub.questionScores).forEach(val => { earned += val as number; });
-                                      }
-                                    }
-                                    
-                                    let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
-
-                                    return (
-                                      <div 
-                                        key={a.id} 
-                                        onClick={() => setSelectedAssignmentId(a.id)}
-                                        className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 rounded-lg cursor-pointer transition-colors"
-                                      >
-                                        <div className="space-y-1">
-                                          <p className="font-bold text-base text-gray-800">{a.title}</p>
-                                          <div className="flex gap-2">
-                                            <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
-                                              {badgeText}
-                                            </Badge>
-                                          </div>
-                                        </div>
-                                        <ChevronRight className="w-5 h-5 text-gray-300" />
-                                      </div>
-                                    );
-                                  })
-                                )}
-                              </div>
-                            )}
-                          </div>
+                            <div className="flex items-center gap-3">
+                              {(() => {
+                                const pendingCount = studentAssignments.filter(a =>
+                                  (a.subject === subjectName || (subjectName === 'Jiný' && !a.subject)) &&
+                                  !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
+                                ).length;
+                                
+                                const completedCount = studentAssignments.filter(a =>
+                                  (a.subject === subjectName || (subjectName === 'Jiný' && !a.subject)) &&
+                                  store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
+                                ).length;
+                                
+                                if (pendingCount > 0) {
+                                  return (
+                                    <Badge className="bg-accent text-white font-semibold text-xs px-2.5 py-0.5 animate-pulse">
+                                      {pendingCount} k vypracování
+                                    </Badge>
+                                  );
+                                } else if (completedCount > 0) {
+                                  return (
+                                    <Badge variant="secondary" className="font-semibold text-xs px-2.5 py-0.5">
+                                      {completedCount} dokončeno
+                                    </Badge>
+                                  );
+                                } else {
+                                  return (
+                                    <Badge variant="outline" className="text-muted-foreground font-semibold text-xs px-2.5 py-0.5 border-gray-200">
+                                      Bez úkolů
+                                    </Badge>
+                                  );
+                                }
+                              })()}
+                              <ChevronRight className="w-5 h-5 text-gray-400" />
+                            </div>
+                          </button>
                         );
                       })}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Sekce 2: Zadané úkoly k vypracování (To Do) */}
-              <div className="space-y-6">
-                <h2 className="text-3xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-3">
-                  <ClipboardList className="w-8 h-8 text-accent" /> Zadané úkoly k vypracování
-                </h2>
-                {(() => {
-                  const pendingAssignments = studentAssignments.filter(a =>
-                    !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
-                  );
-
-                  if (pendingAssignments.length === 0) {
-                    return (
-                      <Card className="border-none shadow-md bg-white p-8 text-center space-y-3">
-                        <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto animate-bounce" />
-                        <h3 className="text-xl font-bold text-gray-800">Skvělé! Všechny úkoly máš hotové.</h3>
-                        <p className="text-muted-foreground">Užívej si volný čas nebo si zopakuj probrané učivo.</p>
-                      </Card>
-                    );
-                  }
-
-                  return (
-                    <div className="grid gap-4">
-                      {pendingAssignments.map(a => (
-                        <Card 
-                          key={a.id} 
-                          className="cursor-pointer hover:shadow-lg transition-all border-none bg-white shadow-sm overflow-hidden" 
-                          onClick={() => setSelectedAssignmentId(a.id)}
-                        >
-                          <div className="h-1 bg-accent/30 w-full" />
-                          <CardContent className="p-6 flex justify-between items-center">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <Badge className="bg-accent/20 text-accent hover:bg-accent/30 border-none font-bold text-xs uppercase px-2 py-0.5">
-                                  {a.subject || 'Jiný'}
-                                </Badge>
-                              </div>
-                              <p className="font-bold text-xl text-gray-800">{a.title}</p>
-                              {a.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full">Vypracovat úkol</span>
-                              <ChevronRight className="w-6 h-6 text-gray-300" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
                     </div>
                   );
                 })()}
