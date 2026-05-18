@@ -44,19 +44,22 @@ export default function ITestApp() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
 
-  // Ensure authView stays in sync with store.currentUser upon reload
+  // Synchronizace zobrazení s přihlášeným uživatelem
   useEffect(() => {
-    if (store.isLoaded && store.currentUser) {
+    if (store.currentUser) {
       setAuthView('dashboard');
+    } else {
+      setAuthView('login');
     }
-  }, [store.isLoaded, store.currentUser]);
+  }, [store.currentUser]);
 
   if (!store.isLoaded) {
     return (
       <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="w-12 h-12 text-primary animate-spin" />
-        <div className="font-headline text-2xl text-primary font-bold animate-pulse">
-          Synchronizace iTest Cloudu...
+        <div className="font-headline text-2xl text-primary font-bold animate-pulse text-center px-4">
+          Synchronizace iTest Cloudu...<br/>
+          <span className="text-sm font-normal text-muted-foreground">Stahuji vaše data z cloudu</span>
         </div>
       </div>
     );
@@ -91,21 +94,20 @@ export default function ITestApp() {
       setNewStudentPassword('');
       setIsAddingStudent(false);
       setTargetClassId(null);
-      toast({ title: "Žák přidán do cloudu", description: `${newStudentName} byl zapsán do třídy.` });
     }
   };
 
   if (authView === 'login') {
     return (
       <div className="min-h-screen bg-[#EFF3F7] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-none shadow-2xl overflow-hidden">
+        <Card className="w-full max-w-md border-none shadow-2xl overflow-hidden animate-fade-in">
           <CardHeader className="text-center space-y-4 bg-primary text-white pb-8">
             <div className="bg-white/20 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-lg transform -rotate-6">
               <School className="text-white w-8 h-8" />
             </div>
             <div className="space-y-1">
               <CardTitle className="font-headline text-4xl">iTest Cloud</CardTitle>
-              <CardDescription className="text-white/70">Moderní vzdělávání, synchronizovaně.</CardDescription>
+              <CardDescription className="text-white/70">Moderní vzdělávání v reálném čase.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="p-8">
@@ -159,16 +161,16 @@ export default function ITestApp() {
 
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar user={currentUser} onLogout={() => { store.logout(); setAuthView('login'); }} />
+        <Navbar user={currentUser} onLogout={() => store.logout()} />
         
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8">
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-4xl font-headline font-bold text-primary tracking-tight">
                 {selectedClass ? `${selectedClass.name}` : 'Nástěnka učitele'}
               </h1>
               <p className="text-muted-foreground">
-                {selectedClass ? 'Správa úkolů v cloudu.' : 'Spravujte své třídy, žáky a cloudové materiály.'}
+                {selectedClass ? 'Správa úkolů a výsledků v cloudu.' : 'Spravujte své třídy, žáky a cloudové materiály.'}
               </p>
             </div>
             <div className="flex gap-2">
@@ -186,8 +188,8 @@ export default function ITestApp() {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Vytvořit novou třídu v databázi</DialogTitle>
-                      <DialogDescription>Tato třída bude uložena do cloudu.</DialogDescription>
+                      <DialogTitle>Vytvořit novou třídu</DialogTitle>
+                      <DialogDescription>Tato třída bude synchronizována do cloudu.</DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                       <Input 
@@ -253,11 +255,19 @@ export default function ITestApp() {
                 );
               })}
 
+              {teacherClasses.length === 0 && (
+                <div className="col-span-full py-20 text-center bg-white/30 rounded-3xl border-2 border-dashed border-primary/20">
+                  <School className="w-12 h-12 text-primary/20 mx-auto mb-4" />
+                  <p className="text-xl font-bold text-primary/60">Zatím nemáte vytvořené žádné třídy.</p>
+                  <p className="text-muted-foreground">Začněte vytvořením své první třídy v cloudu.</p>
+                </div>
+              )}
+
               <Dialog open={isAddingStudent} onOpenChange={setIsAddingStudent}>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Zapsat žáka do cloudu</DialogTitle>
-                    <DialogDescription>Vytvořte účet, který bude uložen v databázi.</DialogDescription>
+                    <DialogDescription>Vytvořte účet, který bude synchronizován napříč zařízeními.</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
@@ -275,7 +285,7 @@ export default function ITestApp() {
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsAddingStudent(false)}>Zrušit</Button>
-                    <Button onClick={handleAddStudent} disabled={!newStudentName.trim() || !newStudentUsername.trim() || !newStudentPassword.trim()}>Přidat do DB</Button>
+                    <Button onClick={handleAddStudent} disabled={!newStudentName.trim() || !newStudentUsername.trim() || !newStudentPassword.trim()}>Přidat do Cloudu</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -293,7 +303,7 @@ export default function ITestApp() {
               ) : (
                 <div className="grid gap-4">
                   {store.assignments.filter(a => a.classId === selectedClassId).map(a => (
-                    <Card key={a.id} className="hover:border-primary transition-all border-none shadow-sm group">
+                    <Card key={a.id} className="hover:border-primary transition-all border-none shadow-sm group bg-white">
                       <CardContent className="p-5 flex justify-between items-center">
                         <div className="flex items-center gap-5">
                           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
@@ -301,7 +311,7 @@ export default function ITestApp() {
                           </div>
                           <div>
                             <h4 className="font-bold text-xl">{a.title}</h4>
-                            <Badge variant="outline" className="text-[10px]">V cloudu</Badge>
+                            <Badge variant="outline" className="text-[10px]">Cloud Synced</Badge>
                           </div>
                         </div>
                         <ChevronRight className="w-5 h-5 text-gray-300" />
@@ -309,7 +319,7 @@ export default function ITestApp() {
                     </Card>
                   ))}
                   {store.assignments.filter(a => a.classId === selectedClassId).length === 0 && (
-                    <div className="text-center py-12 text-muted-foreground">Dosud nebyly vytvořeny žádné úkoly.</div>
+                    <div className="text-center py-12 text-muted-foreground bg-white rounded-3xl">Dosud nebyly vytvořeny žádné úkoly.</div>
                   )}
                 </div>
               )}
@@ -327,7 +337,7 @@ export default function ITestApp() {
                            </div>
                            <p className="font-bold">{student.name}</p>
                          </div>
-                         <p className="text-xs text-muted-foreground">Login: {student.username}</p>
+                         <p className="text-xs text-muted-foreground font-mono">Login: {student.username}</p>
                        </div>
                      ))}
                      {store.users.filter(u => u.classId === selectedClassId).length === 0 && (
@@ -401,7 +411,7 @@ export default function ITestApp() {
                     const a = store.assignments.find(as => as.id === s.assignmentId);
                     return a?.classId === selectedClassId;
                   }).length === 0 && (
-                    <div className="text-center py-12 text-muted-foreground">Zatím nebyly odevzdány žádné práce.</div>
+                    <div className="text-center py-12 text-muted-foreground bg-white rounded-3xl">Zatím nebyly odevzdány žádné práce.</div>
                   )}
                 </div>
               )}
@@ -416,8 +426,8 @@ export default function ITestApp() {
     const studentAssignments = store.assignments.filter(a => a.classId === currentUser.classId);
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar user={currentUser} onLogout={() => { store.logout(); setAuthView('login'); }} />
-        <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8">
+        <Navbar user={currentUser} onLogout={() => store.logout()} />
+        <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 animate-fade-in">
           {selectedAssignmentId ? (
             <div className="space-y-6">
               <Button variant="ghost" className="rounded-full" onClick={() => setSelectedAssignmentId(null)}>← Zpět</Button>
@@ -474,7 +484,7 @@ export default function ITestApp() {
                 {studentAssignments.map(a => {
                   const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id);
                   return (
-                    <Card key={a.id} className="cursor-pointer hover:shadow-lg transition-all" onClick={() => setSelectedAssignmentId(a.id)}>
+                    <Card key={a.id} className="cursor-pointer hover:shadow-lg transition-all bg-white" onClick={() => setSelectedAssignmentId(a.id)}>
                       <CardContent className="p-6 flex justify-between items-center">
                         <div>
                           <p className="font-bold text-xl">{a.title}</p>
