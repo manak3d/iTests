@@ -1,68 +1,63 @@
 
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { User, Class, Assignment, Submission, Role } from '@/lib/types';
+import { useFirestore } from '@/firebase/provider';
+import { collection, doc, setDoc, updateDoc, addDoc, query, where, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export function useITestStore() {
+  const db = useFirestore();
+  const { toast } = useToast();
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [classes, setClasses] = useState<Class[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const { toast } = useToast();
 
+  // Load session from sessionStorage for faster UI
   useEffect(() => {
-    const savedData = localStorage.getItem('itest_data');
-    let initialUsers: User[] = [];
-    
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        setClasses(parsed.classes || []);
-        initialUsers = parsed.users || [];
-        setAssignments(parsed.assignments || []);
-        setSubmissions(parsed.submissions || []);
-      } catch (e) {
-        console.error("Failed to parse itest_data", e);
-      }
-    }
-    
-    if (initialUsers.length === 0) {
-      initialUsers = [{ id: 't1', name: 'Dr. Smith', role: 'teacher', username: 'smith', password: 'password' }];
-    }
-    setUsers(initialUsers);
-
     const sessionUser = sessionStorage.getItem('itest_session');
     if (sessionUser) {
       try {
         setCurrentUser(JSON.parse(sessionUser));
       } catch (e) {
-        console.error("Failed to parse itest_session", e);
+        console.error("Session parse error", e);
       }
     }
-    
-    setIsLoaded(true);
   }, []);
 
+  // Real-time sync with Firestore
   useEffect(() => {
-    if (!isLoaded) return;
-    try {
-      const data = { classes, users, assignments, submissions };
-      localStorage.setItem('itest_data', JSON.stringify(data));
-    } catch (e) {
-      if (e instanceof Error && e.name === 'QuotaExceededError') {
-        toast({
-          title: "Paměť prohlížeče je plná",
-          description: "Nepodařilo se uložit změny. Smažte prosím staré úkoly nebo odevzdané práce.",
-          variant: "destructive"
-        });
-      }
-      console.error("LocalStorage sync failed", e);
-    }
-  }, [classes, users, assignments, submissions, isLoaded, toast]);
+    if (!db) return;
+
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+      setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as User)));
+      setIsLoaded(true);
+    });
+
+    const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
+      setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() } as Class)));
+    });
+
+    const unsubAssignments = onSnapshot(collection(db, 'assignments'), (snap) => {
+      setAssignments(snap.docs.map(d => ({ id: d.id, ...d.data() } as Assignment)));
+    });
+
+    const unsubSubmissions = onSnapshot(collection(db, 'submissions'), (snap) => {
+      setSubmissions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Submission)));
+    });
+
+    return () => {
+      unsubUsers();
+      unsubClasses();
+      unsubAssignments();
+      unsubSubmissions();
+    };
+  }, [db]);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
@@ -79,45 +74,54 @@ export function useITestStore() {
     sessionStorage.removeItem('itest_session');
   }, []);
 
-  const addClass = useCallback((name: string) => {
-    if (!currentUser) return;
+  const addClass = useCallback(async (name: string) => {
+    if (!db || !currentUser) return;
+    const classId = Math.random().toString(36).substring(2, 11);
     const newClass: Class = { 
-      id: Math.random().toString(36).substring(2, 11), 
+      id: classId, 
       name, 
       teacherId: currentUser.id, 
       studentIds: [] 
     };
-    setClasses(prev => [...prev, newClass]);
-    return newClass;
-  }, [currentUser]);
+    setDoc(doc(db, 'classes', classId), newClass);
+  }, [db, currentUser]);
 
-  const addStudent = useCallback((classId: string, name: string, username: string, password?: string) => {
+  const addStudent = useCallback(async (classId: string, name: string, username: string, password?: string) => {
+    if (!db) return;
     const studentId = Math.random().toString(36).substring(2, 11);
     const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
     
-    setUsers(prev => [...prev, newUser]);
-    setClasses(prev => prev.map(c => 
-      c.id === classId ? { ...c, studentIds: [...c.studentIds, studentId] } : c
-    ));
-  }, []);
+    setDoc(doc(db, 'users', studentId), newUser);
+    
+    const cls = classes.find(c => c.id === classId);
+    if (cls) {
+      updateDoc(doc(db, 'classes', classId), {
+        studentIds: [...cls.studentIds, studentId]
+      });
+    }
+  }, [db, classes]);
 
-  const addAssignment = useCallback((assignment: Omit<Assignment, 'id'>) => {
-    const newAssignment = { ...assignment, id: Math.random().toString(36).substring(2, 11) };
-    setAssignments(prev => [...prev, newAssignment]);
-  }, []);
+  const addAssignment = useCallback(async (assignment: Omit<Assignment, 'id'>) => {
+    if (!db) return;
+    const id = Math.random().toString(36).substring(2, 11);
+    setDoc(doc(db, 'assignments', id), { ...assignment, id });
+  }, [db]);
 
-  const submitWork = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'>) => {
+  const submitWork = useCallback(async (submission: Omit<Submission, 'id' | 'submittedAt'>) => {
+    if (!db) return;
+    const id = Math.random().toString(36).substring(2, 11);
     const newSubmission = { 
       ...submission, 
-      id: Math.random().toString(36).substring(2, 11),
+      id,
       submittedAt: new Date().toISOString()
     };
-    setSubmissions(prev => [...prev, newSubmission]);
-  }, []);
+    setDoc(doc(db, 'submissions', id), newSubmission);
+  }, [db]);
 
-  const gradeSubmission = useCallback((id: string, grade: number, feedback: string) => {
-    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, grade, feedback } : s));
-  }, []);
+  const gradeSubmission = useCallback(async (id: string, grade: number, feedback: string) => {
+    if (!db) return;
+    updateDoc(doc(db, 'submissions', id), { grade, feedback });
+  }, [db]);
 
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
