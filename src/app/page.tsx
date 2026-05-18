@@ -1027,21 +1027,34 @@ export default function ITestApp() {
                     store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
                   );
 
-                  if (submittedAssignments.length === 0) {
-                    return (
-                      <Card className="border-none shadow-sm bg-white p-6 text-center text-muted-foreground">
-                        Zatím jsi nevyplnil žádné testy.
-                      </Card>
-                    );
-                  }
+                  // Definujeme předdefinované předměty
+                  const predefinedSubjects = [
+                    'Matematika',
+                    'Český jazyk',
+                    'Anglický jazyk',
+                    'Fyzika',
+                    'Chemie',
+                    'Dějepis',
+                    'Zeměpis',
+                    'Přírodopis',
+                    'Informatika',
+                    'Jiný'
+                  ];
+
+                  // Inicializujeme seskupení s prázdnými poli pro každý předdefinovaný předmět
+                  const grouped: Record<string, typeof submittedAssignments> = {};
+                  predefinedSubjects.forEach(sub => {
+                    grouped[sub] = [];
+                  });
 
                   // Seskupíme odevzdané úkoly podle předmětu
-                  const grouped = submittedAssignments.reduce<Record<string, typeof submittedAssignments>>((acc, a) => {
+                  submittedAssignments.forEach(a => {
                     const subject = a.subject || 'Jiný';
-                    if (!acc[subject]) acc[subject] = [];
-                    acc[subject].push(a);
-                    return acc;
-                  }, {});
+                    if (!grouped[subject]) {
+                      grouped[subject] = [];
+                    }
+                    grouped[subject].push(a);
+                  });
 
                   return (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1054,39 +1067,43 @@ export default function ITestApp() {
                             <CardTitle className="font-headline text-xl text-primary font-bold">{subjectName}</CardTitle>
                           </CardHeader>
                           <CardContent className="p-4 divide-y">
-                            {list.map(a => {
-                              const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
-                              const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                              
-                              let earned = 0;
-                              if (sub.questionScores) {
-                                if (sub.questionScores instanceof Map) {
-                                  sub.questionScores.forEach(val => { earned += val; });
-                                } else {
-                                  Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                            {list.length === 0 ? (
+                              <p className="text-sm text-muted-foreground py-3 px-2 italic">Žádné dokončené testy</p>
+                            ) : (
+                              list.map(a => {
+                                const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
+                                const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                                
+                                let earned = 0;
+                                if (sub.questionScores) {
+                                  if (sub.questionScores instanceof Map) {
+                                    sub.questionScores.forEach(val => { earned += val; });
+                                  } else {
+                                    Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                                  }
                                 }
-                              }
-                              
-                              let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
+                                
+                                let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
 
-                              return (
-                                <div 
-                                  key={a.id} 
-                                  onClick={() => setSelectedAssignmentId(a.id)}
-                                  className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 rounded-lg cursor-pointer transition-colors"
-                                >
-                                  <div className="space-y-1">
-                                    <p className="font-bold text-base text-gray-800">{a.title}</p>
-                                    <div className="flex gap-2">
-                                      <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
-                                        {badgeText}
-                                      </Badge>
+                                return (
+                                  <div 
+                                    key={a.id} 
+                                    onClick={() => setSelectedAssignmentId(a.id)}
+                                    className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 rounded-lg cursor-pointer transition-colors"
+                                  >
+                                    <div className="space-y-1">
+                                      <p className="font-bold text-base text-gray-800">{a.title}</p>
+                                      <div className="flex gap-2">
+                                        <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
+                                          {badgeText}
+                                        </Badge>
+                                      </div>
                                     </div>
+                                    <ChevronRight className="w-5 h-5 text-gray-300" />
                                   </div>
-                                  <ChevronRight className="w-5 h-5 text-gray-300" />
-                                </div>
-                              );
-                            })}
+                                );
+                              })
+                            )}
                           </CardContent>
                         </Card>
                       ))}
