@@ -1,14 +1,29 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Eraser, Pencil, RotateCcw, Download } from 'lucide-react';
+import { Eraser, Pencil, RotateCcw, Minus, Circle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const COLORS = [
+  { id: 'black', value: '#000000', label: 'Černá' },
+  { id: 'blue', value: '#295CA3', label: 'Modrá' },
+  { id: 'red', value: '#E11D48', label: 'Červená' },
+  { id: 'green', value: '#10B981', label: 'Zelená' },
+];
+
+const SIZES = [
+  { id: 'thin', value: 2, label: 'Tenký', iconSize: 4 },
+  { id: 'medium', value: 5, label: 'Střední', iconSize: 8 },
+  { id: 'thick', value: 12, label: 'Tlustý', iconSize: 12 },
+];
 
 export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#295CA3');
   const [lineWidth, setLineWidth] = useState(3);
+  const [isEraser, setIsEraser] = useState(false);
 
   // Initialize canvas with smooth rendering
   useEffect(() => {
@@ -19,9 +34,18 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-  }, [color, lineWidth]);
+  }, []);
+
+  // Update context when tools change
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.strokeStyle = isEraser ? '#FFFFFF' : color;
+    ctx.lineWidth = isEraser ? 30 : lineWidth;
+  }, [color, lineWidth, isEraser]);
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
     const canvas = canvasRef.current;
@@ -83,37 +107,68 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
 
   return (
     <div className="space-y-4 bg-white p-6 rounded-2xl border-2 border-primary/10 shadow-inner">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
-          <Button 
-            variant={color === '#295CA3' ? 'default' : 'ghost'} 
-            size="sm" 
-            className="rounded-md"
-            onClick={() => { setColor('#295CA3'); setLineWidth(3); }}
-          >
-            <Pencil className="w-4 h-4 mr-2" /> Pero
-          </Button>
-          <Button 
-            variant={color === '#000000' ? 'default' : 'ghost'} 
-            size="sm" 
-            className="rounded-md"
-            onClick={() => { setColor('#000000'); setLineWidth(5); }}
-          >
-            <Pencil className="w-4 h-4 mr-2" /> Fix
-          </Button>
-          <Button 
-            variant={color === '#FFFFFF' ? 'default' : 'ghost'} 
-            size="sm" 
-            className="rounded-md"
-            onClick={() => { setColor('#FFFFFF'); setLineWidth(20); }}
-          >
-            <Eraser className="w-4 h-4 mr-2" /> Guma
-          </Button>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        {/* Nástroje a barvy */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+            <Button 
+              variant={!isEraser ? 'default' : 'ghost'} 
+              size="sm" 
+              className="rounded-md h-9"
+              onClick={() => setIsEraser(false)}
+            >
+              <Pencil className="w-4 h-4 mr-2" /> Pero
+            </Button>
+            <Button 
+              variant={isEraser ? 'default' : 'ghost'} 
+              size="sm" 
+              className="rounded-md h-9"
+              onClick={() => setIsEraser(true)}
+            >
+              <Eraser className="w-4 h-4 mr-2" /> Guma
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            {COLORS.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => { setColor(c.value); setIsEraser(false); }}
+                className={cn(
+                  "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95",
+                  color === c.value && !isEraser ? "border-primary scale-110 shadow-md" : "border-transparent"
+                )}
+                style={{ backgroundColor: c.value }}
+                title={c.label}
+              />
+            ))}
+          </div>
         </div>
         
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={clear} className="rounded-full border-dashed">
-            <RotateCcw className="w-4 h-4 mr-2" /> Vymazat plochu
+        {/* Velikosti stopy */}
+        <div className="flex items-center gap-4">
+          <div className="flex gap-2 items-center bg-gray-50 px-3 py-1 rounded-full border">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase mr-2">Tloušťka:</span>
+            {SIZES.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => { setLineWidth(s.value); setIsEraser(false); }}
+                className={cn(
+                  "flex items-center justify-center w-8 h-8 rounded-full transition-all hover:bg-white",
+                  lineWidth === s.value && !isEraser ? "bg-white border shadow-sm" : ""
+                )}
+                title={s.label}
+              >
+                <div 
+                  className="rounded-full bg-slate-700" 
+                  style={{ width: s.iconSize, height: s.iconSize }} 
+                />
+              </button>
+            ))}
+          </div>
+
+          <Button variant="outline" size="sm" onClick={clear} className="rounded-full border-dashed h-9">
+            <RotateCcw className="w-4 h-4 mr-2" /> Vymazat
           </Button>
         </div>
       </div>
