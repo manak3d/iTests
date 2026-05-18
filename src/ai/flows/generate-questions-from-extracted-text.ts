@@ -1,0 +1,96 @@
+'use server';
+/**
+ * @fileOverview A Genkit flow for generating various types of comprehension questions from provided text.
+ *
+ * - generateQuestionsFromExtractedText - A function that generates comprehension questions.
+ * - GenerateQuestionsInput - The input type for the generateQuestionsFromExtractedText function.
+ * - GenerateQuestionsOutput - The return type for the generateQuestionsFromExtractedText function.
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+
+const ShortAnswerQuestionSchema = z.object({
+  type: z.literal('short_answer'),
+  questionText: z.string().describe('The short answer question.'),
+});
+
+const MultipleChoiceQuestionSchema = z.object({
+  type: z.literal('multiple_choice'),
+  questionText: z.string().describe('The multiple choice question.'),
+  options: z.array(z.string()).describe('An array of possible answer options.'),
+  correctAnswerIndex: z.number().int().describe('The 0-based index of the correct option in the options array.'),
+});
+
+const TrueFalseQuestionSchema = z.object({
+  type: z.literal('true_false'),
+  questionText: z.string().describe('The true/false question.'),
+  correctAnswer: z.boolean().describe('The correct answer for the true/false question (true or false).'),
+});
+
+const GenerateQuestionsInputSchema = z.object({
+  extractedText: z.string().describe('The text extracted from a document, used to generate questions.'),
+});
+export type GenerateQuestionsInput = z.infer<typeof GenerateQuestionsInputSchema>;
+
+const GenerateQuestionsOutputSchema = z.object({
+  questions: z.array(z.union([
+    ShortAnswerQuestionSchema,
+    MultipleChoiceQuestionSchema,
+    TrueFalseQuestionSchema,
+  ])).describe('An array of generated comprehension questions of various types.'),
+});
+export type GenerateQuestionsOutput = z.infer<typeof GenerateQuestionsOutputSchema>;
+
+export async function generateQuestionsFromExtractedText(input: GenerateQuestionsInput): Promise<GenerateQuestionsOutput> {
+  return generateQuestionsFlow(input);
+}
+
+const prompt = ai.definePrompt({
+  name: 'generateQuestionsPrompt',
+  input: { schema: GenerateQuestionsInputSchema },
+  output: { schema: GenerateQuestionsOutputSchema },
+  prompt: `You are an AI assistant specialized in creating engaging and diverse comprehension questions for educational purposes.
+Based on the provided text, generate a set of questions including short answer, multiple choice, and true/false.
+Ensure the questions are relevant to the text and cover key information.
+
+Here is the extracted text:
+{{{extractedText}}}
+
+Please output a JSON array of questions, adhering to the following schema for each question type:
+
+Short Answer:
+{
+  "type": "short_answer",
+  "questionText": "..."
+}
+
+Multiple Choice:
+{
+  "type": "multiple_choice",
+  "questionText": "...",
+  "options": ["option1", "option2", "option3", "option4"],
+  "correctAnswerIndex": 0
+}
+
+True/False:
+{
+  "type": "true_false",
+  "questionText": "...",
+  "correctAnswer": true
+}
+
+Make sure to provide at least one question of each type, and a variety of questions overall to test comprehension comprehensively.`,
+});
+
+const generateQuestionsFlow = ai.defineFlow(
+  {
+    name: 'generateQuestionsFromExtractedTextFlow',
+    inputSchema: GenerateQuestionsInputSchema,
+    outputSchema: GenerateQuestionsOutputSchema,
+  },
+  async (input) => {
+    const { output } = await prompt(input);
+    return output!;
+  }
+);
