@@ -44,6 +44,7 @@ export default function ITestApp() {
 
   const [classSearch, setClassSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
+  const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
   
   const [activeTab, setActiveTab] = useState('classes');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -1164,56 +1165,77 @@ export default function ITestApp() {
                   });
 
                   return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {Object.entries(grouped).map(([subjectName, list]) => (
-                        <Card key={subjectName} className="border-none shadow-md overflow-hidden bg-white">
-                          <CardHeader className="bg-primary/5 border-b pb-4 flex flex-row items-center gap-3">
-                            <div className="bg-primary/10 p-2 rounded-lg text-primary">
-                              <BookOpen className="w-5 h-5" />
-                            </div>
-                            <CardTitle className="font-headline text-xl text-primary font-bold">{subjectName}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="p-4 divide-y">
-                            {list.length === 0 ? (
-                              <p className="text-sm text-muted-foreground py-3 px-2 italic">Žádné dokončené testy</p>
-                            ) : (
-                              list.map(a => {
-                                const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
-                                const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                                
-                                let earned = 0;
-                                if (sub.questionScores) {
-                                  if (sub.questionScores instanceof Map) {
-                                    sub.questionScores.forEach(val => { earned += val; });
-                                  } else {
-                                    Object.values(sub.questionScores).forEach(val => { earned += val as number; });
-                                  }
-                                }
-                                
-                                let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
+                    <div className="space-y-4">
+                      {Object.entries(grouped).map(([subjectName, list]) => {
+                        const isExpanded = !!expandedSubjects[subjectName];
+                        return (
+                          <div key={subjectName} className="border border-gray-200/80 bg-white rounded-2xl shadow-sm overflow-hidden transition-all duration-200">
+                            {/* Horizontal Header (Interactive button) */}
+                            <button
+                              type="button"
+                              onClick={() => setExpandedSubjects(prev => ({ ...prev, [subjectName]: !isExpanded }))}
+                              className="w-full flex items-center justify-between p-5 bg-gray-50/50 hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="bg-primary/10 p-2.5 rounded-xl text-primary">
+                                  <BookOpen className="w-5 h-5" />
+                                </div>
+                                <span className="font-headline text-xl text-primary font-bold">{subjectName}</span>
+                              </div>
 
-                                return (
-                                  <div 
-                                    key={a.id} 
-                                    onClick={() => setSelectedAssignmentId(a.id)}
-                                    className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 rounded-lg cursor-pointer transition-colors"
-                                  >
-                                    <div className="space-y-1">
-                                      <p className="font-bold text-base text-gray-800">{a.title}</p>
-                                      <div className="flex gap-2">
-                                        <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
-                                          {badgeText}
-                                        </Badge>
+                              <div className="flex items-center gap-3">
+                                <Badge variant={list.length > 0 ? "default" : "secondary"} className="font-semibold text-xs px-2.5 py-0.5">
+                                  {list.length > 0 ? `${list.length} dokončených testů` : 'Bez testů'}
+                                </Badge>
+                                <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                              </div>
+                            </button>
+
+                            {/* Collapsible Content */}
+                            {isExpanded && (
+                              <div className="border-t divide-y p-4 bg-white animate-fade-in">
+                                {list.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground py-3 px-2 italic text-center">Žádné dokončené testy v tomto předmětu</p>
+                                ) : (
+                                  list.map(a => {
+                                    const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
+                                    const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                                    
+                                    let earned = 0;
+                                    if (sub.questionScores) {
+                                      if (sub.questionScores instanceof Map) {
+                                        sub.questionScores.forEach(val => { earned += val; });
+                                      } else {
+                                        Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                                      }
+                                    }
+                                    
+                                    let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
+
+                                    return (
+                                      <div 
+                                        key={a.id} 
+                                        onClick={() => setSelectedAssignmentId(a.id)}
+                                        className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 rounded-lg cursor-pointer transition-colors"
+                                      >
+                                        <div className="space-y-1">
+                                          <p className="font-bold text-base text-gray-800">{a.title}</p>
+                                          <div className="flex gap-2">
+                                            <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
+                                              {badgeText}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                        <ChevronRight className="w-5 h-5 text-gray-300" />
                                       </div>
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 text-gray-300" />
-                                  </div>
-                                );
-                              })
+                                    );
+                                  })
+                                )}
+                              </div>
                             )}
-                          </CardContent>
-                        </Card>
-                      ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}
