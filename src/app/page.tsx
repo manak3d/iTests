@@ -97,7 +97,8 @@ export default function ITestApp() {
     }
   };
 
-  if (authView === 'login') {
+  // Bezpečná kontrola existence uživatele před vykreslením dashboardu
+  if (authView === 'login' || !store.currentUser) {
     return (
       <div className="min-h-screen bg-[#EFF3F7] flex items-center justify-center p-4">
         <Card className="w-full max-w-md border-none shadow-2xl overflow-hidden animate-fade-in">
@@ -153,7 +154,7 @@ export default function ITestApp() {
     );
   }
 
-  const currentUser = store.currentUser!;
+  const currentUser = store.currentUser;
 
   if (currentUser.role === 'teacher') {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
@@ -224,7 +225,7 @@ export default function ITestApp() {
 
             <TabsContent value="classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {teacherClasses.map(c => {
-                const classStudents = store.users.filter(u => u.classId === c.id);
+                const classStudentsCount = store.users.filter(u => u.classId === c.id).length;
                 return (
                   <Card 
                     key={c.id} 
@@ -242,7 +243,7 @@ export default function ITestApp() {
                     <CardContent>
                       <div className="flex justify-between items-center">
                         <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                          {classStudents.length} {classStudents.length === 1 ? 'Žák' : (classStudents.length > 1 && classStudents.length < 5 ? 'Žáci' : 'Žáků')}
+                          {classStudentsCount} {classStudentsCount === 1 ? 'Žák' : (classStudentsCount > 1 && classStudentsCount < 5 ? 'Žáci' : 'Žáků')}
                         </Badge>
                         <Button variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary rounded-full" onClick={(e) => {
                           e.stopPropagation();
