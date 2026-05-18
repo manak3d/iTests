@@ -12,15 +12,18 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/e
 // Pomocná funkce pro odstranění undefined hodnot před uložením do Firestore
 function cleanData(obj: any): any {
   if (obj === null || obj === undefined) return null;
-  const clean: any = Array.isArray(obj) ? [] : {};
+  
+  if (Array.isArray(obj)) {
+    return obj.map(v => cleanData(v)).filter(v => v !== undefined);
+  }
+  
+  if (typeof obj !== 'object') return obj;
+  
+  const clean: any = {};
   Object.keys(obj).forEach(key => {
     const val = obj[key];
     if (val === undefined) return;
-    if (val !== null && typeof val === 'object') {
-      clean[key] = cleanData(val);
-    } else {
-      clean[key] = val;
-    }
+    clean[key] = cleanData(val);
   });
   return clean;
 }
@@ -61,7 +64,6 @@ export function useITestStore() {
       const fetchedUsers = snap.docs.map(d => ({ ...d.data(), id: d.id } as User));
       setUsers(fetchedUsers);
       
-      // Synchronizace aktuálního uživatele s daty z DB
       if (currentUser) {
         const freshUser = fetchedUsers.find(u => u.id === currentUser.id);
         if (freshUser) {
@@ -69,10 +71,10 @@ export function useITestStore() {
           sessionStorage.setItem('itest_session', JSON.stringify(freshUser));
         }
       }
-      
       setLoadingStates(prev => ({ ...prev, users: false }));
     }, (err) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'users', operation: 'list' }));
+      setLoadingStates(prev => ({ ...prev, users: false }));
     });
 
     const unsubClasses = onSnapshot(collection(db, 'classes'), (snap) => {
@@ -80,6 +82,7 @@ export function useITestStore() {
       setLoadingStates(prev => ({ ...prev, classes: false }));
     }, (err) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'classes', operation: 'list' }));
+      setLoadingStates(prev => ({ ...prev, classes: false }));
     });
 
     const unsubAssignments = onSnapshot(collection(db, 'assignments'), (snap) => {
@@ -87,6 +90,7 @@ export function useITestStore() {
       setLoadingStates(prev => ({ ...prev, assignments: false }));
     }, (err) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'assignments', operation: 'list' }));
+      setLoadingStates(prev => ({ ...prev, assignments: false }));
     });
 
     const unsubSubmissions = onSnapshot(collection(db, 'submissions'), (snap) => {
@@ -94,6 +98,7 @@ export function useITestStore() {
       setLoadingStates(prev => ({ ...prev, submissions: false }));
     }, (err) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'submissions', operation: 'list' }));
+      setLoadingStates(prev => ({ ...prev, submissions: false }));
     });
 
     return () => {

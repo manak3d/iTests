@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useITestStore } from '@/hooks/use-itest-store';
 import { Navbar } from '@/components/itest/Navbar';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -22,7 +22,6 @@ export default function ITestApp() {
   const store = useITestStore();
   const { toast } = useToast();
   
-  const [authView, setAuthView] = useState<'login' | 'dashboard'>('login');
   const [loginRole, setLoginRole] = useState<'teacher' | 'student'>('teacher');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -44,17 +43,6 @@ export default function ITestApp() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
 
-  // Synchronizace zobrazení s přihlášeným uživatelem a čekání na plné načtení
-  useEffect(() => {
-    if (store.isLoaded) {
-      if (store.currentUser) {
-        setAuthView('dashboard');
-      } else {
-        setAuthView('login');
-      }
-    }
-  }, [store.currentUser, store.isLoaded]);
-
   if (!store.isLoaded) {
     return (
       <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background">
@@ -69,9 +57,7 @@ export default function ITestApp() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (store.login(loginRole, username, password)) {
-      setAuthView('dashboard');
-    } else {
+    if (!store.login(loginRole, username, password)) {
       toast({
         title: "Přihlášení se nezdařilo",
         description: "Nesprávné uživatelské jméno nebo heslo.",
@@ -99,8 +85,7 @@ export default function ITestApp() {
     }
   };
 
-  // Bezpečná kontrola existence uživatele před vykreslením dashboardu
-  if (authView === 'login' || !store.currentUser) {
+  if (!store.currentUser) {
     return (
       <div className="min-h-screen bg-[#EFF3F7] flex items-center justify-center p-4">
         <Card className="w-full max-w-md border-none shadow-2xl overflow-hidden animate-fade-in">
