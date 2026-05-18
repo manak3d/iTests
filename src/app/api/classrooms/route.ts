@@ -20,3 +20,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    await dbConnect();
+    const body = await request.json();
+    const updated = await Classroom.findByIdAndUpdate(body.id, { teacherId: body.teacherId }, { new: true });
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}

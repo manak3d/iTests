@@ -12,11 +12,25 @@ import { useToast } from '@/hooks/use-toast';
 
 export function AssignmentCreator({ classId, onSave }: { classId: string; onSave: (a: Omit<Assignment, 'id'>) => void }) {
   const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState('Matematika');
   const [description, setDescription] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [fileUri, setFileUri] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  const SUBJECTS = [
+    'Matematika',
+    'Český jazyk',
+    'Anglický jazyk',
+    'Fyzika',
+    'Chemie',
+    'Dějepis',
+    'Zeměpis',
+    'Přírodopis',
+    'Informatika',
+    'Jiný'
+  ];
 
   const compressImage = (dataUri: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -94,6 +108,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       title,
       description,
       classId,
+      subject,
       questions,
       fileUri,
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -128,14 +143,28 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-primary uppercase">Název úkolu</label>
-            <Input 
-              placeholder="Např. Prověrka z historie" 
-              value={title} 
-              onChange={e => setTitle(e.target.value)}
-              className="h-12 text-lg"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-primary uppercase">Název úkolu</label>
+              <Input 
+                placeholder="Např. Prověrka z historie" 
+                value={title} 
+                onChange={e => setTitle(e.target.value)}
+                className="h-12 text-lg"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-primary uppercase">Předmět</label>
+              <select
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {SUBJECTS.map(subj => (
+                  <option key={subj} value={subj}>{subj}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-bold text-primary uppercase">Výchozí text / Instrukce</label>

@@ -260,8 +260,44 @@ export function useITestStore() {
     .catch(console.error);
   }, [db, toast]);
 
+  const assignClass = useCallback((classId: string) => {
+    if (!currentUser) return;
+    fetch('/api/classrooms', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: classId, teacherId: currentUser.id })
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Třída přidána", description: "Třída byla úspěšně přiřazena k vašemu účtu." });
+        setClasses(prev => prev.map(c => c.id === classId ? { ...c, teacherId: currentUser.id } : c));
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se přidat třídu.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
+  }, [currentUser, toast]);
+
+  const assignStudent = useCallback((studentId: string, classId: string) => {
+    fetch('/api/students', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: studentId, classId })
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Žák přidán", description: "Žák byl úspěšně zapsán do třídy." });
+        setUsers(prev => prev.map(u => u.id === studentId ? { ...u, classId } : u));
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se zapsat žáka.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
+  }, [toast]);
+
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
-    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, submitWork, gradeSubmission
+    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, submitWork, gradeSubmission,
+    assignClass, assignStudent
   };
 }

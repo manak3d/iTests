@@ -35,6 +35,12 @@ export default function ITestApp() {
   const [newStudentUsername, setNewStudentUsername] = useState('');
   const [newStudentPassword, setNewStudentPassword] = useState('');
   const [targetClassId, setTargetClassId] = useState<string | null>(null);
+
+  const [classActionType, setClassActionType] = useState<'create' | 'select'>('create');
+  const [selectedExistingClassId, setSelectedExistingClassId] = useState('');
+
+  const [studentActionType, setStudentActionType] = useState<'create' | 'select'>('create');
+  const [selectedExistingStudentId, setSelectedExistingStudentId] = useState('');
   
   const [activeTab, setActiveTab] = useState('classes');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -319,7 +325,14 @@ export default function ITestApp() {
                 </Button>
               )}
               {activeTab === 'classes' && !selectedClassId && (
-                <Dialog open={isAddingClass} onOpenChange={setIsAddingClass}>
+                <Dialog open={isAddingClass} onOpenChange={(open) => {
+                  setIsAddingClass(open);
+                  if (!open) {
+                    setClassActionType('create');
+                    setNewClassName('');
+                    setSelectedExistingClassId('');
+                  }
+                }}>
                   <DialogTrigger asChild>
                     <Button className="rounded-full shadow-md">
                       <Plus className="w-4 h-4 mr-2" /> Nová třída
@@ -327,13 +340,65 @@ export default function ITestApp() {
                   </DialogTrigger>
                   <DialogContent aria-describedby={undefined}>
                     <DialogHeader>
-                      <DialogTitle>Vytvořit novou třídu</DialogTitle>
+                      <DialogTitle>Přidat třídu</DialogTitle>
                     </DialogHeader>
-                    <div className="py-4">
-                      <Input placeholder="Např. Matematika 8.A" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} />
+                    
+                    <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg mb-4">
+                      <button 
+                        type="button" 
+                        className={`py-2 text-sm font-medium rounded-md transition-all ${classActionType === 'create' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                        onClick={() => setClassActionType('create')}
+                      >Vytvořit novou</button>
+                      <button 
+                        type="button" 
+                        className={`py-2 text-sm font-medium rounded-md transition-all ${classActionType === 'select' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                        onClick={() => setClassActionType('select')}
+                      >Vybrat existující</button>
                     </div>
+
+                    {classActionType === 'create' ? (
+                      <div className="py-4">
+                        <Input placeholder="Např. Matematika 8.A" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} />
+                      </div>
+                    ) : (
+                      <div className="py-4 space-y-2">
+                        <Label className="text-sm text-muted-foreground">Vyberte třídu z databáze:</Label>
+                        {(() => {
+                          const availableClasses = store.classes.filter(c => c.teacherId !== currentUser.id);
+                          if (availableClasses.length === 0) {
+                            return <p className="text-sm text-amber-600 font-semibold py-2">Žádné další třídy nebyly v systému nalezeny.</p>;
+                          }
+                          return (
+                            <select
+                              value={selectedExistingClassId}
+                              onChange={(e) => setSelectedExistingClassId(e.target.value)}
+                              className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                            >
+                              <option value="">-- Vyberte třídu --</option>
+                              {availableClasses.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                          );
+                        })()}
+                      </div>
+                    )}
+
                     <DialogFooter>
-                      <Button onClick={handleAddClass} disabled={!newClassName.trim()}>Vytvořit</Button>
+                      {classActionType === 'create' ? (
+                        <Button onClick={handleAddClass} disabled={!newClassName.trim()}>Vytvořit</Button>
+                      ) : (
+                        <Button 
+                          onClick={() => {
+                            if (selectedExistingClassId) {
+                              store.assignClass(selectedExistingClassId);
+                              setIsAddingClass(false);
+                              setSelectedExistingClassId('');
+                            }
+                          }} 
+                          disabled={!selectedExistingClassId}
+                        >Přidat třídu</Button>
+                      )}
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
@@ -652,16 +717,77 @@ export default function ITestApp() {
             </TabsContent>
           </Tabs>
 
-          <Dialog open={isAddingStudent} onOpenChange={setIsAddingStudent}>
+          <Dialog open={isAddingStudent} onOpenChange={(open) => {
+            setIsAddingStudent(open);
+            if (!open) {
+              setStudentActionType('create');
+              setNewStudentName('');
+              setNewStudentUsername('');
+              setNewStudentPassword('');
+              setSelectedExistingStudentId('');
+            }
+          }}>
             <DialogContent aria-describedby={undefined}>
               <DialogHeader><DialogTitle>Zapsat žáka</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-4">
-                <Input placeholder="Jméno žáka" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} />
-                <Input placeholder="Login" value={newStudentUsername} onChange={(e) => setNewStudentUsername(e.target.value)} />
-                <Input type="password" placeholder="Heslo" value={newStudentPassword} onChange={(e) => setNewStudentPassword(e.target.value)} />
+              
+              <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg mb-4">
+                <button 
+                  type="button" 
+                  className={`py-2 text-sm font-medium rounded-md transition-all ${studentActionType === 'create' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                  onClick={() => setStudentActionType('create')}
+                >Vytvořit nového</button>
+                <button 
+                  type="button" 
+                  className={`py-2 text-sm font-medium rounded-md transition-all ${studentActionType === 'select' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                  onClick={() => setStudentActionType('select')}
+                >Vybrat existujícího</button>
               </div>
+
+              {studentActionType === 'create' ? (
+                <div className="space-y-4 py-4">
+                  <Input placeholder="Jméno žáka" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} />
+                  <Input placeholder="Login" value={newStudentUsername} onChange={(e) => setNewStudentUsername(e.target.value)} />
+                  <Input type="password" placeholder="Heslo" value={newStudentPassword} onChange={(e) => setNewStudentPassword(e.target.value)} />
+                </div>
+              ) : (
+                <div className="py-4 space-y-2">
+                  <Label className="text-sm text-muted-foreground">Vyberte žáka ze systému:</Label>
+                  {(() => {
+                    const availableStudents = store.users.filter(u => u.role === 'student' && u.classId !== targetClassId);
+                    if (availableStudents.length === 0) {
+                      return <p className="text-sm text-amber-600 font-semibold py-2">Žádní další žáci nebyli v systému nalezeni.</p>;
+                    }
+                    return (
+                      <select
+                        value={selectedExistingStudentId}
+                        onChange={(e) => setSelectedExistingStudentId(e.target.value)}
+                        className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="">-- Vyberte žáka --</option>
+                        {availableStudents.map(u => (
+                          <option key={u.id} value={u.id}>{u.name} ({u.username})</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
+              )}
+
               <DialogFooter>
-                <Button onClick={handleAddStudent}>Vytvořit</Button>
+                {studentActionType === 'create' ? (
+                  <Button onClick={handleAddStudent}>Vytvořit</Button>
+                ) : (
+                  <Button 
+                    onClick={() => {
+                      if (selectedExistingStudentId && targetClassId) {
+                        store.assignStudent(selectedExistingStudentId, targetClassId);
+                        setIsAddingStudent(false);
+                        setSelectedExistingStudentId('');
+                      }
+                    }} 
+                    disabled={!selectedExistingStudentId}
+                  >Přiřadit žáka</Button>
+                )}
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -861,38 +987,137 @@ export default function ITestApp() {
               })()}
             </div>
           ) : (
-            <div className="space-y-6">
-              <h2 className="text-3xl font-headline font-bold text-primary">Moje úkoly</h2>
-              <div className="grid gap-4">
-                {studentAssignments.map(a => {
-                  const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id);
-                  
-                  let badgeText = 'Odevzdáno';
-                  if (sub && sub.grade) {
-                    const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                    let earned = 0;
-                    if (sub.questionScores) {
-                      if (sub.questionScores instanceof Map) {
-                        sub.questionScores.forEach(val => { earned += val; });
-                      } else {
-                        Object.values(sub.questionScores).forEach(val => { earned += val as number; });
-                      }
-                    }
-                    badgeText = `Známka: ${sub.grade} (Body: ${earned} / ${totalMax})`;
+            <div className="space-y-10">
+              {/* Sekce 1: Předměty a vyplněné testy */}
+              <div className="space-y-6">
+                <h2 className="text-3xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-3">
+                  <BookOpen className="w-8 h-8 text-accent" /> Moje předměty a vyplněné testy
+                </h2>
+                {(() => {
+                  // Získáme pouze odevzdané úkoly
+                  const submittedAssignments = studentAssignments.filter(a =>
+                    store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
+                  );
+
+                  if (submittedAssignments.length === 0) {
+                    return (
+                      <Card className="border-none shadow-sm bg-white p-6 text-center text-muted-foreground">
+                        Zatím jsi nevyplnil žádné testy.
+                      </Card>
+                    );
+                  }
+
+                  // Seskupíme odevzdané úkoly podle předmětu
+                  const grouped = submittedAssignments.reduce<Record<string, typeof submittedAssignments>>((acc, a) => {
+                    const subject = a.subject || 'Jiný';
+                    if (!acc[subject]) acc[subject] = [];
+                    acc[subject].push(a);
+                    return acc;
+                  }, {});
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {Object.entries(grouped).map(([subjectName, list]) => (
+                        <Card key={subjectName} className="border-none shadow-md overflow-hidden bg-white">
+                          <CardHeader className="bg-primary/5 border-b pb-4 flex flex-row items-center gap-3">
+                            <div className="bg-primary/10 p-2 rounded-lg text-primary">
+                              <BookOpen className="w-5 h-5" />
+                            </div>
+                            <CardTitle className="font-headline text-xl text-primary font-bold">{subjectName}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-4 divide-y">
+                            {list.map(a => {
+                              const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
+                              const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                              
+                              let earned = 0;
+                              if (sub.questionScores) {
+                                if (sub.questionScores instanceof Map) {
+                                  sub.questionScores.forEach(val => { earned += val; });
+                                } else {
+                                  Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                                }
+                              }
+                              
+                              let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
+
+                              return (
+                                <div 
+                                  key={a.id} 
+                                  onClick={() => setSelectedAssignmentId(a.id)}
+                                  className="py-3 flex items-center justify-between hover:bg-gray-50 px-2 rounded-lg cursor-pointer transition-colors"
+                                >
+                                  <div className="space-y-1">
+                                    <p className="font-bold text-base text-gray-800">{a.title}</p>
+                                    <div className="flex gap-2">
+                                      <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
+                                        {badgeText}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <ChevronRight className="w-5 h-5 text-gray-300" />
+                                </div>
+                              );
+                            })}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Sekce 2: Zadané úkoly k vypracování (To Do) */}
+              <div className="space-y-6">
+                <h2 className="text-3xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-3">
+                  <ClipboardList className="w-8 h-8 text-accent" /> Zadané úkoly k vypracování
+                </h2>
+                {(() => {
+                  const pendingAssignments = studentAssignments.filter(a =>
+                    !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
+                  );
+
+                  if (pendingAssignments.length === 0) {
+                    return (
+                      <Card className="border-none shadow-md bg-white p-8 text-center space-y-3">
+                        <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto animate-bounce" />
+                        <h3 className="text-xl font-bold text-gray-800">Skvělé! Všechny úkoly máš hotové.</h3>
+                        <p className="text-muted-foreground">Užívej si volný čas nebo si zopakuj probrané učivo.</p>
+                      </Card>
+                    );
                   }
 
                   return (
-                    <Card key={a.id} className="cursor-pointer hover:shadow-lg transition-all bg-white" onClick={() => setSelectedAssignmentId(a.id)}>
-                      <CardContent className="p-6 flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-xl">{a.title}</p>
-                          {sub && <Badge variant={sub.grade ? "default" : "secondary"} className="mt-1">{badgeText}</Badge>}
-                        </div>
-                        <ChevronRight className="w-6 h-6 text-gray-300" />
-                      </CardContent>
-                    </Card>
+                    <div className="grid gap-4">
+                      {pendingAssignments.map(a => (
+                        <Card 
+                          key={a.id} 
+                          className="cursor-pointer hover:shadow-lg transition-all border-none bg-white shadow-sm overflow-hidden" 
+                          onClick={() => setSelectedAssignmentId(a.id)}
+                        >
+                          <div className="h-1 bg-accent/30 w-full" />
+                          <CardContent className="p-6 flex justify-between items-center">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge className="bg-accent/20 text-accent hover:bg-accent/30 border-none font-bold text-xs uppercase px-2 py-0.5">
+                                  {a.subject || 'Jiný'}
+                                </Badge>
+                              </div>
+                              <p className="font-bold text-xl text-gray-800">{a.title}</p>
+                              {a.description && (
+                                <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full">Vypracovat úkol</span>
+                              <ChevronRight className="w-6 h-6 text-gray-300" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
                   );
-                })}
+                })()}
               </div>
             </div>
           )}

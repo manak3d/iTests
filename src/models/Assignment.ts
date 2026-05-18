@@ -24,6 +24,7 @@ export interface IAssignment extends Document<string> {
   title: string;
   description: string;
   classId: string; // Vazba na Classroom
+  subject?: string;
   questions: IQuestion[];
   dueDate: string;
   fileUri?: string;
@@ -37,6 +38,7 @@ const AssignmentSchema: Schema = new Schema(
     title: { type: String, required: true },
     description: { type: String, default: "" },
     classId: { type: String, required: true },
+    subject: { type: String, default: "Jiný" },
     questions: { type: [QuestionSchema], default: [] },
     dueDate: { type: String, required: true },
     fileUri: { type: String }

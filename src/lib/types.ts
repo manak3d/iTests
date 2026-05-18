@@ -32,6 +32,7 @@ export interface Assignment {
   title: string;
   description: string;
   classId: string;
+  subject?: string;
   questions: Question[];
   dueDate: string;
   fileUri?: string; // Original document as data URI (PDF snapshot or Image)

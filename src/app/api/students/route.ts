@@ -44,3 +44,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
+
+export async function PUT(request: Request) {
+  try {
+    await dbConnect();
+    const body = await request.json();
+    
+    const oldStudent = await Student.findById(body.id);
+    if (!oldStudent) {
+      return NextResponse.json({ success: false, error: "Žák nebyl nalezen." }, { status: 404 });
+    }
+    
+    const oldClassId = oldStudent.classroomId;
+    
+    // Update student classroomId
+    const updatedStudent = await Student.findByIdAndUpdate(
+      body.id,
+      { classroomId: body.classId },
+      { new: true }
+    );
+    
+    const { Classroom } = require('@/models/Classroom');
+    // Remove from old class
+    if (oldClassId) {
+      await Classroom.findByIdAndUpdate(oldClassId, {
+        $pull: { studentIds: body.id }
+      });
+    }
+    // Add to new class
+    if (body.classId) {
+      await Classroom.findByIdAndUpdate(body.classId, {
+        $addToSet: { studentIds: body.id }
+      });
+    }
+    
+    return NextResponse.json({ success: true, data: updatedStudent });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
