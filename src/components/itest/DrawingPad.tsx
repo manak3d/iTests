@@ -2,10 +2,11 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Eraser, Pencil, RotateCcw, Minus, Circle } from 'lucide-react';
+import { Eraser, Pencil, RotateCcw, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
 
-const COLORS = [
+const PRESET_COLORS = [
   { id: 'black', value: '#000000', label: 'Černá' },
   { id: 'blue', value: '#295CA3', label: 'Modrá' },
   { id: 'red', value: '#E11D48', label: 'Červená' },
@@ -108,7 +109,6 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
   return (
     <div className="space-y-4 bg-white p-6 rounded-2xl border-2 border-primary/10 shadow-inner">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-        {/* Nástroje a barvy */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
             <Button 
@@ -129,23 +129,36 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
             </Button>
           </div>
 
-          <div className="flex gap-2">
-            {COLORS.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => { setColor(c.value); setIsEraser(false); }}
-                className={cn(
-                  "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95",
-                  color === c.value && !isEraser ? "border-primary scale-110 shadow-md" : "border-transparent"
-                )}
-                style={{ backgroundColor: c.value }}
-                title={c.label}
-              />
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => { setColor(c.value); setIsEraser(false); }}
+                  className={cn(
+                    "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95",
+                    color === c.value && !isEraser ? "border-primary scale-110 shadow-md" : "border-white"
+                  )}
+                  style={{ backgroundColor: c.value }}
+                  title={c.label}
+                />
+              ))}
+            </div>
+            
+            <div className="relative group">
+              <label className="cursor-pointer flex items-center justify-center w-8 h-8 rounded-full border-2 border-gray-100 bg-white hover:border-primary transition-all shadow-sm">
+                <Palette className="w-4 h-4 text-gray-500" />
+                <input 
+                  type="color" 
+                  value={color} 
+                  onChange={(e) => { setColor(e.target.value); setIsEraser(false); }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+              </label>
+            </div>
           </div>
         </div>
         
-        {/* Velikosti stopy */}
         <div className="flex items-center gap-4">
           <div className="flex gap-2 items-center bg-gray-50 px-3 py-1 rounded-full border">
             <span className="text-[10px] font-bold text-muted-foreground uppercase mr-2">Tloušťka:</span>
@@ -192,7 +205,7 @@ export function DrawingPad({ onSave }: { onSave: (data: string) => void }) {
       
       <div className="flex justify-center">
         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full">
-          Můžeš psát perem, prstem nebo myší
+          Můžeš psát perem, prstem nebo myší • Vyber si barvu z palety
         </p>
       </div>
     </div>
