@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -47,26 +46,39 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
     
     reader.onload = async (event) => {
       const dataUri = event.target?.result as string;
-      setFileUri(dataUri); // Uložíme dokument pro vizuální podklad
+      setFileUri(dataUri);
       
       try {
         toast({ title: "Zpracovávám dokument", description: "AI čte obsah souboru..." });
         const digitizeResult = await digitizePdfContentForAssignment({ fileDataUri: dataUri });
-        setDescription(digitizeResult.extractedText);
         
-        toast({ title: "Generuji otázky", description: "AI navrhuje testové úlohy z textu..." });
-        const aiQuestions = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
-        
-        const newQs: Question[] = aiQuestions.questions.map((q: any) => ({
-          id: Math.random().toString(36).substr(2, 9),
-          type: q.type as QuestionType,
-          text: q.questionText,
-          options: q.options,
-          correctAnswer: q.correctAnswer ?? q.correctAnswerIndex,
-        }));
-        
-        setQuestions([...questions, ...newQs]);
-        toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena pomocí AI." });
+        if (digitizeResult.error) {
+          throw new Error(digitizeResult.error);
+        }
+
+        if (digitizeResult.extractedText) {
+          setDescription(digitizeResult.extractedText);
+          
+          toast({ title: "Generuji otázky", description: "AI navrhuje testové úlohy z textu..." });
+          const aiQuestionsResult = await generateQuestionsFromExtractedText({ extractedText: digitizeResult.extractedText });
+          
+          if (aiQuestionsResult.error) {
+            throw new Error(aiQuestionsResult.error);
+          }
+
+          if (aiQuestionsResult.questions) {
+            const newQs: Question[] = aiQuestionsResult.questions.map((q: any) => ({
+              id: Math.random().toString(36).substr(2, 9),
+              type: q.type as QuestionType,
+              text: q.questionText,
+              options: q.options,
+              correctAnswer: q.correctAnswer ?? q.correctAnswerIndex,
+            }));
+            
+            setQuestions(prev => [...prev, ...newQs]);
+          }
+          toast({ title: "Hotovo!", description: "Práce byla úspěšně vytvořena pomocí AI." });
+        }
       } catch (error: any) {
         console.error("AI Processing Error:", error);
         const isQuotaError = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED');
@@ -114,18 +126,18 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             </div>
             <div className="flex gap-2 w-full md:w-auto">
               <label className="cursor-pointer flex-1 md:flex-none">
-                <div className="bg-white text-primary px-4 py-2 rounded-md text-sm font-bold flex items-center hover:bg-gray-100 transition-colors">
+                <div className="bg-white text-primary px-4 py-2 rounded-md text-sm font-bold flex items-center justify-center hover:bg-gray-100 transition-colors h-10 min-w-[150px]">
                   {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileUp className="w-4 h-4 mr-2" />}
                   Nahrát PDF / Foto
                 </div>
-                <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} />
+                <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} disabled={isProcessing} />
               </label>
             </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
           <div className="space-y-2">
-            <label className="text-sm font-bold text-primary">Název úkolu</label>
+            <label className="text-sm font-bold text-primary uppercase">Název úkolu</label>
             <Input 
               placeholder="Např. Prověrka z historie: Baroko" 
               value={title} 
@@ -134,7 +146,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-bold text-primary">Výchozí text / Instrukce</label>
+            <label className="text-sm font-bold text-primary uppercase">Výchozí text / Instrukce</label>
             <Textarea 
               placeholder="Zde se objeví extrahovaný text z dokumentu (nebo jej zadejte ručně)..." 
               value={description} 
@@ -151,7 +163,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
                   <p className="text-xs text-muted-foreground">Žáci do něj budou moci přímo psát.</p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setFileUri(undefined)}><Trash2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => setFileUri(undefined)} disabled={isProcessing}><Trash2 className="w-4 h-4" /></Button>
             </div>
           )}
         </CardContent>
@@ -168,45 +180,47 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           </div>
         )}
 
-        {questions.map((q, index) => (
-          <Card key={q.id} className="border-l-4 border-l-accent animate-fade-in group shadow-sm">
-            <CardContent className="p-6 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
-                  {q.type === 'drawing' ? 'Kresba / Ruční zápis' : q.type.replace('_', ' ')}
-                </span>
-                <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              </div>
-              <Input 
-                placeholder={`Zadejte otázku č. ${index + 1}`} 
-                value={q.text} 
-                onChange={e => updateQuestion(q.id, { text: e.target.value })}
-                className="font-medium border-none shadow-none focus-visible:ring-0 text-lg px-0"
-              />
-              
-              {q.type === 'multiple_choice' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                  {q.options?.map((opt, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{String.fromCharCode(65 + i)}</div>
-                      <Input 
-                        placeholder={`Možnost ${i + 1}`} 
-                        value={opt} 
-                        onChange={e => {
-                          const newOpts = [...(q.options || [])];
-                          newOpts[i] = e.target.value;
-                          updateQuestion(q.id, { options: newOpts });
-                        }}
-                      />
-                    </div>
-                  ))}
+        <div className="grid gap-4">
+          {questions.map((q, index) => (
+            <Card key={q.id} className="border-l-4 border-l-accent animate-fade-in group shadow-sm">
+              <CardContent className="p-6 space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
+                    {q.type === 'drawing' ? 'Kresba / Ruční zápis' : q.type.replace('_', ' ')}
+                  </span>
+                  <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                <Input 
+                  placeholder={`Zadejte otázku č. ${index + 1}`} 
+                  value={q.text} 
+                  onChange={e => updateQuestion(q.id, { text: e.target.value })}
+                  className="font-medium border-none shadow-none focus-visible:ring-0 text-lg px-0"
+                />
+                
+                {q.type === 'multiple_choice' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    {q.options?.map((opt, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{String.fromCharCode(65 + i)}</div>
+                        <Input 
+                          placeholder={`Možnost ${i + 1}`} 
+                          value={opt} 
+                          onChange={e => {
+                            const newOpts = [...(q.options || [])];
+                            newOpts[i] = e.target.value;
+                            updateQuestion(q.id, { options: newOpts });
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
         <div className="flex flex-wrap gap-2 pt-4 justify-center">
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('short_answer')}>
@@ -228,7 +242,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       </div>
 
       <div className="flex justify-end gap-3 pt-8 border-t">
-        <Button size="lg" className="w-full md:w-auto px-16 h-14 text-xl font-headline" onClick={handleSave}>
+        <Button size="lg" className="w-full md:w-auto px-16 h-14 text-xl font-headline" onClick={handleSave} disabled={isProcessing}>
           Publikovat práci
         </Button>
       </div>

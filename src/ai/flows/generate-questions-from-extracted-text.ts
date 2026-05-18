@@ -8,7 +8,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 const ShortAnswerQuestionSchema = z.object({
   type: z.literal('short_answer'),
@@ -38,13 +38,10 @@ const GenerateQuestionsOutputSchema = z.object({
     ShortAnswerQuestionSchema,
     MultipleChoiceQuestionSchema,
     TrueFalseQuestionSchema,
-  ])).describe('An array of generated comprehension questions of various types.'),
+  ])).optional().describe('An array of generated comprehension questions of various types.'),
+  error: z.string().optional().describe('Error message if the generation failed.'),
 });
 export type GenerateQuestionsOutput = z.infer<typeof GenerateQuestionsOutputSchema>;
-
-export async function generateQuestionsFromExtractedText(input: GenerateQuestionsInput): Promise<GenerateQuestionsOutput> {
-  return generateQuestionsFlow(input);
-}
 
 const prompt = ai.definePrompt({
   name: 'generateQuestionsPrompt',
@@ -83,14 +80,12 @@ True/False:
 Make sure to provide at least one question of each type, and a variety of questions overall to test comprehension comprehensively.`,
 });
 
-const generateQuestionsFlow = ai.defineFlow(
-  {
-    name: 'generateQuestionsFromExtractedTextFlow',
-    inputSchema: GenerateQuestionsInputSchema,
-    outputSchema: GenerateQuestionsOutputSchema,
-  },
-  async (input) => {
+export async function generateQuestionsFromExtractedText(input: GenerateQuestionsInput): Promise<GenerateQuestionsOutput> {
+  try {
     const { output } = await prompt(input);
-    return output!;
+    return { questions: output?.questions };
+  } catch (error: any) {
+    console.error("Genkit Question Generation Error:", error);
+    return { error: error.message || 'Failed to generate questions' };
   }
-);
+}

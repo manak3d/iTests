@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 
 const DigitizePdfContentForAssignmentInputSchema = z.object({
   fileDataUri: z
@@ -20,15 +20,10 @@ const DigitizePdfContentForAssignmentInputSchema = z.object({
 export type DigitizePdfContentForAssignmentInput = z.infer<typeof DigitizePdfContentForAssignmentInputSchema>;
 
 const DigitizePdfContentForAssignmentOutputSchema = z.object({
-  extractedText: z.string().describe('The extracted text content from the document.'),
+  extractedText: z.string().optional().describe('The extracted text content from the document.'),
+  error: z.string().optional().describe('Error message if the processing failed.'),
 });
 export type DigitizePdfContentForAssignmentOutput = z.infer<typeof DigitizePdfContentForAssignmentOutputSchema>;
-
-export async function digitizePdfContentForAssignment(
-  input: DigitizePdfContentForAssignmentInput
-): Promise<DigitizePdfContentForAssignmentOutput> {
-  return digitizePdfContentForAssignmentFlow(input);
-}
 
 const prompt = ai.definePrompt({
   name: 'digitizePdfContentForAssignmentPrompt',
@@ -42,14 +37,14 @@ If there are diagrams or tables, describe their content briefly within the text.
 Document: {{media url=fileDataUri}}`,
 });
 
-const digitizePdfContentForAssignmentFlow = ai.defineFlow(
-  {
-    name: 'digitizePdfContentForAssignmentFlow',
-    inputSchema: DigitizePdfContentForAssignmentInputSchema,
-    outputSchema: DigitizePdfContentForAssignmentOutputSchema,
-  },
-  async input => {
+export async function digitizePdfContentForAssignment(
+  input: DigitizePdfContentForAssignmentInput
+): Promise<DigitizePdfContentForAssignmentOutput> {
+  try {
     const {output} = await prompt(input);
-    return output!;
+    return { extractedText: output?.extractedText };
+  } catch (error: any) {
+    console.error("Genkit Digitization Error:", error);
+    return { error: error.message || 'Failed to digitize document' };
   }
-);
+}
