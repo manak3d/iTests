@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       title: body.title,
       description: body.description || "",
       classId: body.classId,
+      teacherId: body.teacherId, // Uložení vazby na učitele
       subject: body.subject || "Jiný",
       questions: body.questions || [],
       dueDate: body.dueDate,

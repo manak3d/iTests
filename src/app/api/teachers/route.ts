@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Teacher } from "@/models/Teacher";
+import { Student } from "@/models/Student";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
   try {
     await dbConnect();
     const body = await request.json();
+
+    // Kontrola, zda uživatelské jméno již neexistuje mezi žáky (globální unikátnost loginu)
+    const existingStudent = await Student.findOne({ username: body.username });
+    if (existingStudent) {
+      return NextResponse.json({ success: false, error: "Tento uživatel (login) již existuje." }, { status: 400 });
+    }
     
     // Hashování hesla
     let hashedPassword = undefined;

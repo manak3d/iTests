@@ -32,6 +32,7 @@ export interface Assignment {
   title: string;
   description: string;
   classId: string;
+  teacherId?: string; // ID of the teacher who created the assignment
   subject?: string;
   questions: Question[];
   dueDate: string;

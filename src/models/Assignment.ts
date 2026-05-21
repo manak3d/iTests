@@ -24,6 +24,7 @@ export interface IAssignment extends Document<string> {
   title: string;
   description: string;
   classId: string; // Vazba na Classroom
+  teacherId?: string; // Vazba na učitele (vlastník zadání)
   subject?: string;
   questions: IQuestion[];
   dueDate: string;
@@ -38,6 +39,7 @@ const AssignmentSchema: Schema = new Schema(
     title: { type: String, required: true },
     description: { type: String, default: "" },
     classId: { type: String, required: true },
+    teacherId: { type: String }, // Vazba na učitele, nepovinné kvůli kompatibilitě
     subject: { type: String, default: "Jiný" },
     questions: { type: [QuestionSchema], default: [] },
     dueDate: { type: String, required: true },

@@ -124,7 +124,7 @@ export function useITestStore() {
   }, []);
 
   const addClass = useCallback((name: string) => {
-    if (!currentUser) return;
+    if (!currentUser) return "";
     const classId = Math.random().toString(36).substring(2, 11);
     const newClass: Class = { id: classId, name, teacherId: currentUser.id, studentIds: [] };
     
@@ -152,24 +152,26 @@ export function useITestStore() {
       }
     })
     .catch(console.error);
+
+    return classId;
   }, [db, currentUser, toast]);
 
-  const addStudent = useCallback((classId: string, name: string, username: string, password?: string) => {
-    const studentId = Math.random().toString(36).substring(2, 11);
-    const newUser: User = { id: studentId, name, username, role: 'student', classId, password };
+  const addStudent = useCallback((classId: string, name: string, username: string, password?: string, studentId?: string) => {
+    const id = studentId || Math.random().toString(36).substring(2, 11);
+    const newUser: User = { id, name, username, role: 'student', classId, password };
     
     // O samotný zápis studenta do MongoDB se teď stará funkce v page.tsx, 
     // zde už jen zkusíme zálohu do Firebase a upravíme lokální stav.
     setUsers(prev => [...prev, newUser]);
     
     if (db) {
-      setDoc(doc(db, 'users', studentId), cleanData(newUser)).catch(console.error);
+      setDoc(doc(db, 'users', id), cleanData(newUser)).catch(console.error);
     }
-  }, [db, toast]);
+  }, [db]);
 
   const addAssignment = useCallback((assignment: Omit<Assignment, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 11);
-    const newAssignment = { ...assignment, id };
+    const newAssignment = { ...assignment, id, teacherId: currentUser?.id };
     
     // Zápis do MongoDB primárně
     fetch('/api/assignments', {
@@ -191,7 +193,7 @@ export function useITestStore() {
       }
     })
     .catch(console.error);
-  }, [db, toast]);
+  }, [db, currentUser, toast]);
 
   const deleteAssignment = useCallback((id: string) => {
     fetch(`/api/assignments?id=${id}`, {

@@ -14,6 +14,7 @@ export interface IStudent extends Document {
 
 const StudentSchema: Schema = new Schema(
   {
+    _id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     email: { type: String, unique: true, sparse: true },

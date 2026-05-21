@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2 } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -39,11 +39,16 @@ export default function ITestApp() {
   const [classActionType, setClassActionType] = useState<'create' | 'select'>('create');
   const [selectedExistingClassId, setSelectedExistingClassId] = useState('');
 
-  const [studentActionType, setStudentActionType] = useState<'create' | 'select'>('create');
+  const [studentActionType, setStudentActionType] = useState<'create' | 'select' | 'csv'>('create');
   const [selectedExistingStudentId, setSelectedExistingStudentId] = useState('');
 
   const [classSearch, setClassSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
+  const [isImportingCSV, setIsImportingCSV] = useState(false);
+  const [csvClassName, setCsvClassName] = useState('');
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvParsingError, setCsvParsingError] = useState<string | null>(null);
+  const [csvImportProgress, setCsvImportProgress] = useState<string>('');
   const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   
@@ -195,6 +200,335 @@ export default function ITestApp() {
     }
   };
 
+  const handleImportCSV = async () => {
+    if (!csvClassName.trim()) {
+      toast({ title: "Chyba", description: "Zadejte prosím název nové třídy.", variant: "destructive" });
+      return;
+    }
+    if (!csvFile) {
+      toast({ title: "Chyba", description: "Vyberte prosím CSV soubor k importu.", variant: "destructive" });
+      return;
+    }
+
+    setCsvParsingError(null);
+    setCsvImportProgress('Čtení souboru...');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      if (!text) {
+        setCsvParsingError('Nepodařilo se přečíst obsah souboru.');
+        setCsvImportProgress('');
+        return;
+      }
+
+      try {
+        setCsvImportProgress('Analyzování CSV...');
+        // Rozdělení na řádky
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+        if (lines.length < 2) {
+          setCsvParsingError('CSV soubor musí obsahovat záhlaví a alespoň jednoho žáka.');
+          setCsvImportProgress('');
+          return;
+        }
+
+        // Detekce oddělovače (středník nebo čárka)
+        const header = lines[0];
+        let delimiter = ';';
+        if (header.includes(',')) {
+          const semicolonsCount = (header.match(/;/g) || []).length;
+          const commasCount = (header.match(/,/g) || []).length;
+          if (commasCount > semicolonsCount) {
+            delimiter = ',';
+          }
+        }
+
+        const headers = header.split(delimiter).map(h => h.trim().toLowerCase());
+        const nameIdx = headers.findIndex(h => h.includes('jméno') || h.includes('jmeno') || h.includes('name') || h.includes('student'));
+        const usernameIdx = headers.findIndex(h => h.includes('uživ') || h.includes('uziv') || h.includes('user') || h.includes('login'));
+        const passwordIdx = headers.findIndex(h => h.includes('heslo') || h.includes('pass'));
+
+        if (nameIdx === -1) {
+          setCsvParsingError('V CSV nebyl nalezen sloupec pro jméno (např. "Jméno").');
+          setCsvImportProgress('');
+          return;
+        }
+
+        const studentsToCreate: Array<{ name: string, username: string, password?: string }> = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
+          if (cols.length <= nameIdx) continue;
+
+          const fullName = cols[nameIdx];
+          if (!fullName) continue;
+
+          let username = usernameIdx !== -1 && cols[usernameIdx]
+            ? cols[usernameIdx].toLowerCase()
+            : fullName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
+
+          const password = passwordIdx !== -1 && cols[passwordIdx]
+            ? cols[passwordIdx]
+            : '123456';
+
+          studentsToCreate.push({ name: fullName, username, password });
+        }
+
+        if (studentsToCreate.length === 0) {
+          setCsvParsingError('V CSV nebyli nalezeni žádní platní žáci.');
+          setCsvImportProgress('');
+          return;
+        }
+
+        setCsvImportProgress(`Vytváření třídy "${csvClassName}"...`);
+
+        // Voláme store.addClass, který třídu vytvoří v DB (a Firestore) a vrátí vygenerované ID
+        const classId = store.addClass(csvClassName);
+        if (!classId) {
+          throw new Error('Nepodařilo se vytvořit novou třídu v databázi.');
+        }
+
+        let successCount = 0;
+        let duplicateCount = 0;
+
+        for (let idx = 0; idx < studentsToCreate.length; idx++) {
+          const s = studentsToCreate[idx];
+          setCsvImportProgress(`Zápis žáka ${idx + 1} z ${studentsToCreate.length} (${s.name})...`);
+
+          const nameParts = s.name.split(' ');
+          const firstName = nameParts[0] || 'Neznámé';
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
+
+          const studentRes = await fetch('/api/students', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              firstName,
+              lastName,
+              username: s.username,
+              password: s.password,
+              classroomId: classId
+            })
+          });
+
+          if (studentRes.ok) {
+            const resData = await studentRes.json();
+            const createdStudent = resData.data;
+            successCount++;
+            store.addStudent(classId, s.name, s.username, s.password, createdStudent._id);
+          } else {
+            const data = await studentRes.json();
+            if (data.error && data.error.includes("již existuje")) {
+              duplicateCount++;
+              const altUsername = `${s.username}${Math.floor(10 + Math.random() * 90)}`;
+              const altRes = await fetch('/api/students', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  firstName,
+                  lastName,
+                  username: altUsername,
+                  password: s.password,
+                  classroomId: classId
+                })
+              });
+              if (altRes.ok) {
+                const altData = await altRes.json();
+                const createdStudent = altData.data;
+                successCount++;
+                store.addStudent(classId, s.name, altUsername, s.password, createdStudent._id);
+              }
+            }
+          }
+        }
+
+        toast({
+          title: "Import dokončen!",
+          description: `Třída "${csvClassName}" byla vytvořena se ${successCount} žáky. (Duplicity loginů: ${duplicateCount})`
+        });
+
+        // Reset
+        setCsvClassName('');
+        setCsvFile(null);
+        setIsImportingCSV(false);
+        setCsvImportProgress('');
+      } catch (err: any) {
+        console.error(err);
+        setCsvParsingError(err.message || 'Při importu došlo k chybě.');
+        setCsvImportProgress('');
+      }
+    };
+
+    reader.onerror = () => {
+      setCsvParsingError('Čtení souboru selhalo.');
+      setCsvImportProgress('');
+    };
+
+    reader.readAsText(csvFile, 'UTF-8');
+  };
+
+  const handleImportCSVToExisting = async () => {
+    const classId = targetClassId || selectedClassId;
+    if (!classId) {
+      toast({ title: "Chyba", description: "Nebyla vybrána žádná třída.", variant: "destructive" });
+      return;
+    }
+    const classroom = store.classes.find(c => c.id === classId);
+    const className = classroom ? classroom.name : "třídy";
+
+    if (!csvFile) {
+      toast({ title: "Chyba", description: "Vyberte prosím CSV soubor k importu.", variant: "destructive" });
+      return;
+    }
+
+    setCsvParsingError(null);
+    setCsvImportProgress('Čtení souboru...');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      if (!text) {
+        setCsvParsingError('Nepodařilo se přečíst obsah souboru.');
+        setCsvImportProgress('');
+        return;
+      }
+
+      try {
+        setCsvImportProgress('Analyzování CSV...');
+        // Rozdělení na řádky
+        const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+        if (lines.length < 2) {
+          setCsvParsingError('CSV soubor musí obsahovat záhlaví a alespoň jednoho žáka.');
+          setCsvImportProgress('');
+          return;
+        }
+
+        // Detekce oddělovače (středník nebo čárka)
+        const header = lines[0];
+        let delimiter = ';';
+        if (header.includes(',')) {
+          const semicolonsCount = (header.match(/;/g) || []).length;
+          const commasCount = (header.match(/,/g) || []).length;
+          if (commasCount > semicolonsCount) {
+            delimiter = ',';
+          }
+        }
+
+        const headers = header.split(delimiter).map(h => h.trim().toLowerCase());
+        const nameIdx = headers.findIndex(h => h.includes('jméno') || h.includes('jmeno') || h.includes('name') || h.includes('student'));
+        const usernameIdx = headers.findIndex(h => h.includes('uživ') || h.includes('uziv') || h.includes('user') || h.includes('login'));
+        const passwordIdx = headers.findIndex(h => h.includes('heslo') || h.includes('pass'));
+
+        if (nameIdx === -1) {
+          setCsvParsingError('V CSV nebyl nalezen sloupec pro jméno (např. "Jméno").');
+          setCsvImportProgress('');
+          return;
+        }
+
+        const studentsToCreate: Array<{ name: string, username: string, password?: string }> = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
+          if (cols.length <= nameIdx) continue;
+
+          const fullName = cols[nameIdx];
+          if (!fullName) continue;
+
+          let username = usernameIdx !== -1 && cols[usernameIdx]
+            ? cols[usernameIdx].toLowerCase()
+            : fullName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "");
+
+          const password = passwordIdx !== -1 && cols[passwordIdx]
+            ? cols[passwordIdx]
+            : '123456';
+
+          studentsToCreate.push({ name: fullName, username, password });
+        }
+
+        if (studentsToCreate.length === 0) {
+          setCsvParsingError('V CSV nebyli nalezeni žádní platní žáci.');
+          setCsvImportProgress('');
+          return;
+        }
+
+        let successCount = 0;
+        let duplicateCount = 0;
+
+        for (let idx = 0; idx < studentsToCreate.length; idx++) {
+          const s = studentsToCreate[idx];
+          setCsvImportProgress(`Zápis žáka ${idx + 1} z ${studentsToCreate.length} (${s.name})...`);
+
+          const nameParts = s.name.split(' ');
+          const firstName = nameParts[0] || 'Neznámé';
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
+
+          const studentRes = await fetch('/api/students', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              firstName,
+              lastName,
+              username: s.username,
+              password: s.password,
+              classroomId: classId
+            })
+          });
+
+          if (studentRes.ok) {
+            const resData = await studentRes.json();
+            const createdStudent = resData.data;
+            successCount++;
+            store.addStudent(classId, s.name, s.username, s.password, createdStudent._id);
+          } else {
+            const data = await studentRes.json();
+            if (data.error && data.error.includes("již existuje")) {
+              duplicateCount++;
+              const altUsername = `${s.username}${Math.floor(10 + Math.random() * 90)}`;
+              const altRes = await fetch('/api/students', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  firstName,
+                  lastName,
+                  username: altUsername,
+                  password: s.password,
+                  classroomId: classId
+                })
+              });
+              if (altRes.ok) {
+                const altData = await altRes.json();
+                const createdStudent = altData.data;
+                successCount++;
+                store.addStudent(classId, s.name, altUsername, s.password, createdStudent._id);
+              }
+            }
+          }
+        }
+
+        toast({
+          title: "Import dokončen!",
+          description: `Do třídy "${className}" bylo úspěšně přidáno ${successCount} žáků. (Duplicity loginů: ${duplicateCount})`
+        });
+
+        // Reset
+        setCsvFile(null);
+        setCsvImportProgress('');
+        setIsAddingStudent(false);
+      } catch (err: any) {
+        console.error(err);
+        setCsvParsingError(err.message || 'Při importu došlo k chybě.');
+        setCsvImportProgress('');
+      }
+    };
+
+    reader.onerror = () => {
+      setCsvParsingError('Čtení souboru selhalo.');
+      setCsvImportProgress('');
+    };
+
+    reader.readAsText(csvFile, 'UTF-8');
+  };
+
   const handleAddStudent = async () => {
     if (!newStudentName.trim() || !newStudentUsername.trim() || !newStudentPassword.trim()) {
       toast({ title: "Chyba", description: "Musíte vyplnit všechna pole (jméno, login i heslo).", variant: "destructive" });
@@ -202,16 +536,12 @@ export default function ITestApp() {
     }
     
     if (targetClassId) {
-      // 1. Uložení do Firebase (původní)
-      store.addStudent(targetClassId, newStudentName, newStudentUsername, newStudentPassword);
-      
-      // 2. Uložení do MongoDB
       try {
         const nameParts = newStudentName.split(' ');
         const firstName = nameParts[0] || 'Neznámé';
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
 
-        await fetch('/api/students', {
+        const studentRes = await fetch('/api/students', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -219,18 +549,31 @@ export default function ITestApp() {
             lastName,
             username: newStudentUsername,
             password: newStudentPassword,
-            classroomId: targetClassId // Pozn.: Musí se shodovat s formátem ObjectID v MongoDB!
+            classroomId: targetClassId
           })
         });
+
+        const data = await studentRes.json();
+
+        if (!studentRes.ok) {
+          toast({ title: "Registrace žáka selhala", description: data.error || "Chyba databáze", variant: "destructive" });
+          return; // DŮLEŽITÉ: Nepokračujeme dál, abychom nezavřeli modal a nesmazali data učitele
+        }
+
+        // Uložení s reálným ID z MongoDB
+        store.addStudent(targetClassId, newStudentName, newStudentUsername, newStudentPassword, data.data._id);
+
+        toast({ title: "Žák zapsán", description: "Žák byl úspěšně vytvořen v databázi i cloudu." });
+
+        setNewStudentName('');
+        setNewStudentUsername('');
+        setNewStudentPassword('');
+        setIsAddingStudent(false);
+        setTargetClassId(null);
       } catch (error) {
         console.error("Chyba při zápisu žáka do MongoDB:", error);
+        toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
       }
-
-      setNewStudentName('');
-      setNewStudentUsername('');
-      setNewStudentPassword('');
-      setIsAddingStudent(false);
-      setTargetClassId(null);
     }
   };
 
@@ -330,94 +673,179 @@ export default function ITestApp() {
                 </Button>
               )}
               {activeTab === 'classes' && !selectedClassId && (
-                <Dialog open={isAddingClass} onOpenChange={(open) => {
-                  setIsAddingClass(open);
-                  if (!open) {
-                    setClassActionType('create');
-                    setNewClassName('');
-                    setSelectedExistingClassId('');
-                    setClassSearch('');
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button className="rounded-full shadow-md">
-                      <Plus className="w-4 h-4 mr-2" /> Nová třída
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent aria-describedby={undefined}>
-                    <DialogHeader>
-                      <DialogTitle>Přidat třídu</DialogTitle>
-                    </DialogHeader>
-                    
-                    <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg mb-4">
-                      <button 
-                        type="button" 
-                        className={`py-2 text-sm font-medium rounded-md transition-all ${classActionType === 'create' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
-                        onClick={() => setClassActionType('create')}
-                      >Vytvořit novou</button>
-                      <button 
-                        type="button" 
-                        className={`py-2 text-sm font-medium rounded-md transition-all ${classActionType === 'select' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
-                        onClick={() => setClassActionType('select')}
-                      >Vybrat existující</button>
-                    </div>
+                <>
+                  <Dialog open={isImportingCSV} onOpenChange={(open) => {
+                    setIsImportingCSV(open);
+                    if (!open) {
+                      setCsvClassName('');
+                      setCsvFile(null);
+                      setCsvParsingError(null);
+                      setCsvImportProgress('');
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" className="rounded-full shadow-sm bg-white border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors">
+                        <Upload className="w-4 h-4 mr-2 text-accent" /> Importovat z CSV
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent aria-describedby={undefined} className="sm:max-w-md bg-white border rounded-3xl p-6 shadow-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-primary font-headline text-2xl font-bold">
+                          <Upload className="w-6 h-6 text-accent" /> Importovat z CSV
+                        </DialogTitle>
+                        <DialogDescription className="text-muted-foreground text-sm">
+                          Rychle vytvořte celou třídu a hromadně zaregistrujte žáky pomocí nahraného CSV souboru.
+                        </DialogDescription>
+                      </DialogHeader>
 
-                    {classActionType === 'create' ? (
-                      <div className="py-4">
-                        <Input placeholder="Např. Matematika 8.A" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} />
-                      </div>
-                    ) : (
-                      <div className="py-4 space-y-2">
-                        <Label className="text-sm text-muted-foreground">Vyberte třídu z databáze:</Label>
-                        <Input 
-                          placeholder="🔍 Vyhledat třídu..." 
-                          value={classSearch} 
-                          onChange={(e) => setClassSearch(e.target.value)} 
-                          className="mb-2"
-                        />
-                        {(() => {
-                          const availableClasses = store.classes.filter(c => c.teacherId !== currentUser.id);
-                          if (availableClasses.length === 0) {
-                            return <p className="text-sm text-amber-600 font-semibold py-2">Žádné další třídy nebyly v systému nalezeny.</p>;
-                          }
-                          const filtered = availableClasses.filter(c => c.name.toLowerCase().includes(classSearch.toLowerCase()));
-                          if (filtered.length === 0) {
-                            return <p className="text-sm text-amber-600 font-semibold py-2">Žádná třída neodpovídá vyhledávání.</p>;
-                          }
-                          return (
-                            <select
-                              value={selectedExistingClassId}
-                              onChange={(e) => setSelectedExistingClassId(e.target.value)}
-                              className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            >
-                              <option value="">-- Vyberte třídu ({filtered.length}) --</option>
-                              {filtered.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                              ))}
-                            </select>
-                          );
-                        })()}
-                      </div>
-                    )}
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="csvClassName" className="font-bold text-gray-700">Název nové třídy</Label>
+                          <Input 
+                            id="csvClassName" 
+                            placeholder="Např. 8.A Matematika" 
+                            value={csvClassName} 
+                            onChange={(e) => setCsvClassName(e.target.value)} 
+                          />
+                        </div>
 
-                    <DialogFooter>
-                      {classActionType === 'create' ? (
-                        <Button onClick={handleAddClass} disabled={!newClassName.trim()}>Vytvořit</Button>
-                      ) : (
+                        <div className="space-y-2">
+                          <Label htmlFor="csvFile" className="font-bold text-gray-700">CSV soubor se žáky</Label>
+                          <Input 
+                            id="csvFile" 
+                            type="file" 
+                            accept=".csv" 
+                            onChange={(e) => {
+                              const files = e.target.files;
+                              if (files && files.length > 0) {
+                                setCsvFile(files[0]);
+                              }
+                            }}
+                            className="file:bg-primary/5 file:text-primary file:border-none file:px-3 file:py-1 file:rounded-lg file:font-semibold"
+                          />
+                          <div className="text-[11px] text-muted-foreground bg-gray-50 p-3 rounded-2xl border space-y-1.5 leading-relaxed">
+                            <p className="font-bold text-gray-700 text-xs">Struktura sloupců v CSV souboru:</p>
+                            <p>Záhlaví by mělo obsahovat: <code className="bg-gray-200/80 px-1.5 py-0.5 rounded font-mono text-[10px]">Jméno;Uživatelské jméno;Heslo</code></p>
+                            <p>• Jako oddělovač je podporován středník (<code className="font-bold font-mono">;</code>) i čárka (<code className="font-bold font-mono">,</code>).</p>
+                            <p>• Sloupce s loginem a heslem jsou nepovinné (pokud chybí, login se automaticky vytvoří ze jména a výchozí heslo bude <code className="font-mono">123456</code>).</p>
+                          </div>
+                        </div>
+
+                        {csvParsingError && (
+                          <div className="p-3.5 bg-red-50 text-red-600 rounded-2xl text-xs font-semibold border border-red-100 animate-pulse">
+                            ⚠️ {csvParsingError}
+                          </div>
+                        )}
+
+                        {csvImportProgress && (
+                          <div className="p-3.5 bg-primary/5 text-primary rounded-2xl text-xs font-bold border border-primary/10 flex items-center gap-3 justify-center">
+                            <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                            {csvImportProgress}
+                          </div>
+                        )}
+                      </div>
+
+                      <DialogFooter>
                         <Button 
-                          onClick={() => {
-                            if (selectedExistingClassId) {
-                              store.assignClass(selectedExistingClassId);
-                              setIsAddingClass(false);
-                              setSelectedExistingClassId('');
+                          onClick={handleImportCSV} 
+                          disabled={!csvClassName.trim() || !csvFile || !!csvImportProgress}
+                          className="w-full rounded-xl py-5 font-bold shadow-md bg-primary hover:bg-primary/95 text-white"
+                        >
+                          Zahájit import třídy a žáků
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={isAddingClass} onOpenChange={(open) => {
+                    setIsAddingClass(open);
+                    if (!open) {
+                      setClassActionType('create');
+                      setNewClassName('');
+                      setSelectedExistingClassId('');
+                      setClassSearch('');
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button className="rounded-full shadow-md">
+                        <Plus className="w-4 h-4 mr-2" /> Nová třída
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent aria-describedby={undefined}>
+                      <DialogHeader>
+                        <DialogTitle>Přidat třídu</DialogTitle>
+                      </DialogHeader>
+                      
+                      <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg mb-4">
+                        <button 
+                          type="button" 
+                          className={`py-2 text-sm font-medium rounded-md transition-all ${classActionType === 'create' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                          onClick={() => setClassActionType('create')}
+                        >Vytvořit novou</button>
+                        <button 
+                          type="button" 
+                          className={`py-2 text-sm font-medium rounded-md transition-all ${classActionType === 'select' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                          onClick={() => setClassActionType('select')}
+                        >Vybrat existující</button>
+                      </div>
+
+                      {classActionType === 'create' ? (
+                        <div className="py-4">
+                          <Input placeholder="Např. Matematika 8.A" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} />
+                        </div>
+                      ) : (
+                        <div className="py-4 space-y-2">
+                          <Label className="text-sm text-muted-foreground">Vyberte třídu z databáze:</Label>
+                          <Input 
+                            placeholder="🔍 Vyhledat třídu..." 
+                            value={classSearch} 
+                            onChange={(e) => setClassSearch(e.target.value)} 
+                            className="mb-2"
+                          />
+                          {(() => {
+                            const availableClasses = store.classes.filter(c => c.teacherId !== currentUser.id);
+                            if (availableClasses.length === 0) {
+                              return <p className="text-sm text-amber-600 font-semibold py-2">Žádné další třídy nebyly v systému nalezeny.</p>;
                             }
-                          }} 
-                          disabled={!selectedExistingClassId}
-                        >Přidat třídu</Button>
+                            const filtered = availableClasses.filter(c => c.name.toLowerCase().includes(classSearch.toLowerCase()));
+                            if (filtered.length === 0) {
+                              return <p className="text-sm text-amber-600 font-semibold py-2">Žádná třída neodpovídá vyhledávání.</p>;
+                            }
+                            return (
+                              <select
+                                value={selectedExistingClassId}
+                                onChange={(e) => setSelectedExistingClassId(e.target.value)}
+                                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                              >
+                                <option value="">-- Vyberte třídu ({filtered.length}) --</option>
+                                {filtered.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            );
+                          })()}
+                        </div>
                       )}
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+
+                      <DialogFooter>
+                        {classActionType === 'create' ? (
+                          <Button onClick={handleAddClass} disabled={!newClassName.trim()}>Vytvořit</Button>
+                        ) : (
+                          <Button 
+                            onClick={() => {
+                              if (selectedExistingClassId) {
+                                store.assignClass(selectedExistingClassId);
+                                setIsAddingClass(false);
+                                setSelectedExistingClassId('');
+                              }
+                            }} 
+                            disabled={!selectedExistingClassId}
+                          >Přidat třídu</Button>
+                        )}
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </>
               )}
             </div>
           </div>
@@ -509,7 +937,7 @@ export default function ITestApp() {
                       <Plus className="w-4 h-4 mr-2" /> Vytvořit práci
                     </Button>
                   </div>
-                  {store.assignments.filter(a => a.classId === selectedClassId).map(a => (
+                  {store.assignments.filter(a => a.classId === selectedClassId && (a.teacherId === currentUser.id || !a.teacherId)).map(a => (
                     <Card key={a.id} className="hover:border-primary cursor-pointer transition-all border-none shadow-sm bg-white" onClick={() => setViewingAssignment(a.id)}>
                       <CardContent className="p-5 flex justify-between items-center">
                         <div className="flex items-center gap-5">
@@ -539,22 +967,36 @@ export default function ITestApp() {
               )}
             </TabsContent>
 
-            <TabsContent value="students">
-               <Card className="border-none shadow-xl rounded-3xl">
-                 <CardContent className="p-8">
-                   <div className="divide-y">
-                     {store.users.filter(u => u.classId === selectedClassId).map(student => (
-                       <div key={student.id} className="py-5 flex items-center justify-between">
-                         <div className="flex items-center gap-4">
-                           <GraduationCap className="w-5 h-5 text-accent" />
-                           <p className="font-bold">{student.name}</p>
-                         </div>
-                         <p className="text-xs text-muted-foreground">Login: {student.username}</p>
-                       </div>
-                     ))}
-                   </div>
-                 </CardContent>
-               </Card>
+            <TabsContent value="students" className="space-y-4">
+              <div className="flex justify-end">
+                <Button className="rounded-full shadow-md animate-fade-in" onClick={() => {
+                  setTargetClassId(selectedClassId);
+                  setIsAddingStudent(true);
+                }}>
+                  <Plus className="w-4 h-4 mr-2" /> Zapsat žáka
+                </Button>
+              </div>
+              <Card className="border-none shadow-xl rounded-3xl">
+                <CardContent className="p-8">
+                  <div className="divide-y">
+                    {(() => {
+                      const classStudents = store.users.filter(u => u.classId === selectedClassId);
+                      if (classStudents.length === 0) {
+                        return <p className="text-muted-foreground text-center py-6 font-medium">Tato třída zatím nemá žádné žáky.</p>;
+                      }
+                      return classStudents.map(student => (
+                        <div key={student.id} className="py-5 flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <GraduationCap className="w-5 h-5 text-accent" />
+                            <p className="font-bold">{student.name}</p>
+                          </div>
+                          <p className="text-xs text-muted-foreground bg-gray-50 px-3 py-1 rounded-full border font-mono">Login: {student.username}</p>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="submissions">
@@ -742,22 +1184,30 @@ export default function ITestApp() {
               setNewStudentPassword('');
               setSelectedExistingStudentId('');
               setStudentSearch('');
+              setCsvFile(null);
+              setCsvParsingError(null);
+              setCsvImportProgress('');
             }
           }}>
             <DialogContent aria-describedby={undefined}>
               <DialogHeader><DialogTitle>Zapsat žáka</DialogTitle></DialogHeader>
               
-              <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg mb-4">
+              <div className="grid grid-cols-3 gap-1 bg-gray-100 rounded-lg mb-4 p-1">
                 <button 
                   type="button" 
-                  className={`py-2 text-sm font-medium rounded-md transition-all ${studentActionType === 'create' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                  className={`py-2 text-xs font-semibold rounded-md transition-all ${studentActionType === 'create' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
                   onClick={() => setStudentActionType('create')}
-                >Vytvořit nového</button>
+                >Vytvořit</button>
                 <button 
                   type="button" 
-                  className={`py-2 text-sm font-medium rounded-md transition-all ${studentActionType === 'select' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500'}`}
+                  className={`py-2 text-xs font-semibold rounded-md transition-all ${studentActionType === 'select' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
                   onClick={() => setStudentActionType('select')}
-                >Vybrat existujícího</button>
+                >Přiřadit</button>
+                <button 
+                  type="button" 
+                  className={`py-2 text-xs font-semibold rounded-md transition-all ${studentActionType === 'csv' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
+                  onClick={() => setStudentActionType('csv')}
+                >Z CSV</button>
               </div>
 
               {studentActionType === 'create' ? (
@@ -766,7 +1216,7 @@ export default function ITestApp() {
                   <Input placeholder="Login" value={newStudentUsername} onChange={(e) => setNewStudentUsername(e.target.value)} />
                   <Input type="password" placeholder="Heslo" value={newStudentPassword} onChange={(e) => setNewStudentPassword(e.target.value)} />
                 </div>
-              ) : (
+              ) : studentActionType === 'select' ? (
                 <div className="py-4 space-y-2">
                   <Label className="text-sm text-muted-foreground">Vyberte žáka ze systému:</Label>
                   <Input 
@@ -801,12 +1251,48 @@ export default function ITestApp() {
                     );
                   })()}
                 </div>
+              ) : (
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="existingCsvFile" className="font-bold text-gray-700">CSV soubor se žáky</Label>
+                    <Input 
+                      id="existingCsvFile" 
+                      type="file" 
+                      accept=".csv" 
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                          setCsvFile(files[0]);
+                        }
+                      }}
+                      className="file:bg-primary/5 file:text-primary file:border-none file:px-3 file:py-1 file:rounded-lg file:font-semibold cursor-pointer"
+                    />
+                    <div className="text-[11px] text-muted-foreground bg-gray-50 p-3.5 rounded-2xl border space-y-1.5 leading-relaxed">
+                      <p className="font-bold text-gray-700 text-xs">Struktura sloupců v CSV souboru:</p>
+                      <p>Záhlaví: <code className="bg-gray-200/85 px-1.5 py-0.5 rounded font-mono text-[10px] text-primary">Jméno;Uživatelské jméno;Heslo</code></p>
+                      <p>• Jako oddělovač je podporován středník (<code className="font-bold font-mono">;</code>) i čárka (<code className="font-bold font-mono">,</code>).</p>
+                    </div>
+                  </div>
+
+                  {csvParsingError && (
+                    <div className="p-3 bg-red-50 text-red-600 rounded-xl text-xs font-semibold border border-red-100 animate-pulse">
+                      ⚠️ {csvParsingError}
+                    </div>
+                  )}
+
+                  {csvImportProgress && (
+                    <div className="p-3 bg-primary/5 text-primary rounded-xl text-xs font-bold border border-primary/10 flex items-center gap-2.5 justify-center">
+                      <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      {csvImportProgress}
+                    </div>
+                  )}
+                </div>
               )}
 
               <DialogFooter>
                 {studentActionType === 'create' ? (
                   <Button onClick={handleAddStudent}>Vytvořit</Button>
-                ) : (
+                ) : studentActionType === 'select' ? (
                   <Button 
                     onClick={() => {
                       if (selectedExistingStudentId && targetClassId) {
@@ -817,6 +1303,14 @@ export default function ITestApp() {
                     }} 
                     disabled={!selectedExistingStudentId}
                   >Přiřadit žáka</Button>
+                ) : (
+                  <Button
+                    onClick={handleImportCSVToExisting}
+                    disabled={!csvFile || !!csvImportProgress}
+                    className="w-full"
+                  >
+                    Importovat žáky z CSV
+                  </Button>
                 )}
               </DialogFooter>
             </DialogContent>
