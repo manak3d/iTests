@@ -6,6 +6,7 @@ export interface IStudent extends Document {
   email?: string; // e-mail pro žáka může být nepovinný
   username: string;
   password?: string;
+  passwordPlain?: string;
   role: string;
   classroomId: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -20,6 +21,7 @@ const StudentSchema: Schema = new Schema(
     email: { type: String, unique: true, sparse: true },
     username: { type: String, required: true, unique: true },
     password: { type: String, select: false },
+    passwordPlain: { type: String },
     role: { type: String, default: "student" },
     classroomId: { type: String, required: true }, // Změněno na String pro kompatibilitu s Firebase ID
   },

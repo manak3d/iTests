@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       lastName: body.lastName,
       username: body.username,
       password: hashedPassword,
+      passwordPlain: body.password, // Plain text password for teacher/admin visibility
       classroomId: body.classroomId,
       email: body.email || undefined // nepovinné
     });
@@ -36,9 +37,10 @@ export async function POST(request: Request) {
     // Přidání ID žáka do třídy
     const { Classroom } = require('@/models/Classroom');
     if (body.classroomId) {
-      await Classroom.findByIdAndUpdate(body.classroomId, {
-        $push: { studentIds: newStudent._id }
-      });
+      await Classroom.findOneAndUpdate(
+        { _id: body.classroomId },
+        { $push: { studentIds: newStudent._id } }
+      );
     }
 
     const studentData = newStudent.toObject();
@@ -58,32 +60,49 @@ export async function PUT(request: Request) {
     await dbConnect();
     const body = await request.json();
     
-    const oldStudent = await Student.findById(body.id);
+    const oldStudent = await Student.findOne({ _id: body.id });
     if (!oldStudent) {
       return NextResponse.json({ success: false, error: "Žák nebyl nalezen." }, { status: 404 });
     }
     
-    const oldClassId = oldStudent.classroomId;
+    const updateData: any = {};
     
-    // Update student classroomId
-    const updatedStudent = await Student.findByIdAndUpdate(
-      body.id,
-      { classroomId: body.classId },
+    // Support classroom change
+    let oldClassId = oldStudent.classroomId;
+    if (body.classId !== undefined) {
+      updateData.classroomId = body.classId;
+    }
+    
+    // Support password change
+    if (body.password !== undefined) {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(body.password, salt);
+      updateData.passwordPlain = body.password;
+    }
+    
+    const updatedStudent = await Student.findOneAndUpdate(
+      { _id: body.id },
+      { $set: updateData },
       { new: true }
     );
     
-    const { Classroom } = require('@/models/Classroom');
-    // Remove from old class
-    if (oldClassId) {
-      await Classroom.findByIdAndUpdate(oldClassId, {
-        $pull: { studentIds: body.id }
-      });
-    }
-    // Add to new class
-    if (body.classId) {
-      await Classroom.findByIdAndUpdate(body.classId, {
-        $addToSet: { studentIds: body.id }
-      });
+    // Handle classroom array updates in Classroom model if classId changed
+    if (body.classId !== undefined && body.classId !== oldClassId) {
+      const { Classroom } = require('@/models/Classroom');
+      // Remove from old class
+      if (oldClassId) {
+        await Classroom.findOneAndUpdate(
+          { _id: oldClassId },
+          { $pull: { studentIds: body.id } }
+        );
+      }
+      // Add to new class
+      if (body.classId) {
+        await Classroom.findOneAndUpdate(
+          { _id: body.classId },
+          { $addToSet: { studentIds: body.id } }
+        );
+      }
     }
     
     return NextResponse.json({ success: true, data: updatedStudent });

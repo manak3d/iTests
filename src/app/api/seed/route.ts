@@ -3,37 +3,64 @@ import dbConnect from "@/lib/mongodb";
 import { Teacher } from "@/models/Teacher";
 import { Classroom } from "@/models/Classroom";
 import { Student } from "@/models/Student";
+import bcrypt from "bcryptjs";
 
 export async function GET() {
   try {
-    // 1. Připojení k databázi
     await dbConnect();
 
-    // 2. Vyčištění předchozích testovacích dat (volitelné, ale dobré pro testování)
+    // 1. Vyčištění předchozích testovacích dat
     await Teacher.deleteMany({});
     await Classroom.deleteMany({});
     await Student.deleteMany({});
 
-    // 3. Vytvoření testovacího učitele
+    // 2. Hashování hesel
+    const teacherPasswordHash = await bcrypt.hash("heslo", 10);
+    const studentPasswordHash1 = await bcrypt.hash("123456", 10);
+    const studentPasswordHash2 = await bcrypt.hash("QWERT135", 10);
+
+    // 3. Vytvoření testovacího učitele (testu)
     const teacher = await Teacher.create({
       firstName: "Jan",
       lastName: "Komenský",
       email: "jan.komensky@skola.cz",
+      username: "testu",
+      password: teacherPasswordHash,
+      role: "teacher",
       subjects: ["Matematika", "Fyzika"],
     });
 
-    // 4. Vytvoření testovací třídy a přiřazení učitele
+    // 4. Vytvoření testovací třídy
     const classroom = await Classroom.create({
-      name: "9.A",
+      _id: "0.A",
+      name: "0.A",
       teacherId: teacher._id.toString(),
       year: 2024,
+      studentIds: ["tests1", "nina.sekerkova"]
     });
 
-    // 5. Vytvoření testovacího žáka a přiřazení do třídy
-    const student = await Student.create({
-      firstName: "Petr",
-      lastName: "Novák",
-      email: "petr.novak@zaci.cz",
+    // 5. Vytvoření testovacích žáků
+    const student1 = await Student.create({
+      _id: "tests1",
+      firstName: "tests1",
+      lastName: "Neznámé",
+      email: "student1@zaci.cz",
+      username: "tests1",
+      password: studentPasswordHash1,
+      passwordPlain: "123456",
+      role: "student",
+      classroomId: classroom._id.toString(),
+    });
+
+    const student2 = await Student.create({
+      _id: "nina.sekerkova",
+      firstName: "Nina",
+      lastName: "Sekerková",
+      email: "nina.sekerkova@zaci.cz",
+      username: "nina.sekerkova",
+      password: studentPasswordHash2,
+      passwordPlain: "QWERT135",
+      role: "student",
       classroomId: classroom._id.toString(),
     });
 
@@ -42,7 +69,7 @@ export async function GET() {
       data: {
         teacher,
         classroom,
-        student,
+        students: [student1, student2],
       },
     });
   } catch (error: any) {

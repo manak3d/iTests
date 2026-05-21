@@ -297,9 +297,33 @@ export function useITestStore() {
     .catch(console.error);
   }, [toast]);
 
+  const changeStudentPassword = useCallback((studentId: string, newPassword: string) => {
+    return fetch('/api/students', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: studentId, password: newPassword })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Heslo změněno", description: "Heslo žáka bylo úspěšně aktualizováno." });
+        setUsers(prev => prev.map(u => u.id === studentId ? { ...u, password: newPassword } : u));
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se změnit heslo.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [toast]);
+
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, submitWork, gradeSubmission,
-    assignClass, assignStudent
+    assignClass, assignStudent, changeStudentPassword
   };
 }

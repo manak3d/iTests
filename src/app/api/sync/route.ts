@@ -28,7 +28,7 @@ export async function GET() {
     // Sjednotíme učitele a žáky do jednoho pole "users", aby to sedělo s původním frontendem
     const users = [
       ...teachers.map(t => ({ id: t._id, name: `${t.firstName} ${t.lastName}`, username: t.username, role: t.role })),
-      ...students.map(s => ({ id: s._id, name: `${s.firstName} ${s.lastName}`, username: s.username, role: s.role, classId: s.classroomId }))
+      ...students.map(s => ({ id: s._id, name: `${s.firstName} ${s.lastName}`, username: s.username, role: s.role, classId: s.classroomId, password: s.passwordPlain }))
     ];
 
     // Přemapování _id na id pro frontend

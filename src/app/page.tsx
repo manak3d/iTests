@@ -35,6 +35,9 @@ export default function ITestApp() {
   const [newStudentUsername, setNewStudentUsername] = useState('');
   const [newStudentPassword, setNewStudentPassword] = useState('');
   const [targetClassId, setTargetClassId] = useState<string | null>(null);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [newPasswordVal, setNewPasswordVal] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const [classActionType, setClassActionType] = useState<'create' | 'select'>('create');
   const [selectedExistingClassId, setSelectedExistingClassId] = useState('');
@@ -956,12 +959,14 @@ export default function ITestApp() {
                           <th className="p-4 font-bold text-gray-700 text-sm">Celé jméno žáka</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Uživatelské jméno</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Přiřazená třída</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Přístupové heslo</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Akce</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {students.length === 0 ? (
                           <tr>
-                            <td colSpan={3} className="p-6 text-center text-muted-foreground">V systému zatím nejsou registrovaní žádní žáci.</td>
+                            <td colSpan={5} className="p-6 text-center text-muted-foreground">V systému zatím nejsou registrovaní žádní žáci.</td>
                           </tr>
                         ) : (
                           students.map(s => {
@@ -978,6 +983,20 @@ export default function ITestApp() {
                                   ) : (
                                     <span className="text-xs text-muted-foreground italic">Bez třídy</span>
                                   )}
+                                </td>
+                                <td className="p-4 text-sm text-primary font-mono font-bold">{s.password || 'Nenastaveno'}</td>
+                                <td className="p-4">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="rounded-full text-xs font-bold gap-1 px-3"
+                                    onClick={() => {
+                                      setEditingStudentId(s.id);
+                                      setNewPasswordVal(s.password || '');
+                                    }}
+                                  >
+                                    <PenTool className="w-3.5 h-3.5" /> Změnit heslo
+                                  </Button>
                                 </td>
                               </tr>
                             );
@@ -1048,6 +1067,78 @@ export default function ITestApp() {
               )}
             </CardContent>
           </Card>
+
+          {/* Dialog pro změnu hesla žáka (pro Administrátora) */}
+          <Dialog open={editingStudentId !== null} onOpenChange={(open) => {
+            if (!open) {
+              setEditingStudentId(null);
+              setNewPasswordVal('');
+            }
+          }}>
+            <DialogContent className="rounded-3xl border-none shadow-2xl max-w-md bg-white">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-2">
+                  <PenTool className="w-6 h-6 text-accent" /> Změna hesla žáka
+                </DialogTitle>
+                <DialogDescription>
+                  {(() => {
+                    const studentObj = store.users.find(u => u.id === editingStudentId);
+                    return studentObj ? `Zadejte nové přístupové heslo pro žáka ${studentObj.name} (${studentObj.username}).` : 'Zadejte nové přístupové heslo pro vybraného žáka.';
+                  })()}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">Nové heslo</label>
+                  <Input
+                    type="text"
+                    placeholder="Zadejte nové heslo"
+                    value={newPasswordVal}
+                    onChange={(e) => setNewPasswordVal(e.target.value)}
+                    className="rounded-xl h-12"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setEditingStudentId(null);
+                    setNewPasswordVal('');
+                  }}
+                  className="rounded-full"
+                >
+                  Zrušit
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    if (!editingStudentId || !newPasswordVal.trim()) {
+                      toast({ title: "Chyba", description: "Heslo nesmí být prázdné.", variant: "destructive" });
+                      return;
+                    }
+                    setIsChangingPassword(true);
+                    const success = await store.changeStudentPassword(editingStudentId, newPasswordVal.trim());
+                    setIsChangingPassword(false);
+                    if (success) {
+                      setEditingStudentId(null);
+                      setNewPasswordVal('');
+                    }
+                  }}
+                  disabled={isChangingPassword || !newPasswordVal.trim()}
+                  className="rounded-full font-bold shadow-md"
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Ukládám...
+                    </>
+                  ) : 'Uložit heslo'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     );
@@ -1390,12 +1481,33 @@ export default function ITestApp() {
                         return <p className="text-muted-foreground text-center py-6 font-medium">Tato třída zatím nemá žádné žáky.</p>;
                       }
                       return classStudents.map(student => (
-                        <div key={student.id} className="py-5 flex items-center justify-between">
+                        <div key={student.id} className="py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="flex items-center gap-4">
-                            <GraduationCap className="w-5 h-5 text-accent" />
-                            <p className="font-bold">{student.name}</p>
+                            <GraduationCap className="w-5 h-5 text-accent animate-pulse" />
+                            <div>
+                              <p className="font-bold text-gray-800 text-lg">{student.name}</p>
+                              <p className="text-xs text-muted-foreground font-mono">ID: {student.id}</p>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground bg-gray-50 px-3 py-1 rounded-full border font-mono">Login: {student.username}</p>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="text-xs text-muted-foreground bg-gray-50 px-3 py-1.5 rounded-xl border font-mono">
+                              Login: <span className="font-bold text-gray-700">{student.username}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground bg-gray-50 px-3 py-1.5 rounded-xl border font-mono flex items-center gap-2">
+                              Heslo: <span className="font-bold text-primary">{student.password || 'Nenastaveno'}</span>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="rounded-full text-xs font-bold gap-1 px-3"
+                              onClick={() => {
+                                setEditingStudentId(student.id);
+                                setNewPasswordVal(student.password || '');
+                              }}
+                            >
+                              <PenTool className="w-3.5 h-3.5" /> Změnit heslo
+                            </Button>
+                          </div>
                         </div>
                       ));
                     })()}
@@ -1717,6 +1829,78 @@ export default function ITestApp() {
                     Importovat žáky z CSV
                   </Button>
                 )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog pro změnu hesla žáka */}
+          <Dialog open={editingStudentId !== null} onOpenChange={(open) => {
+            if (!open) {
+              setEditingStudentId(null);
+              setNewPasswordVal('');
+            }
+          }}>
+            <DialogContent className="rounded-3xl border-none shadow-2xl max-w-md bg-white">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-headline font-bold text-primary flex items-center gap-2">
+                  <PenTool className="w-6 h-6 text-accent" /> Změna hesla žáka
+                </DialogTitle>
+                <DialogDescription>
+                  {(() => {
+                    const studentObj = store.users.find(u => u.id === editingStudentId);
+                    return studentObj ? `Zadejte nové přístupové heslo pro žáka ${studentObj.name} (${studentObj.username}).` : 'Zadejte nové přístupové heslo pro vybraného žáka.';
+                  })()}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-700">Nové heslo</label>
+                  <Input
+                    type="text"
+                    placeholder="Zadejte nové heslo"
+                    value={newPasswordVal}
+                    onChange={(e) => setNewPasswordVal(e.target.value)}
+                    className="rounded-xl h-12"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setEditingStudentId(null);
+                    setNewPasswordVal('');
+                  }}
+                  className="rounded-full"
+                >
+                  Zrušit
+                </Button>
+                <Button 
+                  onClick={async () => {
+                    if (!editingStudentId || !newPasswordVal.trim()) {
+                      toast({ title: "Chyba", description: "Heslo nesmí být prázdné.", variant: "destructive" });
+                      return;
+                    }
+                    setIsChangingPassword(true);
+                    const success = await store.changeStudentPassword(editingStudentId, newPasswordVal.trim());
+                    setIsChangingPassword(false);
+                    if (success) {
+                      setEditingStudentId(null);
+                      setNewPasswordVal('');
+                    }
+                  }}
+                  disabled={isChangingPassword || !newPasswordVal.trim()}
+                  className="rounded-full font-bold shadow-md"
+                >
+                  {isChangingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Ukládám...
+                    </>
+                  ) : 'Uložit heslo'}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
