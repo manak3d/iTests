@@ -74,28 +74,6 @@ export async function POST(request: Request) {
       });
 
       return NextResponse.json({ success: true, user: { id: student._id, username: student.username, role: student.role, name: `${student.firstName} ${student.lastName}`, classId: student.classroomId } });
-    } else if (role === 'admin') {
-      if (username === 'admin' && password === 'admin123') {
-        const secret = process.env.JWT_SECRET || "default_secret_key";
-        const token = jwt.sign(
-          { id: "admin_root", username: "admin", role: "admin", name: "Hlavní Administrátor" },
-          secret,
-          { expiresIn: "1d" }
-        );
-
-        const cookieStore = await cookies();
-        cookieStore.set("auth_token", token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          maxAge: 60 * 60 * 24, // 1 den
-          path: "/",
-        });
-
-        return NextResponse.json({ success: true, user: { id: "admin_root", username: "admin", role: "admin", name: "Hlavní Administrátor" } });
-      } else {
-        return NextResponse.json({ success: false, error: "Nesprávné administrátorské jméno nebo heslo" }, { status: 401 });
-      }
     } else {
       return NextResponse.json({ success: false, error: "Neplatná role" }, { status: 400 });
     }

@@ -610,7 +610,7 @@ export default function ITestApp() {
               </div>
 
               {authMode === 'login' && (
-                <div className="grid grid-cols-3 gap-1 p-1 bg-gray-100 rounded-lg">
+                <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-lg">
                   <button 
                     type="button" 
                     className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'teacher' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
@@ -621,11 +621,6 @@ export default function ITestApp() {
                     className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'student' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
                     onClick={() => setLoginRole('student')}
                   >Student</button>
-                  <button 
-                    type="button" 
-                    className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'admin' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
-                    onClick={() => setLoginRole('admin')}
-                  >Admin</button>
                 </div>
               )}
 

@@ -16,6 +16,7 @@ export async function GET() {
 
     // 2. Hashování hesel
     const teacherPasswordHash = await bcrypt.hash("heslo", 10);
+    const adminPasswordHash = await bcrypt.hash("admin123", 10);
     const studentPasswordHash1 = await bcrypt.hash("123456", 10);
     const studentPasswordHash2 = await bcrypt.hash("QWERT135", 10);
 
@@ -28,6 +29,17 @@ export async function GET() {
       password: teacherPasswordHash,
       role: "teacher",
       subjects: ["Matematika", "Fyzika"],
+    });
+
+    // 3.1. Vytvoření administrátora (v modelu Teacher s role: "admin")
+    const adminUser = await Teacher.create({
+      firstName: "Hlavní",
+      lastName: "Administrátor",
+      email: "admin@itests.cz",
+      username: "admin",
+      password: adminPasswordHash,
+      role: "admin",
+      subjects: ["Všechny"],
     });
 
     // 4. Vytvoření testovací třídy
