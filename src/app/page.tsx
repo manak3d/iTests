@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -22,7 +22,7 @@ export default function ITestApp() {
   const { toast } = useToast();
   
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [loginRole, setLoginRole] = useState<'teacher' | 'student'>('teacher');
+  const [loginRole, setLoginRole] = useState<'admin' | 'teacher' | 'student'>('teacher');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -53,6 +53,7 @@ export default function ITestApp() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState('classes');
+  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments'>('overview');
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
   const [viewingAssignment, setViewingAssignment] = useState<string | null>(null);
@@ -606,17 +607,22 @@ export default function ITestApp() {
               </div>
 
               {authMode === 'login' && (
-                <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
+                <div className="grid grid-cols-3 gap-1 p-1 bg-gray-100 rounded-lg">
                   <button 
                     type="button" 
-                    className={`py-2 text-sm font-medium rounded-md transition-all ${loginRole === 'teacher' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                    className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'teacher' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
                     onClick={() => setLoginRole('teacher')}
                   >Učitel</button>
                   <button 
                     type="button" 
-                    className={`py-2 text-sm font-medium rounded-md transition-all ${loginRole === 'student' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                    className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'student' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
                     onClick={() => setLoginRole('student')}
                   >Student</button>
+                  <button 
+                    type="button" 
+                    className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'admin' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
+                    onClick={() => setLoginRole('admin')}
+                  >Admin</button>
                 </div>
               )}
 
@@ -647,6 +653,405 @@ export default function ITestApp() {
   }
 
   const currentUser = store.currentUser;
+
+  if (currentUser.role === 'admin') {
+    const teachers = store.users.filter(u => u.role === 'teacher');
+    const students = store.users.filter(u => u.role === 'student');
+    const classrooms = store.classes;
+    const assignments = store.assignments;
+    const submissions = store.submissions;
+
+    return (
+      <div className="min-h-screen flex flex-col bg-[#EFF3F7]">
+        <Navbar user={currentUser} onLogout={() => store.logout()} />
+
+        <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-4xl font-headline font-bold text-primary tracking-tight">
+                Nástěnka administrátora
+              </h1>
+              <p className="text-muted-foreground">
+                Přehled a správa všech učitelů, tříd, žáků a úkolů v systému iTest.
+              </p>
+            </div>
+            <div className="bg-primary/10 border border-primary/20 text-primary font-bold px-4 py-2 rounded-full text-sm">
+              Root administrátorský přístup
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'overview' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('overview')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <LayoutDashboard className="w-8 h-8 text-primary" />
+                <p className="text-sm font-semibold text-muted-foreground">Přehled</p>
+                <p className="text-2xl font-black text-primary">Hlavní</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'teachers' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('teachers')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <GraduationCap className="w-8 h-8 text-accent" />
+                <p className="text-sm font-semibold text-muted-foreground">Učitelé</p>
+                <p className="text-2xl font-black text-accent">{teachers.length}</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'classes' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('classes')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <School className="w-8 h-8 text-green-500" />
+                <p className="text-sm font-semibold text-muted-foreground">Třídy</p>
+                <p className="text-2xl font-black text-green-500">{classrooms.length}</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'students' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('students')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <Users className="w-8 h-8 text-indigo-500" />
+                <p className="text-sm font-semibold text-muted-foreground">Žáci</p>
+                <p className="text-2xl font-black text-indigo-500">{students.length}</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'assignments' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('assignments')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <ClipboardList className="w-8 h-8 text-amber-500" />
+                <p className="text-sm font-semibold text-muted-foreground">Úkoly</p>
+                <p className="text-2xl font-black text-amber-500">{assignments.length}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Active Tab View */}
+          <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white">
+            <CardContent className="p-6 md:p-8">
+              {adminTab === 'overview' && (
+                <div className="space-y-8 animate-fade-in">
+                  <div>
+                    <h3 className="text-2xl font-headline font-bold text-gray-800">Aktuální stav platformy</h3>
+                    <p className="text-muted-foreground text-sm">Rychlé statistiky a nedávné aktivity na platformě iTest Cloud.</p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="bg-gray-50 p-6 rounded-2xl border space-y-4">
+                      <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-primary" /> Celková odevzdání prací
+                      </h4>
+                      <p className="text-3xl font-black text-primary">{submissions.length} odevzdaných prací</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Žáci úspěšně vypracovali a odevzdali celkem {submissions.length} digitálních testů a výkresů za posledních 30 dní.
+                      </p>
+                    </div>
+
+                    <div className="bg-gray-50 p-6 rounded-2xl border space-y-4">
+                      <h4 className="font-bold text-gray-700 flex items-center gap-2">
+                        <School className="w-5 h-5 text-green-500" /> Rozložení žáků ve třídách
+                      </h4>
+                      <p className="text-3xl font-black text-green-500">
+                        {classrooms.length > 0 ? Math.round(students.length / classrooms.length) : 0} žáků / třída
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        V průměru připadá přibližně {classrooms.length > 0 ? (students.length / classrooms.length).toFixed(1) : 0} žáků na jednu vytvořenou školní třídu v databázi.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="font-bold text-lg text-gray-800">Rychlý rozcestník administrátora</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('teachers')}>
+                        <GraduationCap className="w-5 h-5 text-accent" /> Zobrazit učitele →
+                      </Button>
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('classes')}>
+                        <School className="w-5 h-5 text-green-500" /> Zobrazit třídy →
+                      </Button>
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('students')}>
+                        <Users className="w-5 h-5 text-indigo-500" /> Zobrazit žáky →
+                      </Button>
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('assignments')}>
+                        <ClipboardList className="w-5 h-5 text-amber-500" /> Zobrazit úkoly →
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {adminTab === 'teachers' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div>
+                    <h3 className="text-2xl font-headline font-bold text-gray-800">Seznam Učitelů</h3>
+                    <p className="text-muted-foreground text-sm">Správa a přehled všech registrovaných učitelských účtů.</p>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="p-4 font-bold text-gray-700 text-sm">Jméno učitele</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Uživatelské jméno</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Spravované třídy</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {teachers.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="p-6 text-center text-muted-foreground">V systému zatím nejsou žádní učitelé.</td>
+                          </tr>
+                        ) : (
+                          teachers.map(t => {
+                            const managedClasses = classrooms.filter(c => c.teacherId === t.id);
+                            return (
+                              <tr key={t.id} className="hover:bg-gray-50/50">
+                                <td className="p-4 font-bold text-primary flex items-center gap-2">
+                                  <GraduationCap className="w-4 h-4 text-accent" /> {t.name}
+                                </td>
+                                <td className="p-4 text-sm text-gray-600 font-mono">{t.username}</td>
+                                <td className="p-4">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {managedClasses.length === 0 ? (
+                                      <span className="text-xs text-muted-foreground italic">Žádné třídy</span>
+                                    ) : (
+                                      managedClasses.map(c => (
+                                        <Badge key={c.id} variant="secondary" className="font-semibold">{c.name}</Badge>
+                                      ))
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {adminTab === 'classes' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div>
+                    <h3 className="text-2xl font-headline font-bold text-gray-800">Školní třídy</h3>
+                    <p className="text-muted-foreground text-sm">Rozklikněte jakoukoli třídu pro detailní seznam žáků a zadaných prací.</p>
+                  </div>
+
+                  <div className="grid gap-4">
+                    {classrooms.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground bg-gray-50 border rounded-2xl">
+                        V systému zatím nejsou vytvořeny žádné třídy.
+                      </div>
+                    ) : (
+                      classrooms.map(c => {
+                        const classTeacher = teachers.find(t => t.id === c.teacherId);
+                        const classStudents = students.filter(s => s.classId === c.id);
+                        const classAssignments = assignments.filter(a => a.classId === c.id);
+                        const isExpanded = expandedSubjects[c.id];
+
+                        return (
+                          <Card key={c.id} className="border-none shadow-sm bg-gray-50/70 overflow-hidden">
+                            <CardContent className="p-5 flex justify-between items-center cursor-pointer hover:bg-gray-50" onClick={() => setExpandedSubjects(prev => ({ ...prev, [c.id]: !isExpanded }))}>
+                              <div className="flex items-center gap-4">
+                                <School className="w-6 h-6 text-green-500" />
+                                <div>
+                                  <h4 className="font-black text-xl text-gray-800">{c.name}</h4>
+                                  <p className="text-xs text-muted-foreground">
+                                    Třídní učitel: <span className="font-bold text-gray-700">{classTeacher ? classTeacher.name : 'Nespecifikován'}</span>
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-6">
+                                <div className="text-right">
+                                  <p className="text-sm font-bold text-gray-700">{classStudents.length} žáků</p>
+                                  <p className="text-xs text-muted-foreground">{classAssignments.length} úkolů</p>
+                                </div>
+                                <span className="text-gray-400">
+                                  {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                </span>
+                              </div>
+                            </CardContent>
+
+                            {isExpanded && (
+                              <div className="p-6 bg-white border-t border-gray-100 grid md:grid-cols-2 gap-6 animate-fade-in">
+                                {/* Students list */}
+                                <div className="space-y-3">
+                                  <h5 className="font-bold text-sm uppercase tracking-wider text-primary flex items-center gap-2">
+                                    <Users className="w-4 h-4 text-indigo-500" /> Žáci ve třídě ({classStudents.length})
+                                  </h5>
+                                  <div className="divide-y border rounded-xl overflow-hidden bg-gray-50/30 max-h-64 overflow-y-auto">
+                                    {classStudents.length === 0 ? (
+                                      <p className="p-4 text-sm text-muted-foreground italic text-center">Tato třída nemá žádné zapsané žáky.</p>
+                                    ) : (
+                                      classStudents.map(s => (
+                                        <div key={s.id} className="p-3 flex justify-between items-center text-sm">
+                                          <span className="font-bold text-gray-800">{s.name}</span>
+                                          <span className="text-xs text-muted-foreground font-mono bg-gray-100 px-2 py-0.5 rounded border">Login: {s.username}</span>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Assignments list */}
+                                <div className="space-y-3">
+                                  <h5 className="font-bold text-sm uppercase tracking-wider text-primary flex items-center gap-2">
+                                    <ClipboardList className="w-4 h-4 text-amber-500" /> Zadané úkoly a práce ({classAssignments.length})
+                                  </h5>
+                                  <div className="divide-y border rounded-xl overflow-hidden bg-gray-50/30 max-h-64 overflow-y-auto">
+                                    {classAssignments.length === 0 ? (
+                                      <p className="p-4 text-sm text-muted-foreground italic text-center">Pro tuto třídu nebyly zadány žádné úkoly.</p>
+                                    ) : (
+                                      classAssignments.map(a => {
+                                        const subCount = submissions.filter(s => s.assignmentId === a.id).length;
+                                        return (
+                                          <div key={a.id} className="p-3 flex justify-between items-center text-sm">
+                                            <div className="space-y-0.5">
+                                              <p className="font-bold text-gray-800">{a.title}</p>
+                                              <p className="text-[10px] text-muted-foreground">Předmět: {a.subject || 'Obecný'}</p>
+                                            </div>
+                                            <Badge variant="outline" className="font-bold text-primary bg-primary/5">{subCount} odevzdání</Badge>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </Card>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {adminTab === 'students' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div>
+                    <h3 className="text-2xl font-headline font-bold text-gray-800">Seznam Žáků</h3>
+                    <p className="text-muted-foreground text-sm">Přehled všech zapsaných žáků ve všech třídách platformy.</p>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="p-4 font-bold text-gray-700 text-sm">Celé jméno žáka</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Uživatelské jméno</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Přiřazená třída</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {students.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="p-6 text-center text-muted-foreground">V systému zatím nejsou registrovaní žádní žáci.</td>
+                          </tr>
+                        ) : (
+                          students.map(s => {
+                            const classroom = classrooms.find(c => c.id === s.classId);
+                            return (
+                              <tr key={s.id} className="hover:bg-gray-50/50">
+                                <td className="p-4 font-bold text-indigo-600 flex items-center gap-2">
+                                  <Users className="w-4 h-4 text-indigo-500" /> {s.name}
+                                </td>
+                                <td className="p-4 text-sm text-gray-600 font-mono">{s.username}</td>
+                                <td className="p-4">
+                                  {classroom ? (
+                                    <Badge variant="outline" className="font-bold text-green-600 bg-green-50 border-green-150">{classroom.name}</Badge>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">Bez třídy</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {adminTab === 'assignments' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div>
+                    <h3 className="text-2xl font-headline font-bold text-gray-800">Všechny zadané práce</h3>
+                    <p className="text-muted-foreground text-sm">Kompletní přehled všech digitálních úkolů a testů vytvořených učiteli.</p>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="p-4 font-bold text-gray-700 text-sm">Název úkolu</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Učitel (Tvůrce)</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Určeno pro třídu</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Počet otázek</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Odevzdání</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {assignments.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-6 text-center text-muted-foreground">V systému nebyly vytvořeny žádné úkoly.</td>
+                          </tr>
+                        ) : (
+                          assignments.map(a => {
+                            const creator = teachers.find(t => t.id === a.teacherId);
+                            const classroom = classrooms.find(c => c.id === a.classId);
+                            const subCount = submissions.filter(s => s.assignmentId === a.id).length;
+
+                            return (
+                              <tr key={a.id} className="hover:bg-gray-50/50">
+                                <td className="p-4 font-bold text-gray-800 flex items-center gap-2">
+                                  <ClipboardList className="w-4 h-4 text-amber-500" /> {a.title}
+                                </td>
+                                <td className="p-4 text-sm text-gray-600">
+                                  {creator ? creator.name : <span className="text-xs text-muted-foreground italic">Legacy/Systém</span>}
+                                </td>
+                                <td className="p-4">
+                                  {classroom ? (
+                                    <Badge variant="secondary" className="font-semibold">{classroom.name}</Badge>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground italic">Legacy třída</span>
+                                  )}
+                                </td>
+                                <td className="p-4 text-sm text-gray-600 font-semibold">{a.questions?.length || 0}</td>
+                                <td className="p-4">
+                                  <Badge variant="outline" className="font-bold text-primary bg-primary/5">{subCount} odevzdání</Badge>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
 
   if (currentUser.role === 'teacher') {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);

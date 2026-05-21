@@ -25,7 +25,7 @@ export async function GET() {
     // 4. Vytvoření testovací třídy a přiřazení učitele
     const classroom = await Classroom.create({
       name: "9.A",
-      teacherId: teacher._id,
+      teacherId: teacher._id.toString(),
       year: 2024,
     });
 
@@ -34,7 +34,7 @@ export async function GET() {
       firstName: "Petr",
       lastName: "Novák",
       email: "petr.novak@zaci.cz",
-      classroomId: classroom._id,
+      classroomId: classroom._id.toString(),
     });
 
     return NextResponse.json({
