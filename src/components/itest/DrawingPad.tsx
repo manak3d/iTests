@@ -26,12 +26,14 @@ export function DrawingPad({
   onSave, 
   backgroundImage, 
   initialDrawing,
-  compact = false
+  compact = false,
+  disabled = false
 }: { 
   onSave: (data: string) => void; 
   backgroundImage?: string;
   initialDrawing?: string;
   compact?: boolean;
+  disabled?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
@@ -112,6 +114,7 @@ export function DrawingPad({
   };
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (disabled) return;
     setIsDrawing(true);
     const { x, y } = getCoordinates(e.nativeEvent);
     const ctx = canvasRef.current?.getContext('2d');

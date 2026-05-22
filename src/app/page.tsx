@@ -74,6 +74,24 @@ export default function ITestApp() {
   const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
   const [questionDrawingOpen, setQuestionDrawingOpen] = useState<Record<string, boolean>>({});
   
+  const selectStudentAssignment = (id: string | null) => {
+    setSelectedAssignmentId(id);
+    setStudentAnswers({});
+    setQuestionDrawings({});
+    setMainWorkDrawing(undefined);
+  };
+
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleString('cs-CZ', { 
+      day: 'numeric', 
+      month: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
   const [evalGrade, setEvalGrade] = useState<number | undefined>();
   const [evalFeedback, setEvalFeedback] = useState<string>('');
   const [evalScores, setEvalScores] = useState<Record<string, number>>({});
@@ -1571,7 +1589,14 @@ export default function ITestApp() {
                               {a.questions.map(q => (
                                 <div key={q.id} className="p-4 bg-gray-50 rounded-lg flex justify-between items-center">
                                   <span className="font-medium">{q.text}</span>
-                                  <Badge variant="outline">{q.type}</Badge>
+                                  <Badge variant="outline">
+                                    {q.type === 'short_answer' ? 'Krátká odpověď' : 
+                                     q.type === 'long_answer' ? 'Dlouhá odpověď' : 
+                                     q.type === 'multiple_choice' ? 'Výběr z možností' : 
+                                     q.type === 'multiple_selection' ? 'Více výběrů' : 
+                                     q.type === 'true_false' ? 'Ano / Ne' : 
+                                     q.type === 'drawing' ? 'Kresba' : q.type}
+                                  </Badge>
                                 </div>
                               ))}
                             </div>
@@ -1591,10 +1616,14 @@ export default function ITestApp() {
               ) : isCreatingAssignment ? (
                 <div className="space-y-4">
                   <Button variant="ghost" className="rounded-full" onClick={() => setIsCreatingAssignment(false)}>← Zpět</Button>
-                  <AssignmentCreator classId={selectedClassId!} onSave={(a) => {
-                    store.addAssignment(a);
-                    setIsCreatingAssignment(false);
-                  }} />
+                  <AssignmentCreator 
+                    classId={selectedClassId!} 
+                    students={store.users.filter(u => u.role === 'student' && u.classId === selectedClassId)}
+                    onSave={(a) => {
+                      store.addAssignment(a);
+                      setIsCreatingAssignment(false);
+                    }} 
+                  />
                 </div>
               ) : (
                 <div className="grid gap-4">
@@ -2140,16 +2169,21 @@ export default function ITestApp() {
   }
 
   if (currentUser.role === 'student') {
-    const studentAssignments = store.assignments.filter(a => a.classId === currentUser.classId);
+    const studentAssignments = store.assignments.filter(a => 
+      a.classId === currentUser.classId &&
+      (!a.studentIds || a.studentIds.length === 0 || a.studentIds.includes(currentUser.id))
+    );
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Navbar user={currentUser} onLogout={() => store.logout()} />
         <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 animate-fade-in">
           {selectedAssignmentId ? (
             <div className="space-y-6">
-              <Button variant="ghost" className="rounded-full" onClick={() => setSelectedAssignmentId(null)}>← Zpět</Button>
+              <Button variant="ghost" className="rounded-full" onClick={() => selectStudentAssignment(null)}>← Zpět</Button>
               {(() => {
                 const a = store.assignments.find(as => as.id === selectedAssignmentId);
+                 const now = new Date();
+                 const hasEnded = a && a.endTime ? now > new Date(a.endTime) : false;
                 const submission = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === currentUser.id);
                 if (!a) return null;
                 return (
@@ -2248,37 +2282,48 @@ export default function ITestApp() {
                                       ) 
                                     : 0;
                                   
-                                  const isCorrect = score === maxPoints;
+                                  const isGraded = submission.grade !== undefined && submission.grade !== null;
+                                  const isCorrect = isGraded && score === maxPoints;
 
                                   return (
                                     <div 
                                       key={q.id} 
                                       className={`p-5 rounded-2xl border transition-all ${
-                                        isCorrect 
-                                          ? 'bg-green-50/30 border-green-200' 
-                                          : 'bg-red-50/30 border-red-200 shadow-sm'
+                                        !isGraded
+                                          ? 'bg-gray-50/50 border-gray-200 text-gray-500'
+                                          : isCorrect 
+                                            ? 'bg-green-50/30 border-green-200' 
+                                            : 'bg-red-50/30 border-red-200 shadow-sm'
                                       }`}
                                     >
                                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-3">
                                         <div className="flex items-center gap-2">
-                                          <Badge className={`font-bold ${isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                          <Badge className={`font-bold ${
+                                             !isGraded
+                                               ? 'bg-gray-400 text-white hover:bg-gray-400'
+                                               : isCorrect 
+                                                 ? 'bg-green-500 text-white hover:bg-green-500' 
+                                                 : 'bg-red-500 text-white hover:bg-red-500'
+                                           }`}>
                                             {index + 1}
                                           </Badge>
                                           <p className="font-bold text-lg text-gray-800">{q.text}</p>
                                         </div>
                                         
                                         <div className="flex items-center gap-2">
-                                          {!isCorrect && (
+                                          {isGraded && !isCorrect && (
                                             <Badge variant="destructive" className="bg-red-100 text-red-700 hover:bg-red-100 border-none font-bold text-xs uppercase px-2.5 py-0.5">
                                               Chyba
                                             </Badge>
                                           )}
                                           <Badge variant="outline" className={`font-bold border px-3 py-1 ${
-                                            isCorrect 
-                                              ? 'bg-green-100/50 text-green-800 border-green-300' 
-                                              : 'bg-red-100/50 text-red-800 border-red-300'
+                                            !isGraded
+                                                ? 'bg-gray-100/50 text-gray-600 border-gray-300 hover:bg-gray-100/50'
+                                                : isCorrect 
+                                                  ? 'bg-green-100/50 text-green-800 border-green-300 hover:bg-green-100/50' 
+                                                  : 'bg-red-100/50 text-red-800 border-red-300 hover:bg-red-100/50'
                                           }`}>
-                                            Body: {score} / {maxPoints} b
+                                            {isGraded ? `Body: ${score} / ${maxPoints} b` : `Max. bodů: ${maxPoints} b`}
                                           </Badge>
                                         </div>
                                       </div>
@@ -2337,8 +2382,18 @@ export default function ITestApp() {
                             </div>
                           )}
                         </div>
-                      ) : (
+                                            ) : (
                         <div className="space-y-8">
+                          {hasEnded && (
+                            <div className="bg-amber-50 border-2 border-amber-200 p-5 rounded-2xl flex items-start gap-3 shadow-sm animate-pulse">
+                              <span className="text-2xl">⚠️</span>
+                              <div>
+                                <h4 className="font-bold text-amber-800 text-lg">Vypršel časový limit</h4>
+                                <p className="text-sm text-amber-600 font-medium">Tento úkol měl termín odevzdání do {formatDateTime(a.endTime)}. Nyní si ho můžete pouze prohlédnout, ale již nelze odevzdat žádné odpovědi.</p>
+                              </div>
+                            </div>
+                          )}
+
                           {/* Popis úkolu */}
                           {a.description && (
                             <div className="p-4 bg-gray-50 rounded-xl">
@@ -2373,6 +2428,7 @@ export default function ITestApp() {
                                       placeholder="Vaše odpověď..."
                                       value={studentAnswers[q.id] || ''}
                                       onChange={(e) => setStudentAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                      disabled={hasEnded}
                                     />
                                   )}
 
@@ -2382,6 +2438,7 @@ export default function ITestApp() {
                                       className="min-h-[100px]"
                                       value={studentAnswers[q.id] || ''}
                                       onChange={(e) => setStudentAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                      disabled={hasEnded}
                                     />
                                   )}
 
@@ -2391,12 +2448,13 @@ export default function ITestApp() {
                                          <button
                                            key={i}
                                            type="button"
+                                           disabled={hasEnded}
                                            className={`p-3 rounded-lg border text-left transition-all ${
                                              studentAnswers[q.id] === i
                                                ? 'bg-primary text-white border-primary shadow-md'
-                                               : 'bg-white hover:bg-gray-100'
+                                               : 'bg-white hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-white'
                                            }`}
-                                           onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: i }))}
+                                           onClick={() => !hasEnded && setStudentAnswers(prev => ({ ...prev, [q.id]: i }))}
                                          >
                                            <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                                            {opt}
@@ -2414,12 +2472,14 @@ export default function ITestApp() {
                                            <button
                                              key={i}
                                              type="button"
+                                             disabled={hasEnded}
                                              className={`p-3 rounded-lg border text-left transition-all flex items-center justify-between ${
                                                isSelected
                                                  ? 'bg-primary text-white border-primary shadow-md font-bold'
-                                                 : 'bg-white hover:bg-gray-100'
+                                                 : 'bg-white hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-white'
                                              }`}
                                              onClick={() => {
+                                               if (hasEnded) return;
                                                let nextAnswers;
                                                if (isSelected) {
                                                  nextAnswers = currentAnswers.filter((val: number) => val !== i);
@@ -2446,23 +2506,25 @@ export default function ITestApp() {
                                     <div className="flex gap-3">
                                       <button
                                         type="button"
+                                        disabled={hasEnded}
                                         className={`flex-1 p-3 rounded-lg border text-center font-bold transition-all ${
                                           studentAnswers[q.id] === true
                                             ? 'bg-green-500 text-white border-green-500'
-                                            : 'bg-white hover:bg-green-50'
+                                            : 'bg-white hover:bg-green-50 disabled:opacity-50 disabled:hover:bg-white'
                                         }`}
-                                        onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: true }))}
+                                        onClick={() => !hasEnded && setStudentAnswers(prev => ({ ...prev, [q.id]: true }))}
                                       >
                                         ✓ Ano
                                       </button>
                                       <button
                                         type="button"
+                                        disabled={hasEnded}
                                         className={`flex-1 p-3 rounded-lg border text-center font-bold transition-all ${
                                           studentAnswers[q.id] === false
                                             ? 'bg-red-500 text-white border-red-500'
-                                            : 'bg-white hover:bg-red-50'
+                                            : 'bg-white hover:bg-red-50 disabled:opacity-50 disabled:hover:bg-white'
                                         }`}
-                                        onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: false }))}
+                                        onClick={() => !hasEnded && setStudentAnswers(prev => ({ ...prev, [q.id]: false }))}
                                       >
                                         ✗ Ne
                                       </button>
@@ -2473,12 +2535,13 @@ export default function ITestApp() {
                                   {q.type === 'drawing' && (
                                     <DrawingPad
                                       compact
+                                      disabled={hasEnded}
                                       onSave={(data) => setQuestionDrawings(prev => ({ ...prev, [q.id]: data }))}
                                     />
                                   )}
 
                                   {/* Toggle: Dokreslit perem (pro všechny typy kromě drawing) */}
-                                  {q.type !== 'drawing' && (
+                                  {q.type !== 'drawing' && !hasEnded && (
                                     <div className="pt-1">
                                       <button
                                         type="button"
@@ -2515,12 +2578,15 @@ export default function ITestApp() {
                             <div className="space-y-2">
                               <h3 className="font-headline text-xl font-bold text-primary">Pracovní dokument</h3>
                               <p className="text-sm text-muted-foreground">Piš perem přímo do dokumentu nebo ho nech prázdný.</p>
-                              <DrawingPad backgroundImage={a.fileUri} onSave={setMainWorkDrawing} />
+                              <DrawingPad backgroundImage={a.fileUri} disabled={hasEnded} onSave={setMainWorkDrawing} />
                             </div>
                           ) : null}
-                          <Button className="w-full h-14 text-xl shadow-lg" onClick={() => {
-                            store.submitWork({ assignmentId: selectedAssignmentId, studentId: currentUser.id, answers: studentAnswers, questionDrawings, mainWorkDrawing });
-                          }}>Odevzdat v cloudu</Button>
+                          
+                          {!hasEnded && (
+                            <Button className="w-full h-14 text-xl shadow-lg" onClick={() => {
+                              store.submitWork({ assignmentId: selectedAssignmentId, studentId: currentUser.id, answers: studentAnswers, questionDrawings, mainWorkDrawing });
+                            }}>Odevzdat v cloudu</Button>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -2565,29 +2631,65 @@ export default function ITestApp() {
                     );
                   }
 
-                  return (
+                                    return (
                     <div className="grid gap-4">
-                      {pending.map(a => (
-                        <Card 
-                          key={a.id} 
-                          className="cursor-pointer hover:shadow-md transition-all border-none bg-white shadow-sm overflow-hidden" 
-                          onClick={() => setSelectedAssignmentId(a.id)}
-                        >
-                          <div className="h-1 bg-accent/30 w-full" />
-                          <CardContent className="p-5 flex justify-between items-center">
-                            <div>
-                              <p className="font-bold text-lg text-gray-800">{a.title}</p>
-                              {a.description && (
-                                <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full">Vypracovat úkol</span>
-                              <ChevronRight className="w-5 h-5 text-gray-300" />
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                      {pending.map(a => {
+                        const now = new Date();
+                        const hasStarted = !a.startTime || now >= new Date(a.startTime);
+                        const hasEnded = a.endTime && now > new Date(a.endTime);
+
+                        return (
+                          <Card 
+                            key={a.id} 
+                            className={`transition-all border-none bg-white shadow-sm overflow-hidden ${
+                              !hasStarted 
+                                ? 'opacity-60 cursor-not-allowed select-none' 
+                                : 'cursor-pointer hover:shadow-md hover:border-primary'
+                            }`}
+                            onClick={() => {
+                              if (hasStarted) {
+                                selectStudentAssignment(a.id);
+                              }
+                            }}
+                          >
+                            <div className={`h-1 w-full ${!hasStarted ? 'bg-gray-300' : hasEnded ? 'bg-amber-500' : 'bg-accent/30'}`} />
+                            <CardContent className="p-5 flex justify-between items-center">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold text-lg text-gray-800">{a.title}</p>
+                                  {!hasStarted && (
+                                    <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full uppercase">🔒 Neaktivní</span>
+                                  )}
+                                  {hasEnded && (
+                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase">⌛ Vypršel čas</span>
+                                  )}
+                                </div>
+                                {a.description && (
+                                  <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
+                                )}
+                                <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                                  {a.startTime && (
+                                    <span>Od: {formatDateTime(a.startTime)}</span>
+                                  )}
+                                  {a.endTime && (
+                                    <span className={hasEnded ? 'text-amber-600 font-bold' : ''}>Do: {formatDateTime(a.endTime)}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {!hasStarted ? (
+                                  <span className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">Začne {formatDateTime(a.startTime)}</span>
+                                ) : hasEnded ? (
+                                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full flex items-center gap-1">Prohlédnout (vypršelo)</span>
+                                ) : (
+                                  <span className="text-xs font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full">Vypracovat úkol</span>
+                                )}
+                                <ChevronRight className="w-5 h-5 text-gray-300" />
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -2632,10 +2734,10 @@ export default function ITestApp() {
                         let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
 
                         return (
-                          <Card 
+                                                    <Card 
                             key={a.id} 
                             className="cursor-pointer hover:shadow-md transition-all border-none bg-white shadow-sm overflow-hidden" 
-                            onClick={() => setSelectedAssignmentId(a.id)}
+                            onClick={() => selectStudentAssignment(a.id)}
                           >
                             <CardContent className="p-5 flex justify-between items-center">
                               <div>

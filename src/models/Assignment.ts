@@ -29,6 +29,9 @@ export interface IAssignment extends Document<string> {
   questions: IQuestion[];
   dueDate: string;
   fileUri?: string;
+  startTime?: string;
+  endTime?: string;
+  studentIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,7 +46,10 @@ const AssignmentSchema: Schema = new Schema(
     subject: { type: String, default: "Jiný" },
     questions: { type: [QuestionSchema], default: [] },
     dueDate: { type: String, required: true },
-    fileUri: { type: String }
+    fileUri: { type: String },
+    startTime: { type: String },
+    endTime: { type: String },
+    studentIds: { type: [String], default: [] }
   },
   {
     timestamps: true,

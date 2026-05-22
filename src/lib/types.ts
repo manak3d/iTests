@@ -37,6 +37,9 @@ export interface Assignment {
   questions: Question[];
   dueDate: string;
   fileUri?: string; // Original document as data URI (PDF snapshot or Image)
+  startTime?: string;
+  endTime?: string;
+  studentIds?: string[];
 }
 
 export interface Submission {

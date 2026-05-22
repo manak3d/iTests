@@ -23,7 +23,10 @@ export async function POST(request: Request) {
       subject: body.subject || "Jiný",
       questions: body.questions || [],
       dueDate: body.dueDate,
-      fileUri: body.fileUri
+      fileUri: body.fileUri,
+      startTime: body.startTime || undefined,
+      endTime: body.endTime || undefined,
+      studentIds: body.studentIds || []
     });
 
     return NextResponse.json({ success: true, data: newAssignment }, { status: 201 });

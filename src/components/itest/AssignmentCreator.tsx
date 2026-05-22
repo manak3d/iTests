@@ -7,10 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera } from 'lucide-react';
-import { Question, QuestionType, Assignment } from '@/lib/types';
+import { Question, QuestionType, Assignment, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
-export function AssignmentCreator({ classId, onSave }: { classId: string; onSave: (a: Omit<Assignment, 'id'>) => void }) {
+export function AssignmentCreator({ classId, students = [], onSave }: { classId: string; students?: User[]; onSave: (a: Omit<Assignment, 'id'>) => void }) {
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('Matematika');
   const [description, setDescription] = useState('');
@@ -18,6 +18,11 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
   const [fileUri, setFileUri] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [assignType, setAssignType] = useState<'all' | 'specific'>('all');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   const SUBJECTS = [
     'Matematika',
@@ -111,7 +116,10 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       subject,
       questions,
       fileUri,
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      dueDate: endTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      startTime: startTime || undefined,
+      endTime: endTime || undefined,
+      studentIds: assignType === 'specific' ? selectedStudentIds : [],
     });
   };
 
@@ -175,6 +183,84 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
               className="min-h-[150px] text-base"
             />
           </div>
+          {/* Časový limit a zacílení žáků */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-5 rounded-2xl border border-slate-100/80">
+            <div className="space-y-4">
+              <h4 className="font-bold text-sm text-primary uppercase tracking-wider">⏱️ Časový limit testu</h4>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Od kdy (zahájení):</label>
+                  <Input 
+                    type="datetime-local" 
+                    value={startTime} 
+                    onChange={e => setStartTime(e.target.value)}
+                    className="h-10 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Do kdy (uzávěrka):</label>
+                  <Input 
+                    type="datetime-local" 
+                    value={endTime} 
+                    onChange={e => setEndTime(e.target.value)}
+                    className="h-10 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 border-t md:border-t-0 md:border-l border-slate-200/60 pt-4 md:pt-0 md:pl-6">
+              <h4 className="font-bold text-sm text-primary uppercase tracking-wider">🎯 Zacílení žáků</h4>
+              <div className="space-y-3">
+                <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setAssignType('all')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${assignType === 'all' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                  >
+                    Celá třída
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAssignType('specific')}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${assignType === 'specific' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                  >
+                    Vybraní žáci
+                  </button>
+                </div>
+
+                {assignType === 'specific' && (
+                  <div className="border rounded-xl bg-white p-3 max-h-32 overflow-y-auto space-y-1.5 animate-fade-in">
+                    {students.length === 0 ? (
+                      <p className="text-xs text-muted-foreground italic text-center py-2">Ve třídě nejsou žádní žáci.</p>
+                    ) : (
+                      students.map(s => {
+                        const isChecked = selectedStudentIds.includes(s.id);
+                        return (
+                          <label key={s.id} className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setSelectedStudentIds(prev => prev.filter(id => id !== s.id));
+                                } else {
+                                  setSelectedStudentIds(prev => [...prev, s.id]);
+                                }
+                              }}
+                              className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                            />
+                            <span>{s.name} <span className="text-gray-400">({s.username})</span></span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {fileUri && (
             <div className="p-4 bg-muted rounded-xl border border-dashed flex items-center justify-between">
               <div className="flex items-center gap-3">
