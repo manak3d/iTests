@@ -1714,7 +1714,14 @@ export default function ITestApp() {
                                       <div className="flex-1 space-y-2">
                                         <div className="flex justify-between items-start mb-2">
                                           <p className="font-semibold">{index + 1}. {q.text}</p>
-                                          <Badge variant="outline">{q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}</Badge>
+                                          <Badge variant="outline">
+                                             {q.type === 'short_answer' ? 'Krátká odpověď' : 
+                                              q.type === 'long_answer' ? 'Dlouhá odpověď' : 
+                                              q.type === 'multiple_choice' ? 'Výběr z možností' : 
+                                              q.type === 'multiple_selection' ? 'Více výběrů' : 
+                                              q.type === 'true_false' ? 'Ano / Ne' : 
+                                              q.type === 'drawing' ? 'Kresba' : q.type}
+                                           </Badge>
                                         </div>
                                         
                                         {q.type !== 'drawing' && (
@@ -2350,7 +2357,14 @@ export default function ITestApp() {
                                       <Badge variant="outline" className="bg-primary/10 text-primary font-bold">{index + 1}</Badge>
                                       <p className="font-semibold text-lg">{q.text}</p>
                                     </div>
-                                    <Badge variant="secondary" className="text-[10px] uppercase">{q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}</Badge>
+                                    <Badge variant="secondary" className="text-[10px] uppercase">
+                                      {q.type === 'short_answer' ? 'Krátká odpověď' : 
+                                       q.type === 'long_answer' ? 'Dlouhá odpověď' : 
+                                       q.type === 'multiple_choice' ? 'Výběr z možností' : 
+                                       q.type === 'multiple_selection' ? 'Více výběrů' : 
+                                       q.type === 'true_false' ? 'Ano / Ne' : 
+                                       q.type === 'drawing' ? 'Kresba' : q.type}
+                                    </Badge>
                                   </div>
 
                                   {/* Textový vstup pro všechny typy kromě drawing */}

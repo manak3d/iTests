@@ -202,7 +202,12 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
-                      {q.type === 'drawing' ? 'Kresba' : q.type === 'multiple_selection' ? 'Více výběrů' : q.type.replace('_', ' ')}
+                      {q.type === 'short_answer' ? 'Krátká odp.' : 
+                       q.type === 'long_answer' ? 'Dlouhá odp.' : 
+                       q.type === 'multiple_choice' ? 'Výběr (A-D)' : 
+                       q.type === 'multiple_selection' ? 'Více výběrů' : 
+                       q.type === 'true_false' ? 'Ano / Ne' : 
+                       q.type === 'drawing' ? 'Kresba' : q.type}
                     </span>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-gray-50 border px-2 py-1 rounded-md">
                       <span className="font-semibold">Body:</span>
