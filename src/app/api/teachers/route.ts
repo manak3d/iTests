@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Teacher } from "@/models/Teacher";
 import { Student } from "@/models/Student";
+import { Classroom } from "@/models/Classroom";
+import { Assignment } from "@/models/Assignment";
+import { Submission } from "@/models/Submission";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
@@ -43,3 +46,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    await dbConnect();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Missing teacher ID" }, { status: 400 });
+    }
+
+    const teacher = await Teacher.findOne({ _id: id });
+    if (!teacher) {
+      return NextResponse.json({ success: false, error: "Teacher not found" }, { status: 404 });
+    }
+
+    // 1. U tříd spravovaných tímto učitelem nastavíme teacherId na "" (nezařazeno), aby je mohli převzít jiní učitelé
+    await Classroom.updateMany({ teacherId: id }, { $set: { teacherId: "" } });
+
+    // 2. Smazání samotného učitele
+    await Teacher.deleteOne({ _id: id });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+

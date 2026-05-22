@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Student } from "@/models/Student";
 import { Teacher } from "@/models/Teacher";
+import { Submission } from "@/models/Submission";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
@@ -110,3 +111,40 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    await dbConnect();
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Missing student ID" }, { status: 400 });
+    }
+
+    const student = await Student.findOne({ _id: id });
+    if (!student) {
+      return NextResponse.json({ success: false, error: "Student not found" }, { status: 404 });
+    }
+
+    // 1. Odebrání žáka z pole studentIds v jeho třídě
+    if (student.classroomId) {
+      const { Classroom } = require('@/models/Classroom');
+      await Classroom.findOneAndUpdate(
+        { _id: student.classroomId },
+        { $pull: { studentIds: id } }
+      );
+    }
+
+    // 2. Smazání všech odevzdaných prací (submissions) tohoto žáka
+    await Submission.deleteMany({ studentId: id });
+
+    // 3. Smazání samotného žáka
+    await Student.deleteOne({ _id: id });
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+

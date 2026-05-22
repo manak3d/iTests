@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3 } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -38,6 +38,13 @@ export default function ITestApp() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [newPasswordVal, setNewPasswordVal] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    type: 'teacher' | 'classroom' | 'student' | 'assignment';
+    id: string;
+    name: string;
+  } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{ id: string, name: string } | null>(null);
+  const [newClassNameVal, setNewClassNameVal] = useState('');
 
   const [classActionType, setClassActionType] = useState<'create' | 'select'>('create');
   const [selectedExistingClassId, setSelectedExistingClassId] = useState('');
@@ -805,12 +812,13 @@ export default function ITestApp() {
                           <th className="p-4 font-bold text-gray-700 text-sm">Jméno učitele</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Uživatelské jméno</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Spravované třídy</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Akce</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {teachers.length === 0 ? (
                           <tr>
-                            <td colSpan={3} className="p-6 text-center text-muted-foreground">V systému zatím nejsou žádní učitelé.</td>
+                            <td colSpan={4} className="p-6 text-center text-muted-foreground">V systému zatím nejsou žádní učitelé.</td>
                           </tr>
                         ) : (
                           teachers.map(t => {
@@ -831,6 +839,20 @@ export default function ITestApp() {
                                       ))
                                     )}
                                   </div>
+                                </td>
+                                <td className="p-4">
+                                  {t.id === currentUser.id ? (
+                                    <span className="text-xs text-muted-foreground italic bg-gray-100 px-2 py-1 rounded-full border">Aktivní účet</span>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => setDeleteTarget({ type: 'teacher', id: t.id, name: t.name })}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -874,11 +896,35 @@ export default function ITestApp() {
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-6">
+                              <div className="flex items-center gap-4">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 rounded-full text-primary hover:bg-primary/5"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRenameTarget({ id: c.id, name: c.name });
+                                    setNewClassNameVal(c.name);
+                                  }}
+                                  title="Přejmenovat třídu"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </Button>
                                 <div className="text-right">
                                   <p className="text-sm font-bold text-gray-700">{classStudents.length} žáků</p>
                                   <p className="text-xs text-muted-foreground">{classAssignments.length} úkolů</p>
                                 </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteTarget({ type: 'classroom', id: c.id, name: c.name });
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
                                 <span className="text-gray-400">
                                   {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                                 </span>
@@ -980,7 +1026,7 @@ export default function ITestApp() {
                                   )}
                                 </td>
                                 <td className="p-4 text-sm text-primary font-mono font-bold">{s.password || 'Nenastaveno'}</td>
-                                <td className="p-4">
+                                <td className="p-4 flex gap-2">
                                   <Button 
                                     variant="outline" 
                                     size="sm" 
@@ -991,6 +1037,14 @@ export default function ITestApp() {
                                     }}
                                   >
                                     <PenTool className="w-3.5 h-3.5" /> Změnit heslo
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => setDeleteTarget({ type: 'student', id: s.id, name: s.name })}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </td>
                               </tr>
@@ -1019,12 +1073,13 @@ export default function ITestApp() {
                           <th className="p-4 font-bold text-gray-700 text-sm">Určeno pro třídu</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Počet otázek</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Odevzdání</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Akce</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {assignments.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="p-6 text-center text-muted-foreground">V systému nebyly vytvořeny žádné úkoly.</td>
+                            <td colSpan={6} className="p-6 text-center text-muted-foreground">V systému nebyly vytvořeny žádné úkoly.</td>
                           </tr>
                         ) : (
                           assignments.map(a => {
@@ -1050,6 +1105,16 @@ export default function ITestApp() {
                                 <td className="p-4 text-sm text-gray-600 font-semibold">{a.questions?.length || 0}</td>
                                 <td className="p-4">
                                   <Badge variant="outline" className="font-bold text-primary bg-primary/5">{subCount} odevzdání</Badge>
+                                </td>
+                                <td className="p-4">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => setDeleteTarget({ type: 'assignment', id: a.id, name: a.title })}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
                                 </td>
                               </tr>
                             );
@@ -1134,6 +1199,98 @@ export default function ITestApp() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Dialog pro potvrzení smazání */}
+          <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+            <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl p-6">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-xl font-headline font-bold text-red-600 flex items-center gap-2">
+                  <Trash2 className="w-5 h-5 text-red-500 animate-pulse" />
+                  Potvrdit smazání
+                </DialogTitle>
+                <DialogDescription className="text-gray-600 text-sm leading-relaxed">
+                  {deleteTarget?.type === 'teacher' && (
+                    <>Opravdu chcete smazat učitele <strong className="text-gray-800">"{deleteTarget.name}"</strong>? Tím dojde k jeho trvalému odstranění. Všechny jeho spravované třídy, žáci a úkoly budou bezpečně zachovány a uvolněny pro ostatní učitele.</>
+                  )}
+                  {deleteTarget?.type === 'classroom' && (
+                    <>Opravdu chcete smazat třídu <strong className="text-gray-800">"{deleteTarget.name}"</strong>? Tím dojde k <strong>odstranění všech žáků, jejich úkolů a odevzdaných prací</strong> v této třídě! Tato akce je nevratná.</>
+                  )}
+                  {deleteTarget?.type === 'student' && (
+                    <>Opravdu chcete smazat žáka <strong className="text-gray-800">"{deleteTarget.name}"</strong>? Tím dojde k <strong>odstranění všech jeho odevzdaných prací</strong>! Tato akce je nevratná.</>
+                  )}
+                  {deleteTarget?.type === 'assignment' && (
+                    <>Opravdu chcete smazat úkol <strong className="text-gray-800">"{deleteTarget.name}"</strong>? Tím dojde k <strong>odstranění všech odevzdaných prací</strong> spojených s tímto úkolem! Tato akce je nevratná.</>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="mt-6 flex justify-end gap-3">
+                <Button variant="outline" className="rounded-full font-bold px-4" onClick={() => setDeleteTarget(null)}>
+                  Zrušit
+                </Button>
+                <Button 
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-full font-bold px-5" 
+                  onClick={() => {
+                    if (deleteTarget) {
+                      if (deleteTarget.type === 'teacher') store.deleteTeacher(deleteTarget.id);
+                      if (deleteTarget.type === 'classroom') store.deleteClassroom(deleteTarget.id);
+                      if (deleteTarget.type === 'student') store.deleteStudent(deleteTarget.id);
+                      if (deleteTarget.type === 'assignment') store.deleteAssignment(deleteTarget.id);
+                      setDeleteTarget(null);
+                    }
+                  }}
+                >
+                  Smazat
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog pro přejmenování třídy */}
+          <Dialog open={renameTarget !== null} onOpenChange={(open) => { if (!open) setRenameTarget(null); }}>
+            <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl p-6">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-xl font-headline font-bold text-primary flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-accent animate-pulse" />
+                  Přejmenovat třídu
+                </DialogTitle>
+                <DialogDescription className="text-gray-500 text-sm leading-relaxed">
+                  Zadejte nový název pro třídu <strong className="text-gray-800">"{renameTarget?.name}"</strong>.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="renameInput" className="font-bold text-gray-700">Nový název třídy</Label>
+                  <Input 
+                    id="renameInput"
+                    placeholder="Např. 8.A Matematika"
+                    value={newClassNameVal}
+                    onChange={(e) => setNewClassNameVal(e.target.value)}
+                    className="rounded-xl h-12"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex justify-end gap-3">
+                <Button variant="outline" className="rounded-full font-bold px-4" onClick={() => setRenameTarget(null)}>
+                  Zrušit
+                </Button>
+                <Button 
+                  disabled={!newClassNameVal.trim() || newClassNameVal === renameTarget?.name}
+                  className="bg-primary hover:bg-primary/95 text-white rounded-full font-bold px-5" 
+                  onClick={async () => {
+                    if (renameTarget && newClassNameVal.trim()) {
+                      const success = await store.renameClassroom(renameTarget.id, newClassNameVal.trim());
+                      if (success) {
+                        setRenameTarget(null);
+                      }
+                    }
+                  }}
+                >
+                  Uložit změny
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     );
@@ -1150,8 +1307,26 @@ export default function ITestApp() {
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-4xl font-headline font-bold text-primary tracking-tight">
-                {selectedClass ? `${selectedClass.name}` : 'Nástěnka učitele'}
+              <h1 className="text-4xl font-headline font-bold text-primary tracking-tight flex items-center gap-2">
+                {selectedClass ? (
+                  <>
+                    <span>{selectedClass.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-full text-muted-foreground hover:text-primary hover:bg-primary/5"
+                      onClick={() => {
+                        setRenameTarget({ id: selectedClass.id, name: selectedClass.name });
+                        setNewClassNameVal(selectedClass.name);
+                      }}
+                      title="Přejmenovat třídu"
+                    >
+                      <Edit3 className="w-4.5 h-4.5" />
+                    </Button>
+                  </>
+                ) : (
+                  'Nástěnka učitele'
+                )}
               </h1>
               <p className="text-muted-foreground">
                 {selectedClass ? 'Správa úkolů a výsledků v cloudu.' : 'Spravujte své třídy, žáky a cloudové materiály.'}
@@ -1895,6 +2070,53 @@ export default function ITestApp() {
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Ukládám...
                     </>
                   ) : 'Uložit heslo'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog pro přejmenování třídy */}
+          <Dialog open={renameTarget !== null} onOpenChange={(open) => { if (!open) setRenameTarget(null); }}>
+            <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl p-6">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-xl font-headline font-bold text-primary flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-accent animate-pulse" />
+                  Přejmenovat třídu
+                </DialogTitle>
+                <DialogDescription className="text-gray-500 text-sm leading-relaxed">
+                  Zadejte nový název pro třídu <strong className="text-gray-800">"{renameTarget?.name}"</strong>.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="renameInputTeacher" className="font-bold text-gray-700">Nový název třídy</Label>
+                  <Input 
+                    id="renameInputTeacher"
+                    placeholder="Např. 8.A Matematika"
+                    value={newClassNameVal}
+                    onChange={(e) => setNewClassNameVal(e.target.value)}
+                    className="rounded-xl h-12"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex justify-end gap-3">
+                <Button variant="outline" className="rounded-full font-bold px-4" onClick={() => setRenameTarget(null)}>
+                  Zrušit
+                </Button>
+                <Button 
+                  disabled={!newClassNameVal.trim() || newClassNameVal === renameTarget?.name}
+                  className="bg-primary hover:bg-primary/95 text-white rounded-full font-bold px-5" 
+                  onClick={async () => {
+                    if (renameTarget && newClassNameVal.trim()) {
+                      const success = await store.renameClassroom(renameTarget.id, newClassNameVal.trim());
+                      if (success) {
+                        setRenameTarget(null);
+                      }
+                    }
+                  }}
+                >
+                  Uložit změny
                 </Button>
               </DialogFooter>
             </DialogContent>

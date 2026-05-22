@@ -215,6 +215,92 @@ export function useITestStore() {
     .catch(console.error);
   }, [db, toast]);
 
+  const deleteClassroom = useCallback((id: string) => {
+    fetch(`/api/classrooms?id=${id}`, {
+      method: 'DELETE'
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Smazáno", description: "Třída i všichni žáci, jejich úkoly a odevzdané práce byly smazány." });
+        
+        // 1. Získání ID všech žáků a úkolů v této třídě k pročištění lokálního stavu
+        const studentsInClass = users.filter(u => u.role === 'student' && u.classId === id).map(u => u.id);
+        const assignmentsInClass = assignments.filter(a => a.classId === id).map(a => a.id);
+
+        // 2. Filtrování lokálního stavu
+        setClasses(prev => prev.filter(c => c.id !== id));
+        setUsers(prev => prev.filter(u => u.classId !== id));
+        setAssignments(prev => prev.filter(a => a.classId !== id));
+        setSubmissions(prev => prev.filter(s => !studentsInClass.includes(s.studentId) && !assignmentsInClass.includes(s.assignmentId)));
+
+        // 3. Fallback/backup v Firestore
+        if (db) {
+          deleteDoc(doc(db, 'classes', id)).catch(console.error);
+          studentsInClass.forEach(sId => deleteDoc(doc(db, 'users', sId)).catch(console.error));
+          assignmentsInClass.forEach(aId => deleteDoc(doc(db, 'assignments', aId)).catch(console.error));
+        }
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se smazat třídu.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
+  }, [db, toast, users, assignments]);
+
+  const deleteStudent = useCallback((id: string) => {
+    fetch(`/api/students?id=${id}`, {
+      method: 'DELETE'
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Smazáno", description: "Žák i všechny jeho odevzdané práce byly smazány." });
+        
+        // 1. Najdeme třídu studenta pro odebrání z pole studentIds v lokálním stavu
+        const student = users.find(u => u.id === id);
+        if (student && student.classId) {
+          setClasses(prev => prev.map(c => c.id === student.classId ? { ...c, studentIds: c.studentIds.filter(sId => sId !== id) } : c));
+        }
+
+        // 2. Filtrování lokálního stavu
+        setUsers(prev => prev.filter(u => u.id !== id));
+        setSubmissions(prev => prev.filter(s => s.studentId !== id));
+
+        // 3. Fallback/backup v Firestore
+        if (db) {
+          deleteDoc(doc(db, 'users', id)).catch(console.error);
+        }
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se smazat žáka.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
+  }, [db, toast, users]);
+
+  const deleteTeacher = useCallback((id: string) => {
+    fetch(`/api/teachers?id=${id}`, {
+      method: 'DELETE'
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Smazáno", description: "Učitel byl úspěšně smazán. Spravované třídy byly zachovány." });
+        
+        // 1. Nastavíme teacherId u lokálních tříd na "" (nezařazeno)
+        setClasses(prev => prev.map(c => c.teacherId === id ? { ...c, teacherId: "" } : c));
+
+        // 2. Odebereme učitele z lokálního seznamu uživatelů
+        setUsers(prev => prev.filter(u => u.id !== id));
+
+        // 3. Fallback/backup v Firestore (smažeme pouze dokument učitele)
+        if (db) {
+          deleteDoc(doc(db, 'users', id)).catch(console.error);
+        }
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se smazat učitele.", variant: "destructive" });
+      }
+    })
+    .catch(console.error);
+  }, [db, toast]);
+
+
   const submitWork = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'>) => {
     const id = Math.random().toString(36).substring(2, 11);
     const newSubmission = { ...submission, id, submittedAt: new Date().toISOString() };
@@ -321,9 +407,41 @@ export function useITestStore() {
     });
   }, [toast]);
 
+  const renameClassroom = useCallback((classId: string, newName: string) => {
+    return fetch('/api/classrooms', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: classId, name: newName })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Třída přejmenována", description: "Název třídy byl úspěšně aktualizován." });
+        setClasses(prev => prev.map(c => c.id === classId ? { ...c, name: newName } : c));
+        
+        // Nepovinná záloha do Firebase
+        if (db) {
+          const classroom = classes.find(c => c.id === classId);
+          if (classroom) {
+            setDoc(doc(db, 'classes', classId), cleanData({ ...classroom, name: newName })).catch(console.error);
+          }
+        }
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se přejmenovat třídu.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [db, toast, classes]);
+
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
-    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword
+    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
+    assignClass, assignStudent, changeStudentPassword, renameClassroom
   };
 }
