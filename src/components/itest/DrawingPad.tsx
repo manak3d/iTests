@@ -8,9 +8,12 @@ import { cn } from '@/lib/utils';
 
 const PRESET_COLORS = [
   { id: 'black', value: '#000000', label: 'Černá' },
-  { id: 'blue', value: '#295CA3', label: 'Modrá' },
-  { id: 'red', value: '#E11D48', label: 'Červená' },
-  { id: 'green', value: '#10B981', label: 'Zelená' },
+  { id: 'blue', value: '#2563EB', label: 'Modrá' },
+  { id: 'red', value: '#DC2626', label: 'Červená' },
+  { id: 'green', value: '#16A34A', label: 'Zelená' },
+  { id: 'yellow', value: '#CA8A04', label: 'Žlutá' },
+  { id: 'orange', value: '#EA580C', label: 'Oranžová' },
+  { id: 'purple', value: '#9333EA', label: 'Fialová' },
 ];
 
 const SIZES = [
@@ -202,20 +205,33 @@ export function DrawingPad({
                 <Eraser className="w-3 h-3 inline mr-1" />Guma
               </button>
             </div>
-            <div className="flex gap-1">
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => { setColor(c.value); setIsEraser(false); }}
-                  className={cn(
-                    "w-5 h-5 rounded-full border transition-transform hover:scale-110",
-                    color === c.value && !isEraser ? "border-primary scale-110 ring-1 ring-primary" : "border-gray-200"
-                  )}
-                  style={{ backgroundColor: c.value }}
-                  title={c.label}
-                />
-              ))}
+            <div className="flex items-center gap-1">
+              <div className="flex gap-0.5 sm:gap-1">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => { setColor(c.value); setIsEraser(false); }}
+                    className={cn(
+                      "w-4 h-4 sm:w-5 sm:h-5 rounded-full border transition-transform hover:scale-110",
+                      color === c.value && !isEraser ? "border-primary scale-110 ring-1 ring-primary" : "border-gray-200"
+                    )}
+                    style={{ backgroundColor: c.value }}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+              <div className="relative group ml-0.5">
+                <label className="cursor-pointer flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded-full border border-gray-200 bg-white hover:border-primary hover:scale-110 transition-all shadow-sm">
+                  <Palette className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-gray-500" />
+                  <input 
+                    type="color" 
+                    value={color} 
+                    onChange={(e) => { setColor(e.target.value); setIsEraser(false); }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                </label>
+              </div>
             </div>
           </div>
           <button

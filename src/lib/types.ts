@@ -16,7 +16,7 @@ export interface Class {
   studentIds: string[];
 }
 
-export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'true_false' | 'drawing';
+export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'multiple_selection' | 'true_false' | 'drawing';
 
 export interface Question {
   id: string;

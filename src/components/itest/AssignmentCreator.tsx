@@ -59,7 +59,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
       type,
       text: '',
       points: 1,
-      options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
+      options: (type === 'multiple_choice' || type === 'multiple_selection') ? ['', '', '', ''] : undefined,
     };
     setQuestions([...questions, newQuestion]);
   };
@@ -202,7 +202,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
-                      {q.type === 'drawing' ? 'Kresba' : q.type.replace('_', ' ')}
+                      {q.type === 'drawing' ? 'Kresba' : q.type === 'multiple_selection' ? 'Více výběrů' : q.type.replace('_', ' ')}
                     </span>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-gray-50 border px-2 py-1 rounded-md">
                       <span className="font-semibold">Body:</span>
@@ -227,7 +227,7 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
                   className="font-medium border-none shadow-none focus-visible:ring-0 text-lg px-0"
                 />
                 
-                {q.type === 'multiple_choice' && (
+                {(q.type === 'multiple_choice' || q.type === 'multiple_selection') && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                     {q.options?.map((opt, i) => (
                       <div key={i} className="flex items-center gap-2">
@@ -259,6 +259,9 @@ export function AssignmentCreator({ classId, onSave }: { classId: string; onSave
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('multiple_choice')}>
             <Plus className="w-4 h-4 mr-2" /> Výběr (A-D)
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('multiple_selection')}>
+            <Plus className="w-4 h-4 mr-2" /> Více výběrů (A-D)
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('true_false')}>
             <Plus className="w-4 h-4 mr-2" /> Ano / Ne

@@ -1723,8 +1723,14 @@ export default function ITestApp() {
                                             {answer === undefined || answer === null || answer === '' ? (
                                               <span className="italic text-gray-400">Neodpovězeno</span>
                                             ) : q.type === 'multiple_choice' ? (
-                                              <span className="font-bold">{String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}</span>
-                                            ) : q.type === 'true_false' ? (
+                                               <span className="font-bold">{String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}</span>
+                                             ) : q.type === 'multiple_selection' ? (
+                                               <span className="font-bold">
+                                                 {Array.isArray(answer) && answer.length > 0
+                                                   ? answer.map((val: number) => `${String.fromCharCode(65 + val)}. ${q.options?.[val]}`).join(', ')
+                                                   : <span className="italic text-gray-400">Žádná možnost nevybrána</span>}
+                                               </span>
+                                             ) : q.type === 'true_false' ? (
                                               <span className="font-bold">{answer ? '✓ Ano' : '✗ Ne'}</span>
                                             ) : (
                                               <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
@@ -2278,10 +2284,16 @@ export default function ITestApp() {
                                             {answer === undefined || answer === null || answer === '' ? (
                                               <span className="italic text-gray-400">Neodpovězeno</span>
                                             ) : q.type === 'multiple_choice' ? (
-                                              <span className="font-semibold text-gray-800">
-                                                {String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}
-                                              </span>
-                                            ) : q.type === 'true_false' ? (
+                                               <span className="font-semibold text-gray-800">
+                                                 {String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}
+                                               </span>
+                                             ) : q.type === 'multiple_selection' ? (
+                                               <span className="font-semibold text-gray-800">
+                                                 {Array.isArray(answer) && answer.length > 0
+                                                   ? answer.map((val: number) => `${String.fromCharCode(65 + val)}. ${q.options?.[val]}`).join(', ')
+                                                   : <span className="italic text-gray-400">Žádná možnost nevybrána</span>}
+                                               </span>
+                                             ) : q.type === 'true_false' ? (
                                               <span className="font-semibold text-gray-800">
                                                 {answer ? '✓ Ano' : '✗ Ne'}
                                               </span>
@@ -2360,24 +2372,61 @@ export default function ITestApp() {
                                   )}
 
                                   {q.type === 'multiple_choice' && q.options && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                      {q.options.map((opt, i) => (
-                                        <button
-                                          key={i}
-                                          type="button"
-                                          className={`p-3 rounded-lg border text-left transition-all ${
-                                            studentAnswers[q.id] === i
-                                              ? 'bg-primary text-white border-primary shadow-md'
-                                              : 'bg-white hover:bg-gray-100'
-                                          }`}
-                                          onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: i }))}
-                                        >
-                                          <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                                          {opt}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                       {q.options.map((opt, i) => (
+                                         <button
+                                           key={i}
+                                           type="button"
+                                           className={`p-3 rounded-lg border text-left transition-all ${
+                                             studentAnswers[q.id] === i
+                                               ? 'bg-primary text-white border-primary shadow-md'
+                                               : 'bg-white hover:bg-gray-100'
+                                           }`}
+                                           onClick={() => setStudentAnswers(prev => ({ ...prev, [q.id]: i }))}
+                                         >
+                                           <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                                           {opt}
+                                         </button>
+                                       ))}
+                                     </div>
+                                   )}
+
+                                   {q.type === 'multiple_selection' && q.options && (
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                       {q.options.map((opt, i) => {
+                                         const currentAnswers = Array.isArray(studentAnswers[q.id]) ? studentAnswers[q.id] : [];
+                                         const isSelected = currentAnswers.includes(i);
+                                         return (
+                                           <button
+                                             key={i}
+                                             type="button"
+                                             className={`p-3 rounded-lg border text-left transition-all flex items-center justify-between ${
+                                               isSelected
+                                                 ? 'bg-primary text-white border-primary shadow-md font-bold'
+                                                 : 'bg-white hover:bg-gray-100'
+                                             }`}
+                                             onClick={() => {
+                                               let nextAnswers;
+                                               if (isSelected) {
+                                                 nextAnswers = currentAnswers.filter((val: number) => val !== i);
+                                               } else {
+                                                 nextAnswers = [...currentAnswers, i].sort((a: number, b: number) => a - b);
+                                               }
+                                               setStudentAnswers(prev => ({ ...prev, [q.id]: nextAnswers }));
+                                             }}
+                                           >
+                                             <div>
+                                               <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                                               {opt}
+                                             </div>
+                                             <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? 'bg-white text-primary border-white' : 'border-gray-300'}`}>
+                                               {isSelected && '✓'}
+                                             </div>
+                                           </button>
+                                         );
+                                       })}
+                                     </div>
+                                   )}
 
                                   {q.type === 'true_false' && (
                                     <div className="flex gap-3">
