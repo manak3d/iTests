@@ -17,6 +17,12 @@ export async function POST(request: Request) {
     if (existingStudent) {
       return NextResponse.json({ success: false, error: "Tento uživatel (login) již existuje." }, { status: 400 });
     }
+
+    // Kontrola, zda uživatelské jméno již neexistuje mezi učiteli
+    const existingTeacher = await Teacher.findOne({ username: body.username });
+    if (existingTeacher) {
+      return NextResponse.json({ success: false, error: "Tento uživatel (login) již existuje." }, { status: 400 });
+    }
     
     // Hashování hesla
     let hashedPassword = undefined;

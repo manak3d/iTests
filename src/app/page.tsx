@@ -200,6 +200,14 @@ export default function ITestApp() {
       }
     } else {
       if (name && username && password) {
+        // Kontrola unikátnosti loginu na klientu
+        const usernameLower = username.trim().toLowerCase();
+        const exists = store.users.some(u => u.username.toLowerCase() === usernameLower);
+        if (exists) {
+          toast({ title: "Registrace selhala", description: "Tento uživatel (login) již existuje.", variant: "destructive" });
+          return;
+        }
+
         try {
           const nameParts = name.split(' ');
           const firstName = nameParts[0] || 'Neznámé';
@@ -578,6 +586,14 @@ export default function ITestApp() {
   const handleAddStudent = async () => {
     if (!newStudentName.trim() || !newStudentUsername.trim() || !newStudentPassword.trim()) {
       toast({ title: "Chyba", description: "Musíte vyplnit všechna pole (jméno, login i heslo).", variant: "destructive" });
+      return;
+    }
+
+    // Kontrola unikátnosti loginu na klientu
+    const studentUsernameLower = newStudentUsername.trim().toLowerCase();
+    const exists = store.users.some(u => u.username.toLowerCase() === studentUsernameLower);
+    if (exists) {
+      toast({ title: "Chyba", description: "Tento uživatel (login) již existuje.", variant: "destructive" });
       return;
     }
     
