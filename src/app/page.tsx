@@ -75,17 +75,17 @@ export default function ITestApp() {
   const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
   const [questionDrawingOpen, setQuestionDrawingOpen] = useState<Record<string, boolean>>({});
   
-    const [isEditingSettings, setIsEditingSettings] = useState(false);
+  const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
-  const [editClassId, setEditClassId] = useState('');
+  const [editSharedClassIds, setEditSharedClassIds] = useState<string[]>([]);
   const [editAssignType, setEditAssignType] = useState<'all' | 'specific'>('all');
   const [editSelectedStudentIds, setEditSelectedStudentIds] = useState<string[]>([]);
 
   const handleStartEditSettings = (a: Assignment) => {
     setEditStartTime(a.startTime || '');
     setEditEndTime(a.endTime || '');
-    setEditClassId(a.classId || selectedClassId || '');
+    setEditSharedClassIds(a.sharedWithClassIds || []);
     setEditAssignType(a.studentIds && a.studentIds.length > 0 ? 'specific' : 'all');
     setEditSelectedStudentIds(a.studentIds || []);
     setIsEditingSettings(true);
@@ -1634,10 +1634,15 @@ export default function ITestApp() {
                           {!isEditingSettings ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                               <div className="space-y-1">
-                                <span className="font-semibold text-gray-500 block text-xs uppercase">Cílová třída a zacílení:</span>
+                                <span className="font-semibold text-gray-500 block text-xs uppercase">Sdílení a zacílení:</span>
                                 <p className="font-bold text-slate-800">
-                                  Třída: {store.classes.find(c => c.id === a.classId)?.name || a.classId}
+                                  Původní třída: {store.classes.find(c => c.id === a.classId)?.name || a.classId}
                                 </p>
+                                {a.sharedWithClassIds && a.sharedWithClassIds.length > 0 && (
+                                  <p className="text-xs text-primary font-semibold">
+                                    + sdíleno do: {a.sharedWithClassIds.map(id => store.classes.find(c => c.id === id)?.name || id).join(', ')}
+                                  </p>
+                                )}
                                 <p className="text-xs text-muted-foreground">
                                   {a.studentIds && a.studentIds.length > 0 
                                     ? `Cíleno na vybrané žáky (${a.studentIds.length} žáků)` 
@@ -1656,49 +1661,69 @@ export default function ITestApp() {
                             </div>
                           ) : (
                             <div className="space-y-4 pt-2">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Cílová třída:</label>
-                                  <select
-                                    value={editClassId}
-                                    onChange={e => {
-                                      setEditClassId(e.target.value);
-                                      setEditSelectedStudentIds([]);
-                                    }}
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                  >
-                                    {store.classes.map(c => (
-                                      <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                  </select>
+
+                              {/* Sdílení do dalších tříd */}
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase">📤 Sdílet do dalších tříd:</label>
+                                <p className="text-xs text-muted-foreground">
+                                  Původní třída <strong>{store.classes.find(c => c.id === a.classId)?.name || a.classId}</strong> zůstane vždy. Zaškrtni třídy, které mají test taky vidět.
+                                </p>
+                                <div className="border rounded-xl bg-white p-3 max-h-40 overflow-y-auto space-y-1.5">
+                                  {store.classes.filter(c => c.id !== a.classId).length === 0 ? (
+                                    <p className="text-xs text-muted-foreground italic text-center py-2">Žádné jiné třídy neexistují.</p>
+                                  ) : (
+                                    store.classes.filter(c => c.id !== a.classId).map(c => {
+                                      const isShared = editSharedClassIds.includes(c.id);
+                                      return (
+                                        <label key={c.id} className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors">
+                                          <input
+                                            type="checkbox"
+                                            checked={isShared}
+                                            onChange={() => {
+                                              if (isShared) {
+                                                setEditSharedClassIds(prev => prev.filter(id => id !== c.id));
+                                              } else {
+                                                setEditSharedClassIds(prev => [...prev, c.id]);
+                                              }
+                                            }}
+                                            className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                                          />
+                                          <span className="font-semibold">{c.name}</span>
+                                          {isShared && <span className="ml-auto text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Sdíleno</span>}
+                                        </label>
+                                      );
+                                    })
+                                  )}
                                 </div>
-                                <div className="space-y-2">
-                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Zacílení:</label>
-                                  <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 h-10">
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditAssignType('all')}
-                                      className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${editAssignType === 'all' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
-                                    >
-                                      Celá třída
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditAssignType('specific')}
-                                      className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${editAssignType === 'specific' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
-                                    >
-                                      Vybraní žáci
-                                    </button>
-                                  </div>
+                              </div>
+
+                              {/* Zacílení žáků */}
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500 uppercase">🎯 Zacílení žáků (původní třída):</label>
+                                <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 h-10">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditAssignType('all')}
+                                    className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${editAssignType === 'all' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                                  >
+                                    Celá třída
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditAssignType('specific')}
+                                    className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${editAssignType === 'specific' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                                  >
+                                    Vybraní žáci
+                                  </button>
                                 </div>
                               </div>
 
                               {editAssignType === 'specific' && (
                                 <div className="space-y-2">
-                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Výběr žáků:</label>
+                                  <label className="text-xs font-bold text-gray-500 uppercase">Výběr žáků (původní třída):</label>
                                   <div className="border rounded-xl bg-white p-3 max-h-36 overflow-y-auto space-y-1.5">
                                     {(() => {
-                                      const activeStudents = store.users.filter(u => u.role === 'student' && u.classId === editClassId);
+                                      const activeStudents = store.users.filter(u => u.role === 'student' && u.classId === a.classId);
                                       if (activeStudents.length === 0) {
                                         return <p className="text-xs text-muted-foreground italic text-center py-2">Ve třídě nejsou žádní žáci.</p>;
                                       }
@@ -1727,9 +1752,10 @@ export default function ITestApp() {
                                 </div>
                               )}
 
+                              {/* Časové limity */}
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Zahájení (od kdy):</label>
+                                  <label className="text-xs font-bold text-gray-500 uppercase">Zahájení (od kdy):</label>
                                   <Input 
                                     type="datetime-local" 
                                     value={editStartTime} 
@@ -1738,7 +1764,7 @@ export default function ITestApp() {
                                   />
                                 </div>
                                 <div className="space-y-1.5">
-                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Uzávěrka (do kdy):</label>
+                                  <label className="text-xs font-bold text-gray-500 uppercase">Uzávěrka (do kdy):</label>
                                   <Input 
                                     type="datetime-local" 
                                     value={editEndTime} 
@@ -1761,7 +1787,7 @@ export default function ITestApp() {
                                   className="font-bold"
                                   onClick={async () => {
                                     const success = await store.updateAssignment(a.id, {
-                                      classId: editClassId,
+                                      sharedWithClassIds: editSharedClassIds,
                                       startTime: editStartTime || undefined,
                                       endTime: editEndTime || undefined,
                                       studentIds: editAssignType === 'specific' ? editSelectedStudentIds : []
@@ -2367,10 +2393,14 @@ export default function ITestApp() {
   }
 
   if (currentUser.role === 'student') {
-    const studentAssignments = store.assignments.filter(a => 
-      a.classId === currentUser.classId &&
-      (!a.studentIds || a.studentIds.length === 0 || a.studentIds.includes(currentUser.id))
-    );
+    const studentAssignments = store.assignments.filter(a => {
+      // Žák vidí test pokud: je v jeho třídě NEBO je třída v sharedWithClassIds
+      const isInClass = a.classId === currentUser.classId || 
+        (a.sharedWithClassIds && a.sharedWithClassIds.includes(currentUser.classId!));
+      // A test je buď pro celou třídu, nebo explicitně pro tohoto žáka
+      const isTargeted = !a.studentIds || a.studentIds.length === 0 || a.studentIds.includes(currentUser.id);
+      return isInClass && isTargeted;
+    });
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Navbar user={currentUser} onLogout={() => store.logout()} />

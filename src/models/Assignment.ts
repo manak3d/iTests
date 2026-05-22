@@ -32,6 +32,7 @@ export interface IAssignment extends Document<string> {
   startTime?: string;
   endTime?: string;
   studentIds?: string[];
+  sharedWithClassIds?: string[]; // Sdílení do dalších tříd (původní classId zůstává)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,7 +50,8 @@ const AssignmentSchema: Schema = new Schema(
     fileUri: { type: String },
     startTime: { type: String },
     endTime: { type: String },
-    studentIds: { type: [String], default: [] }
+    studentIds: { type: [String], default: [] },
+    sharedWithClassIds: { type: [String], default: [] }
   },
   {
     timestamps: true,

@@ -195,7 +195,7 @@ export function useITestStore() {
     .catch(console.error);
   }, [db, currentUser, toast]);
 
-  const updateAssignment = useCallback((id: string, updates: { startTime?: string; endTime?: string; studentIds?: string[]; classId: string }) => {
+  const updateAssignment = useCallback((id: string, updates: { startTime?: string; endTime?: string; studentIds?: string[]; sharedWithClassIds?: string[] }) => {
     return fetch('/api/assignments', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

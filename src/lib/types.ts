@@ -40,6 +40,7 @@ export interface Assignment {
   startTime?: string;
   endTime?: string;
   studentIds?: string[];
+  sharedWithClassIds?: string[]; // Sdílení do dalších tříd
 }
 
 export interface Submission {
