@@ -10,7 +10,26 @@ import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera } from 
 import { Question, QuestionType, Assignment, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
-export function AssignmentCreator({ classId, students = [], onSave }: { classId: string; students?: User[]; onSave: (a: Omit<Assignment, 'id'>) => void }) {
+import { Class } from '@/lib/types';
+
+export function AssignmentCreator({ 
+  classId, 
+  students = [], 
+  classes = [], 
+  allStudents = [],
+  onSave 
+}: { 
+  classId: string; 
+  students?: User[]; 
+  classes?: Class[]; 
+  allStudents?: User[]; 
+  onSave: (a: Omit<Assignment, 'id'>) => void 
+}) {
+  const [targetClassId, setTargetClassId] = useState(classId);
+
+  const activeStudents = allStudents.length > 0 
+    ? allStudents.filter(u => u.role === 'student' && u.classId === targetClassId)
+    : students;
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('Matematika');
   const [description, setDescription] = useState('');
@@ -112,7 +131,7 @@ export function AssignmentCreator({ classId, students = [], onSave }: { classId:
     onSave({
       title,
       description,
-      classId,
+            classId: targetClassId,
       subject,
       questions,
       fileUri,
@@ -209,9 +228,28 @@ export function AssignmentCreator({ classId, students = [], onSave }: { classId:
               </div>
             </div>
 
-            <div className="space-y-4 border-t md:border-t-0 md:border-l border-slate-200/60 pt-4 md:pt-0 md:pl-6">
+                        <div className="space-y-4 border-t md:border-t-0 md:border-l border-slate-200/60 pt-4 md:pt-0 md:pl-6">
               <h4 className="font-bold text-sm text-primary uppercase tracking-wider">🎯 Zacílení žáků</h4>
               <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Cílová třída:</label>
+                  <select
+                    value={targetClassId}
+                    onChange={e => {
+                      setTargetClassId(e.target.value);
+                      setSelectedStudentIds([]);
+                    }}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-bold ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {classes.length > 0 ? (
+                      classes.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))
+                    ) : (
+                      <option value={classId}>{classId}</option>
+                    )}
+                  </select>
+                </div>
                 <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200">
                   <button
                     type="button"
@@ -229,12 +267,12 @@ export function AssignmentCreator({ classId, students = [], onSave }: { classId:
                   </button>
                 </div>
 
-                {assignType === 'specific' && (
+                                 {assignType === 'specific' && (
                   <div className="border rounded-xl bg-white p-3 max-h-32 overflow-y-auto space-y-1.5 animate-fade-in">
-                    {students.length === 0 ? (
+                    {activeStudents.length === 0 ? (
                       <p className="text-xs text-muted-foreground italic text-center py-2">Ve třídě nejsou žádní žáci.</p>
                     ) : (
-                      students.map(s => {
+                      activeStudents.map(s => {
                         const isChecked = selectedStudentIds.includes(s.id);
                         return (
                           <label key={s.id} className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors">

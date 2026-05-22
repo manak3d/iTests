@@ -195,6 +195,37 @@ export function useITestStore() {
     .catch(console.error);
   }, [db, currentUser, toast]);
 
+  const updateAssignment = useCallback((id: string, updates: { startTime?: string; endTime?: string; studentIds?: string[]; classId: string }) => {
+    return fetch('/api/assignments', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Zadání upraveno", description: "Nastavení úkolu bylo úspěšně uloženo." });
+        setAssignments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
+        
+        if (db) {
+          setDoc(doc(db, 'assignments', id), cleanData({
+            ...assignments.find(a => a.id === id),
+            ...updates
+          })).catch(console.error);
+        }
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se upravit zadání.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [db, toast, assignments]);
+
   const deleteAssignment = useCallback((id: string) => {
     fetch(`/api/assignments?id=${id}`, {
       method: 'DELETE'
@@ -442,6 +473,6 @@ export function useITestStore() {
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment
   };
 }

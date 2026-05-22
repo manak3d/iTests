@@ -11,6 +11,7 @@ import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, 
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
+import { Assignment } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
@@ -74,6 +75,22 @@ export default function ITestApp() {
   const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
   const [questionDrawingOpen, setQuestionDrawingOpen] = useState<Record<string, boolean>>({});
   
+    const [isEditingSettings, setIsEditingSettings] = useState(false);
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
+  const [editClassId, setEditClassId] = useState('');
+  const [editAssignType, setEditAssignType] = useState<'all' | 'specific'>('all');
+  const [editSelectedStudentIds, setEditSelectedStudentIds] = useState<string[]>([]);
+
+  const handleStartEditSettings = (a: Assignment) => {
+    setEditStartTime(a.startTime || '');
+    setEditEndTime(a.endTime || '');
+    setEditClassId(a.classId || selectedClassId || '');
+    setEditAssignType(a.studentIds && a.studentIds.length > 0 ? 'specific' : 'all');
+    setEditSelectedStudentIds(a.studentIds || []);
+    setIsEditingSettings(true);
+  };
+
   const selectStudentAssignment = (id: string | null) => {
     setSelectedAssignmentId(id);
     setStudentAnswers({});
@@ -1579,8 +1596,171 @@ export default function ITestApp() {
                     if (!a) return null;
                     return (
                       <Card className="border-none shadow-xl bg-white p-8">
-                        <h2 className="text-3xl font-headline font-bold text-primary">{a.title}</h2>
+                                                <h2 className="text-3xl font-headline font-bold text-primary">{a.title}</h2>
                         <p className="text-muted-foreground mt-2 text-lg">{a.description}</p>
+
+                        {/* Assignment Details & Settings */}
+                        <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-100 mt-6 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-sm text-primary uppercase tracking-wider">⚙️ Nastavení úkolu</h3>
+                            {!isEditingSettings && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 text-xs font-bold text-primary flex items-center gap-1.5 rounded-full"
+                                onClick={() => handleStartEditSettings(a)}
+                              >
+                                ✏️ Upravit nastavení
+                              </Button>
+                            )}
+                          </div>
+
+                          {!isEditingSettings ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                              <div className="space-y-1">
+                                <span className="font-semibold text-gray-500 block text-xs uppercase">Cílová třída a zacílení:</span>
+                                <p className="font-bold text-slate-800">
+                                  Třída: {store.classes.find(c => c.id === a.classId)?.name || a.classId}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {a.studentIds && a.studentIds.length > 0 
+                                    ? `Cíleno na vybrané žáky (${a.studentIds.length} žáků)` 
+                                    : 'Cíleno na celou třídu'}
+                                </p>
+                              </div>
+                              <div className="space-y-1">
+                                <span className="font-semibold text-gray-500 block text-xs uppercase">Časová dostupnost:</span>
+                                <p className="font-bold text-slate-800">
+                                  {a.startTime ? `Od: ${formatDateTime(a.startTime)}` : 'Ihned dostupné'}
+                                </p>
+                                <p className="font-bold text-slate-800">
+                                  {a.endTime ? `Do: ${formatDateTime(a.endTime)}` : 'Bez uzávěrky'}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-4 pt-2">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Cílová třída:</label>
+                                  <select
+                                    value={editClassId}
+                                    onChange={e => {
+                                      setEditClassId(e.target.value);
+                                      setEditSelectedStudentIds([]);
+                                    }}
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  >
+                                    {store.classes.map(c => (
+                                      <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Zacílení:</label>
+                                  <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 h-10">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditAssignType('all')}
+                                      className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${editAssignType === 'all' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                                    >
+                                      Celá třída
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditAssignType('specific')}
+                                      className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${editAssignType === 'specific' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                                    >
+                                      Vybraní žáci
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {editAssignType === 'specific' && (
+                                <div className="space-y-2">
+                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Výběr žáků:</label>
+                                  <div className="border rounded-xl bg-white p-3 max-h-36 overflow-y-auto space-y-1.5">
+                                    {(() => {
+                                      const activeStudents = store.users.filter(u => u.role === 'student' && u.classId === editClassId);
+                                      if (activeStudents.length === 0) {
+                                        return <p className="text-xs text-muted-foreground italic text-center py-2">Ve třídě nejsou žádní žáci.</p>;
+                                      }
+                                      return activeStudents.map(s => {
+                                        const isChecked = editSelectedStudentIds.includes(s.id);
+                                        return (
+                                          <label key={s.id} className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors">
+                                            <input
+                                              type="checkbox"
+                                              checked={isChecked}
+                                              onChange={() => {
+                                                if (isChecked) {
+                                                  setEditSelectedStudentIds(prev => prev.filter(id => id !== s.id));
+                                                } else {
+                                                  setEditSelectedStudentIds(prev => [...prev, s.id]);
+                                                }
+                                              }}
+                                              className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                                            />
+                                            <span>{s.name} <span className="text-gray-400">({s.username})</span></span>
+                                          </label>
+                                        );
+                                      });
+                                    })()}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Zahájení (od kdy):</label>
+                                  <Input 
+                                    type="datetime-local" 
+                                    value={editStartTime} 
+                                    onChange={e => setEditStartTime(e.target.value)}
+                                    className="h-10 text-sm"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-bold text-gray-500 uppercase font-bold">Uzávěrka (do kdy):</label>
+                                  <Input 
+                                    type="datetime-local" 
+                                    value={editEndTime} 
+                                    onChange={e => setEditEndTime(e.target.value)}
+                                    className="h-10 text-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex gap-2 justify-end pt-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => setIsEditingSettings(false)}
+                                >
+                                  Zrušit
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  className="font-bold"
+                                  onClick={async () => {
+                                    const success = await store.updateAssignment(a.id, {
+                                      classId: editClassId,
+                                      startTime: editStartTime || undefined,
+                                      endTime: editEndTime || undefined,
+                                      studentIds: editAssignType === 'specific' ? editSelectedStudentIds : []
+                                    });
+                                    if (success) {
+                                      setIsEditingSettings(false);
+                                    }
+                                  }}
+                                >
+                                  Uložit změny v cloudu
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         
                         {a.questions && a.questions.length > 0 && (
                           <div className="mt-8">
@@ -1616,9 +1796,11 @@ export default function ITestApp() {
               ) : isCreatingAssignment ? (
                 <div className="space-y-4">
                   <Button variant="ghost" className="rounded-full" onClick={() => setIsCreatingAssignment(false)}>← Zpět</Button>
-                  <AssignmentCreator 
+                                    <AssignmentCreator 
                     classId={selectedClassId!} 
                     students={store.users.filter(u => u.role === 'student' && u.classId === selectedClassId)}
+                    classes={store.classes}
+                    allStudents={store.users}
                     onSave={(a) => {
                       store.addAssignment(a);
                       setIsCreatingAssignment(false);

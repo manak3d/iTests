@@ -37,6 +37,35 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    await dbConnect();
+    const body = await request.json();
+    const { id, startTime, endTime, studentIds, classId } = body;
+    
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Missing assignment ID" }, { status: 400 });
+    }
+
+    const updated = await Assignment.findOneAndUpdate(
+      { _id: id },
+      {
+        $set: {
+          startTime: startTime || undefined,
+          endTime: endTime || undefined,
+          studentIds: studentIds || [],
+          classId: classId
+        }
+      },
+      { new: true }
+    );
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     await dbConnect();
