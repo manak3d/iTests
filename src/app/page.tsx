@@ -1467,6 +1467,7 @@ export default function ITestApp() {
                               if (!sub || !assignment || !student) return null;
                               return (
                                 <Card className="border-none shadow-2xl rounded-3xl overflow-hidden print-container">
+                                  <style>{`@media print{body{visibility:hidden!important;background:white!important}.print-container,.print-container *{visibility:visible!important}.print-container{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border:none!important}.print-exclude,button,textarea,input,.dialog,[role="dialog"],header,nav{display:none!important;visibility:hidden!important}.print-show{display:block!important;visibility:visible!important}}`}</style>
                                   <CardHeader className="bg-white border-b p-8 flex flex-row items-center justify-between gap-4">
                                     <div>
                                       <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
