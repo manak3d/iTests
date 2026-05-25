@@ -22,6 +22,11 @@ export default function ITestApp() {
   const store = useITestStore();
   const { toast } = useToast();
   
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loginRole, setLoginRole] = useState<'admin' | 'teacher' | 'student'>('teacher');
   const [name, setName] = useState('');
@@ -98,8 +103,8 @@ export default function ITestApp() {
   };
 
   const handleStartSendCopy = (a: Assignment) => {
-    setCopyStartTime(a.startTime || '');
-    setCopyEndTime(a.endTime || '');
+    setCopyStartTime('');
+    setCopyEndTime('');
     setCopyTargetClassId('');
     setCopyAssignType('all');
     setCopySelectedStudentIds([]);
@@ -653,6 +658,14 @@ export default function ITestApp() {
       }
     }
   };
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-[#EFF3F7] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   if (!store.currentUser) {
     return (
@@ -1846,7 +1859,7 @@ export default function ITestApp() {
                                       title: a.title, description: a.description,
                                       classId: copyTargetClassId, teacherId: a.teacherId,
                                       subject: a.subject || 'Jiný', questions: a.questions,
-                                      dueDate: a.dueDate || new Date().toISOString(),
+                                      dueDate: copyEndTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
                                       fileUri: a.fileUri,
                                       startTime: copyStartTime || undefined,
                                       endTime: copyEndTime || undefined,
@@ -2465,8 +2478,10 @@ export default function ITestApp() {
               <Button variant="ghost" className="rounded-full" onClick={() => selectStudentAssignment(null)}>← Zpět</Button>
               {(() => {
                 const a = store.assignments.find(as => as.id === selectedAssignmentId);
-                 const now = new Date();
-                 const hasEnded = a && a.endTime ? now > new Date(a.endTime) : false;
+                const now = new Date();
+                const pad = (n: number) => n < 10 ? '0' + n : n;
+                const nowStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                const hasEnded = a && a.endTime ? nowStr > a.endTime : false;
                 const submission = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === currentUser.id);
                 if (!a) return null;
                 return (
@@ -2918,8 +2933,10 @@ export default function ITestApp() {
                     <div className="grid gap-4">
                       {pending.map(a => {
                         const now = new Date();
-                        const hasStarted = !a.startTime || now >= new Date(a.startTime);
-                        const hasEnded = a.endTime && now > new Date(a.endTime);
+                        const pad = (n: number) => n < 10 ? '0' + n : n;
+                        const nowStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                        const hasStarted = !a.startTime || nowStr >= a.startTime;
+                        const hasEnded = a.endTime && nowStr > a.endTime;
 
                         return (
                           <Card 
