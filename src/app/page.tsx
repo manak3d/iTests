@@ -127,9 +127,7 @@ export default function ITestApp() {
       hour: '2-digit', 
       minute: '2-digit' 
     });
-  };
-
-  const downloadAllSubmissionsZip = async (assignmentId: string) => {
+  };  const downloadAllSubmissionsZip = async (assignmentId: string) => {
     try {
       const assignment = store.assignments.find(a => a.id === assignmentId);
       if (!assignment) return;
@@ -190,109 +188,211 @@ export default function ITestApp() {
           doc.setFont("Helvetica");
         }
         
-        let yPos = 20;
-        const writeLine = (text: string, size = 12, style = 'normal', color = '#000000', indent = 20) => {
-          if (yPos > 275) {
+        // 1. Hlavička protokolu (Stylizovaná jako kopie s tisku - CardHeader)
+        doc.setFontSize(20);
+        doc.setTextColor("#4F46E5"); // Indigo primary
+        doc.text(assignment.title, 15, 23);
+        
+        doc.setFontSize(11);
+        doc.setTextColor("#4B5563"); // gray-600
+        doc.text(`Odevzdal(a): ${studentName} (${student ? student.username : ''})`, 15, 29);
+        
+        doc.setDrawColor(229, 231, 235); // border-gray-200
+        doc.setLineWidth(0.5);
+        doc.line(15, 33, 195, 33);
+        
+        let yPos = 42;
+        
+        // 2. Odpovědi na otázky (Kartičky v pořadí s inlinovanými kresbami)
+        if (assignment.questions && assignment.questions.length > 0) {
+          doc.setFontSize(12);
+          doc.setTextColor("#4F46E5");
+          doc.text("ODPOVĚDI NA OTÁZKY", 15, yPos);
+          yPos += 8;
+          
+          assignment.questions.forEach((q, idx) => {
+            const answer = sub.answers?.[q.id];
+            const score = sub.questionScores?.[q.id] || 0;
+            const isCorrect = score === (q.points || 1);
+            const drawing = sub.questionDrawings?.[q.id];
+            
+            // Určení textu odpovědi
+            let ansText = 'Neodpovězeno';
+            if (q.type === 'drawing') {
+              ansText = 'Kresba odevzdaná níže v této kartě';
+            } else if (q.type === 'multiple_choice') {
+              ansText = answer !== undefined && answer !== null && answer !== '' 
+                ? `${String.fromCharCode(65 + Number(answer))}. ${q.options?.[Number(answer)] || ''}` 
+                : 'Neodpovězeno';
+            } else if (q.type === 'multiple_selection') {
+              ansText = Array.isArray(answer) && answer.length > 0
+                ? answer.map((val: number) => `${String.fromCharCode(65 + val)}. ${q.options?.[val] || ''}`).join(', ')
+                : 'Neodpovězeno';
+            } else if (q.type === 'true_false') {
+              ansText = answer !== undefined && answer !== null && answer !== ''
+                ? (answer ? '✓ Ano' : '✗ Ne')
+                : 'Neodpovězeno';
+            } else if (answer !== undefined && answer !== null && answer !== '') {
+              ansText = String(answer);
+            }
+            
+            // Typ otázky a text
+            const qTypeLabel = q.type === 'short_answer' ? 'Krátká odpověď' : 
+                               q.type === 'long_answer' ? 'Dlouhá odpověď' : 
+                               q.type === 'multiple_choice' ? 'Výběr z možností' : 
+                               q.type === 'multiple_selection' ? 'Více výběrů' : 
+                               q.type === 'true_false' ? 'Ano / Ne' : 
+                               q.type === 'drawing' ? 'Kresba' : q.type;
+                               
+            const qLines = doc.splitTextToSize(`${idx + 1}. ${q.text} [${qTypeLabel}]`, 122); // Necháme místo pro body pill
+            const aLines = q.type !== 'drawing' ? doc.splitTextToSize(`Odpověď: ${ansText}`, 168) : [];
+            
+            // Výpočet výšek
+            let textHeight = 6 + qLines.length * 5;
+            if (q.type !== 'drawing') {
+              textHeight += 4 + aLines.length * 5;
+            }
+            
+            const drawingHeight = drawing ? 52 : 0; // 45mm obrázek + 7mm padding
+            const cardHeight = textHeight + drawingHeight + 6;
+            
+            // Kontrola konce stránky
+            if (yPos + cardHeight > 275) {
+              doc.addPage();
+              if (fontBase64) doc.setFont("Roboto", "normal");
+              yPos = 20;
+            }
+            
+            // Pozadí a okraje karty
+            doc.setFillColor(249, 250, 251); // bg-gray-50
+            doc.setDrawColor(229, 231, 235); // border-gray-200
+            doc.roundedRect(15, yPos, 180, cardHeight, 3, 3, "FD");
+            
+            // Otázka
+            doc.setFontSize(10.5);
+            doc.setTextColor("#1F2937"); // gray-800
+            qLines.forEach((line: string, lineIdx: number) => {
+              doc.text(line, 20, yPos + 7 + lineIdx * 5);
+            });
+            
+            // Odpověď
+            if (q.type !== 'drawing') {
+              doc.setFontSize(10);
+              doc.setTextColor("#4B5563"); // gray-600
+              aLines.forEach((line: string, lineIdx: number) => {
+                doc.text(line, 20, yPos + 7 + qLines.length * 5 + 4 + lineIdx * 5);
+              });
+            }
+            
+            // Kresba
+            if (drawing) {
+              try {
+                const imgY = yPos + textHeight + 2;
+                doc.setFillColor(255, 255, 255);
+                doc.setDrawColor(229, 231, 235);
+                doc.roundedRect(20, imgY, 90, 46, 2, 2, "FD");
+                doc.addImage(drawing, 'JPEG', 20.5, imgY + 0.5, 89, 45, undefined, 'FAST');
+              } catch (drawErr) {
+                console.error("Chyba při inlinování kresby do PDF:", drawErr);
+              }
+            }
+            
+            // Bodový odznáček (Pill)
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(229, 231, 235);
+            doc.roundedRect(148, yPos + 4, 42, 7, 1.5, 1.5, "FD");
+            doc.setFontSize(9.5);
+            doc.setTextColor(score === (q.points || 1) ? "#16A34A" : "#DC2626");
+            doc.text(`Body: ${score} / ${q.points || 1}`, 152, yPos + 9);
+            
+            yPos += cardHeight + 4;
+          });
+        }
+        
+        // 3. Hlavní odevzdaný list (Vypracovaný dokument)
+        if (sub.mainWorkDrawing) {
+          try {
             doc.addPage();
             if (fontBase64) doc.setFont("Roboto", "normal");
-            yPos = 20;
+            
+            doc.setFontSize(14);
+            doc.setTextColor("#4F46E5");
+            doc.text("VYPRACOVANÝ DOKUMENT / LIST", 15, 20);
+            
+            doc.setDrawColor(229, 231, 235);
+            doc.roundedRect(14.5, 25.5, 181, 246, 3, 3, "D");
+            
+            doc.addImage(sub.mainWorkDrawing, 'JPEG', 15, 26, 180, 245, undefined, 'FAST');
+            yPos = 20; // Resetujeme yPos na 20, protože jsme na nové čisté stránce
+          } catch (imgErr) {
+            console.error("Chyba při vkládání hlavního nákresu do PDF:", imgErr);
           }
-          doc.setFontSize(size);
-          doc.setTextColor(color);
-          doc.text(text, indent, yPos);
-          yPos += size * 0.7 + 3;
-        };
+        }
         
-        // Hlavička PDF
-        writeLine(`iTEST CLOUD - VÝSLEDKY ÚKOLU`, 9, 'normal', '#666666');
-        writeLine(assignment.title, 18, 'bold', '#295CA3');
-        yPos += 2;
-        
-        // Informace o studentovi a výsledku
-        writeLine(`Žák: ${studentName} (${student ? student.username : ''})`, 12, 'normal', '#333333');
-        writeLine(`Datum odevzdání: ${sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('cs-CZ') : 'Neznámé'}`, 10, 'normal', '#666666');
-        writeLine(`Výsledná známka: ${sub.grade || 'Nehodnoceno'}`, 13, 'bold', '#2563EB');
-        
+        // 4. Celkové hodnocení a slovní posudek (Stylizováno jako 'Výsledky pro tiskovou verzi')
         const totalMax = assignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
         let earned = 0;
         if (sub.questionScores) {
           Object.values(sub.questionScores).forEach(val => { earned += val as number; });
         }
         const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
-        writeLine(`Celkové skóre: ${earned} / ${totalMax} bodů (${pct} %)`, 11, 'bold', '#16A34A');
         
-        if (sub.feedback) {
-          yPos += 2;
-          writeLine(`Slovní hodnocení:`, 10, 'bold', '#295CA3');
-          const splitFeedback = doc.splitTextToSize(sub.feedback, 170);
-          splitFeedback.forEach((line: string) => {
-            writeLine(line, 10, 'normal', '#333333', 25);
-          });
+        const feedbackLines = sub.feedback ? doc.splitTextToSize(sub.feedback, 166) : [];
+        const scoreHeight = 14;
+        const gradeHeight = 18;
+        const feedbackBlockHeight = sub.feedback ? (8 + feedbackLines.length * 5 + 6) : 0;
+        const totalResultsHeight = 10 + scoreHeight + 4 + gradeHeight + (sub.feedback ? 6 + feedbackBlockHeight : 0);
+        
+        if (yPos + totalResultsHeight > 275 || yPos === 20) {
+          doc.addPage();
+          if (fontBase64) doc.setFont("Roboto", "normal");
+          yPos = 20;
         }
         
-        yPos += 4;
+        doc.setFontSize(12);
+        doc.setTextColor("#4F46E5");
+        doc.text("CELKOVÉ HODNOCENÍ A VÝSLEDEK", 15, yPos + 2);
+        yPos += 8;
         
-        // Otázky a odpovědi
-        if (assignment.questions && assignment.questions.length > 0) {
-          writeLine(`ODPOVĚDI NA OTÁZKY`, 12, 'bold', '#295CA3');
-          yPos += 2;
+        // A. Celkové skóre
+        doc.setFillColor(238, 242, 246); // light blue-gray
+        doc.setDrawColor(199, 210, 254); // border-indigo-200
+        doc.roundedRect(15, yPos, 180, scoreHeight, 3, 3, "FD");
+        
+        doc.setFontSize(10.5);
+        doc.setTextColor("#4F46E5");
+        doc.text("Celkové skóre:", 22, yPos + 9);
+        doc.setFontSize(12);
+        doc.text(`${earned} / ${totalMax} bodů (${pct} %)`, 142, yPos + 9.5);
+        yPos += scoreHeight + 4;
+        
+        // B. Výsledná známka
+        doc.setFillColor(249, 250, 251); // bg-gray-50
+        doc.setDrawColor(229, 231, 235); // border-gray-200
+        doc.roundedRect(15, yPos, 180, gradeHeight, 3, 3, "FD");
+        
+        doc.setFontSize(10.5);
+        doc.setTextColor("#4B5563"); // gray-600
+        doc.text("Výsledná známka:", 22, yPos + 11);
+        doc.setFontSize(16);
+        doc.setTextColor("#4F46E5"); // Indigo
+        doc.text(String(sub.grade || 'Nehodnoceno'), 155, yPos + 12.5);
+        yPos += gradeHeight + 6;
+        
+        // C. Slovní hodnocení
+        if (sub.feedback && feedbackBlockHeight > 0) {
+          doc.setFillColor(249, 250, 251);
+          doc.setDrawColor(229, 231, 235);
+          doc.roundedRect(15, yPos, 180, feedbackBlockHeight, 3, 3, "FD");
           
-          assignment.questions.forEach((q, idx) => {
-            const answer = sub.answers?.[q.id];
-            const score = sub.questionScores?.[q.id] || 0;
-            
-            writeLine(`${idx + 1}. ${q.text}  (${score} / ${q.points || 1} b)`, 10, 'bold', '#333333');
-            
-            if (q.type === 'drawing') {
-              writeLine(`Odpověď: Nákres (viz další strana)`, 9, 'italic', '#666666', 25);
-            } else if (q.type === 'multiple_choice' || q.type === 'multiple_selection') {
-              writeLine(`Odpověď: ${answer !== undefined ? answer : 'Neodpovězeno'}`, 9, 'normal', '#333333', 25);
-            } else if (q.type === 'true_false') {
-              writeLine(`Odpověď: ${answer ? '✓ Ano' : '✗ Ne'}`, 9, 'normal', '#333333', 25);
-            } else {
-              const ansText = answer !== undefined ? String(answer) : 'Neodpovězeno';
-              const splitAns = doc.splitTextToSize(ansText, 160);
-              splitAns.forEach((line: string) => {
-                writeLine(line, 9, 'normal', '#333333', 25);
-              });
-            }
-            yPos += 2;
-          });
-        }
-        
-        // Vložení studentových nákresů přímo do PDF
-        if (sub.mainWorkDrawing) {
-          try {
-            doc.addPage();
-            if (fontBase64) doc.setFont("Roboto", "normal");
-            yPos = 20;
-            writeLine(`PŘILOŽENÝ DOKUMENT / VYPRACOVANÝ LIST`, 13, 'bold', '#295CA3');
-            yPos += 3;
-            doc.addImage(sub.mainWorkDrawing, 'JPEG', 15, yPos, 180, 200, undefined, 'FAST');
-          } catch (imgErr) {
-            console.error("Chyba při vkládání hlavního nákresu do PDF:", imgErr);
-          }
-        }
-        
-        if (sub.questionDrawings) {
-          Object.entries(sub.questionDrawings).forEach(([qId, drawingData]) => {
-            try {
-              const qIndex = assignment.questions.findIndex(q => q.id === qId);
-              const qNum = qIndex !== -1 ? qIndex + 1 : qId;
-              const qObj = assignment.questions.find(q => q.id === qId);
-              
-              doc.addPage();
-              if (fontBase64) doc.setFont("Roboto", "normal");
-              yPos = 20;
-              writeLine(`NÁKRES K OTÁZCE Č. ${qNum}`, 13, 'bold', '#295CA3');
-              if (qObj) {
-                writeLine(`Otázka: ${qObj.text}`, 10, 'normal', '#666666');
-              }
-              yPos += 3;
-              doc.addImage(drawingData, 'JPEG', 15, yPos, 180, 90, undefined, 'FAST');
-            } catch (qImgErr) {
-              console.error("Chyba při vkládání nákresu otázky do PDF:", qImgErr);
-            }
+          doc.setFontSize(9);
+          doc.setTextColor("#9CA3AF"); // gray-400
+          doc.text("SLOVNÍ HODNOCENÍ UČITELE:", 20, yPos + 6);
+          
+          doc.setFontSize(10);
+          doc.setTextColor("#1F2937"); // gray-800
+          feedbackLines.forEach((line: string, lineIdx: number) => {
+            doc.text(line, 20, yPos + 12 + lineIdx * 5);
           });
         }
         
