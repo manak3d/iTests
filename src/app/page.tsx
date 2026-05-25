@@ -1473,12 +1473,6 @@ export default function ITestApp() {
                                       <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
                                       <CardDescription>Odevzdal: {student.name}</CardDescription>
                                     </div>
-                                    <Button
-                                      onClick={() => window.print()}
-                                      className="print-exclude rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
-                                    >
-                                      🖨️ Tisk / Uložit PDF
-                                    </Button>
                                   </CardHeader>
                                   <CardContent className="p-8 space-y-8">
                                     {assignment.questions && assignment.questions.length > 0 && (
