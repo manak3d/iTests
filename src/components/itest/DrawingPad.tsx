@@ -41,6 +41,8 @@ export function DrawingPad({
   const [color, setColor] = useState('#295CA3');
   const [lineWidth, setLineWidth] = useState(compact ? 2 : 3);
   const [isEraser, setIsEraser] = useState(false);
+  const [eraserPos, setEraserPos] = useState<{ x: number, y: number } | null>(null);
+  const [eraserSize, setEraserSize] = useState(30);
 
   const canvasWidth = 800;
   const canvasHeight = compact ? 250 : (backgroundImage ? 1100 : 400);
@@ -132,6 +134,38 @@ export function DrawingPad({
       ctx.lineTo(x, y);
       ctx.stroke();
     }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    draw(e);
+    if (isEraser) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const scale = rect.width / e.currentTarget.width;
+      const baseSize = compact ? 20 : 30;
+      setEraserSize(baseSize * scale);
+      setEraserPos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isEraser) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const scale = rect.width / e.currentTarget.width;
+      const baseSize = compact ? 20 : 30;
+      setEraserSize(baseSize * scale);
+      setEraserPos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    stopDrawing();
+    setEraserPos(null);
   };
 
   const stopDrawing = () => {
@@ -253,13 +287,27 @@ export function DrawingPad({
             height={canvasHeight}
             onMouseDown={startDrawing}
             onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onMouseMove={draw}
+            onMouseLeave={handleMouseLeave}
+            onMouseEnter={handleMouseEnter}
+            onMouseMove={handleMouseMove}
             onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
             onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
             onTouchMove={(e) => { e.preventDefault(); draw(e); }}
-            className="w-full cursor-crosshair touch-none bg-white"
+            className={cn("w-full touch-none bg-white", isEraser ? "cursor-none" : "cursor-crosshair")}
           />
+          {isEraser && eraserPos && (
+            <div 
+              className="pointer-events-none absolute rounded-full border-2 border-red-500 bg-white/30"
+              style={{
+                left: eraserPos.x,
+                top: eraserPos.y,
+                width: eraserSize,
+                height: eraserSize,
+                transform: 'translate(-50%, -50%)',
+                zIndex: 50,
+              }}
+            />
+          )}
         </div>
       </div>
     );
@@ -361,13 +409,26 @@ export function DrawingPad({
           height={canvasHeight}
           onMouseDown={startDrawing}
           onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onMouseMove={draw}
+          onMouseLeave={handleMouseLeave}
+          onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseMove}
           onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
           onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
           onTouchMove={(e) => { e.preventDefault(); draw(e); }}
-          className="drawing-canvas w-full cursor-crosshair touch-none bg-transparent relative z-10"
+          className={cn("drawing-canvas w-full touch-none bg-transparent relative z-10", isEraser ? "cursor-none" : "cursor-crosshair")}
         />
+        {isEraser && eraserPos && (
+          <div 
+            className="pointer-events-none absolute rounded-full border-2 border-red-500 bg-white/30 z-20"
+            style={{
+              left: eraserPos.x,
+              top: eraserPos.y,
+              width: eraserSize,
+              height: eraserSize,
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
+        )}
         <div className="absolute inset-0 pointer-events-none border-2 border-transparent group-hover:border-primary/20 transition-colors rounded-lg z-20" />
       </div>
       
