@@ -1979,19 +1979,17 @@ export default function ITestApp() {
 
                         <div className="bg-emerald-50/40 p-5 rounded-2xl border border-emerald-100 mt-4 space-y-3 print-exclude">
                           <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-bold text-sm text-emerald-700 uppercase tracking-wider">📦 Hromadný export prací</h3>
-                              <p className="text-xs text-emerald-600/80 mt-1">Stáhněte si vypracované a opravené testy všech žáků v jednom ZIP archivu.</p>
-                            </div>
+                            <h3 className="font-bold text-sm text-emerald-700 uppercase tracking-wider">📦 Hromadný export prací</h3>
                             <Button 
                               variant="outline" 
                               size="sm"
-                              className="h-9 text-xs font-bold text-emerald-700 border-emerald-200 hover:bg-emerald-50 rounded-full flex items-center gap-1.5"
+                              className="h-8 text-xs font-bold text-emerald-700 border-emerald-200 hover:bg-emerald-50 rounded-full flex items-center gap-1.5"
                               onClick={() => downloadAllSubmissionsZip(a.id)}
                             >
                               📥 Stáhnout ZIP s PDF
                             </Button>
                           </div>
+                          <p className="text-xs text-emerald-600/80">Stáhněte si vypracované a opravené testy všech žáků v jednom ZIP archivu.</p>
                         </div>
 
                         <div className="bg-blue-50/40 p-5 rounded-2xl border border-blue-100 mt-4 space-y-3">
