@@ -2830,8 +2830,20 @@ export default function ITestApp() {
               {(() => {
                 const a = store.assignments.find(as => as.id === selectedAssignmentId);
                 const now = new Date();
-                const pad = (n: number) => n < 10 ? '0' + n : n;
-                const nowStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                const formatter = new Intl.DateTimeFormat('en-US', {
+                  timeZone: 'Europe/Prague',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                });
+                const parts = formatter.formatToParts(now);
+                const getVal = (type: string) => parts.find(p => p.type === type)?.value || '';
+                let hourVal = getVal('hour');
+                if (hourVal === '24') hourVal = '00';
+                const nowStr = `${getVal('year')}-${getVal('month')}-${getVal('day')}T${hourVal}:${getVal('minute')}`;
                 const hasEnded = a && a.endTime ? nowStr > a.endTime : false;
                 const submission = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === currentUser.id);
                 if (!a) return null;
@@ -3284,8 +3296,20 @@ export default function ITestApp() {
                     <div className="grid gap-4">
                       {pending.map(a => {
                         const now = new Date();
-                        const pad = (n: number) => n < 10 ? '0' + n : n;
-                        const nowStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                        const formatter = new Intl.DateTimeFormat('en-US', {
+                          timeZone: 'Europe/Prague',
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false
+                        });
+                        const parts = formatter.formatToParts(now);
+                        const getVal = (type: string) => parts.find(p => p.type === type)?.value || '';
+                        let hourVal = getVal('hour');
+                        if (hourVal === '24') hourVal = '00';
+                        const nowStr = `${getVal('year')}-${getVal('month')}-${getVal('day')}T${hourVal}:${getVal('minute')}`;
                         const hasStarted = !a.startTime || nowStr >= a.startTime;
                         const hasEnded = a.endTime && nowStr > a.endTime;
 
