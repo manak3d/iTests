@@ -129,6 +129,194 @@ export default function ITestApp() {
     });
   };
 
+  const downloadAllSubmissionsZip = async (assignmentId: string) => {
+    try {
+      const assignment = store.assignments.find(a => a.id === assignmentId);
+      if (!assignment) return;
+      
+      const assignmentSubmissions = store.submissions.filter(s => s.assignmentId === assignmentId);
+      if (assignmentSubmissions.length === 0) {
+        toast({ title: "Informace", description: "Pro tento úkol zatím nejsou žádné odevzdané práce.", variant: "default" });
+        return;
+      }
+      
+      toast({ title: "Příprava archivu", description: "Generuji ZIP s PDF soubory..." });
+      
+      // Dynamický import JSZip a jsPDF
+      const [JSZipModule, jsPDFModule] = await Promise.all([
+        import('jszip'),
+        import('jspdf')
+      ]);
+      const JSZip = JSZipModule.default;
+      const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
+      
+      // Stažení fontu Roboto pro diakritiku (Czech/Slovak)
+      let fontBase64 = '';
+      try {
+        const response = await fetch("https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.ttf");
+        if (response.ok) {
+          const fontBuffer = await response.arrayBuffer();
+          const bytes = new Uint8Array(fontBuffer);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          fontBase64 = window.btoa(binary);
+        }
+      } catch (fontErr) {
+        console.warn("Nepodařilo se stáhnout Roboto font, použije se Helvetica (bez diakritiky):", fontErr);
+      }
+      
+      const zip = new JSZip();
+      const folder = zip.folder(assignment.title.replace(/[/\\?%*:|"<>\s]+/g, '_'));
+      
+      for (const sub of assignmentSubmissions) {
+        const student = store.users.find(u => u.id === sub.studentId);
+        const studentName = student ? student.name : sub.studentId;
+        const studentNameEscaped = studentName.replace(/[/\\?%*:|"<>\s]+/g, '_');
+        
+        // Vytvoření PDF dokumentu pro žáka
+        const doc = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: "a4"
+        });
+        
+        if (fontBase64) {
+          doc.addFileToVFS("Roboto.ttf", fontBase64);
+          doc.addFont("Roboto.ttf", "Roboto", "normal");
+          doc.setFont("Roboto");
+        } else {
+          doc.setFont("Helvetica");
+        }
+        
+        let yPos = 20;
+        const writeLine = (text: string, size = 12, style = 'normal', color = '#000000', indent = 20) => {
+          if (yPos > 275) {
+            doc.addPage();
+            if (fontBase64) doc.setFont("Roboto", "normal");
+            yPos = 20;
+          }
+          doc.setFontSize(size);
+          doc.setTextColor(color);
+          doc.text(text, indent, yPos);
+          yPos += size * 0.7 + 3;
+        };
+        
+        // Hlavička PDF
+        writeLine(`iTEST CLOUD - VÝSLEDKY ÚKOLU`, 9, 'normal', '#666666');
+        writeLine(assignment.title, 18, 'bold', '#295CA3');
+        yPos += 2;
+        
+        // Informace o studentovi a výsledku
+        writeLine(`Žák: ${studentName} (${student ? student.username : ''})`, 12, 'normal', '#333333');
+        writeLine(`Datum odevzdání: ${sub.submittedAt ? new Date(sub.submittedAt).toLocaleString('cs-CZ') : 'Neznámé'}`, 10, 'normal', '#666666');
+        writeLine(`Výsledná známka: ${sub.grade || 'Nehodnoceno'}`, 13, 'bold', '#2563EB');
+        
+        const totalMax = assignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+        let earned = 0;
+        if (sub.questionScores) {
+          Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+        }
+        const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+        writeLine(`Celkové skóre: ${earned} / ${totalMax} bodů (${pct} %)`, 11, 'bold', '#16A34A');
+        
+        if (sub.feedback) {
+          yPos += 2;
+          writeLine(`Slovní hodnocení:`, 10, 'bold', '#295CA3');
+          const splitFeedback = doc.splitTextToSize(sub.feedback, 170);
+          splitFeedback.forEach((line: string) => {
+            writeLine(line, 10, 'normal', '#333333', 25);
+          });
+        }
+        
+        yPos += 4;
+        
+        // Otázky a odpovědi
+        if (assignment.questions && assignment.questions.length > 0) {
+          writeLine(`ODPOVĚDI NA OTÁZKY`, 12, 'bold', '#295CA3');
+          yPos += 2;
+          
+          assignment.questions.forEach((q, idx) => {
+            const answer = sub.answers?.[q.id];
+            const score = sub.questionScores?.[q.id] || 0;
+            
+            writeLine(`${idx + 1}. ${q.text}  (${score} / ${q.points || 1} b)`, 10, 'bold', '#333333');
+            
+            if (q.type === 'drawing') {
+              writeLine(`Odpověď: Nákres (viz další strana)`, 9, 'italic', '#666666', 25);
+            } else if (q.type === 'multiple_choice' || q.type === 'multiple_selection') {
+              writeLine(`Odpověď: ${answer !== undefined ? answer : 'Neodpovězeno'}`, 9, 'normal', '#333333', 25);
+            } else if (q.type === 'true_false') {
+              writeLine(`Odpověď: ${answer ? '✓ Ano' : '✗ Ne'}`, 9, 'normal', '#333333', 25);
+            } else {
+              const ansText = answer !== undefined ? String(answer) : 'Neodpovězeno';
+              const splitAns = doc.splitTextToSize(ansText, 160);
+              splitAns.forEach((line: string) => {
+                writeLine(line, 9, 'normal', '#333333', 25);
+              });
+            }
+            yPos += 2;
+          });
+        }
+        
+        // Vložení studentových nákresů přímo do PDF
+        if (sub.mainWorkDrawing) {
+          try {
+            doc.addPage();
+            if (fontBase64) doc.setFont("Roboto", "normal");
+            yPos = 20;
+            writeLine(`PŘILOŽENÝ DOKUMENT / VYPRACOVANÝ LIST`, 13, 'bold', '#295CA3');
+            yPos += 3;
+            doc.addImage(sub.mainWorkDrawing, 'JPEG', 15, yPos, 180, 200, undefined, 'FAST');
+          } catch (imgErr) {
+            console.error("Chyba při vkládání hlavního nákresu do PDF:", imgErr);
+          }
+        }
+        
+        if (sub.questionDrawings) {
+          Object.entries(sub.questionDrawings).forEach(([qId, drawingData]) => {
+            try {
+              const qIndex = assignment.questions.findIndex(q => q.id === qId);
+              const qNum = qIndex !== -1 ? qIndex + 1 : qId;
+              const qObj = assignment.questions.find(q => q.id === qId);
+              
+              doc.addPage();
+              if (fontBase64) doc.setFont("Roboto", "normal");
+              yPos = 20;
+              writeLine(`NÁKRES K OTÁZCE Č. ${qNum}`, 13, 'bold', '#295CA3');
+              if (qObj) {
+                writeLine(`Otázka: ${qObj.text}`, 10, 'normal', '#666666');
+              }
+              yPos += 3;
+              doc.addImage(drawingData, 'JPEG', 15, yPos, 180, 90, undefined, 'FAST');
+            } catch (qImgErr) {
+              console.error("Chyba při vkládání nákresu otázky do PDF:", qImgErr);
+            }
+          });
+        }
+        
+        const pdfOutput = doc.output('arraybuffer');
+        folder?.file(`${studentNameEscaped}.pdf`, pdfOutput);
+      }
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = window.URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${assignment.title.replace(/[/\\?%*:|"<>\s]+/g, '_')}_prace_pdf.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({ title: "Staženo", description: "Archiv ZIP s PDF soubory byl úspěšně stažen.", variant: "default" });
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: "Chyba", description: "Hromadný export do ZIP selhal.", variant: "destructive" });
+    }
+  };
+
   const [evalGrade, setEvalGrade] = useState<number | undefined>();
   const [evalFeedback, setEvalFeedback] = useState<string>('');
   const [evalScores, setEvalScores] = useState<Record<string, number>>({});
@@ -1685,7 +1873,6 @@ export default function ITestApp() {
                           ) : (
                             <div className="space-y-4 pt-2">
 
-                              {/* Zacílení žáků */}
                               <div className="space-y-2">
                                 <label className="text-xs font-bold text-gray-500 uppercase">🎯 Zacílení žáků:</label>
                                 <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 h-10">
@@ -1740,7 +1927,6 @@ export default function ITestApp() {
                                 </div>
                               )}
 
-                              {/* Časové limity */}
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                   <label className="text-xs font-bold text-gray-500 uppercase">Zahájení (od kdy):</label>
@@ -1791,7 +1977,23 @@ export default function ITestApp() {
                           )}
                         </div>
 
-                        {/* Poslat jako kopii do jiné třídy */}
+                        <div className="bg-emerald-50/40 p-5 rounded-2xl border border-emerald-100 mt-4 space-y-3 print-exclude">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-bold text-sm text-emerald-700 uppercase tracking-wider">📦 Hromadný export prací</h3>
+                              <p className="text-xs text-emerald-600/80 mt-1">Stáhněte si vypracované a opravené testy všech žáků v jednom ZIP archivu.</p>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-9 text-xs font-bold text-emerald-700 border-emerald-200 hover:bg-emerald-50 rounded-full flex items-center gap-1.5"
+                              onClick={() => downloadAllSubmissionsZip(a.id)}
+                            >
+                              📥 Stáhnout ZIP s PDF
+                            </Button>
+                          </div>
+                        </div>
+
                         <div className="bg-blue-50/40 p-5 rounded-2xl border border-blue-100 mt-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <h3 className="font-bold text-sm text-blue-700 uppercase tracking-wider">📤 Poslat jako kopii do jiné třídy</h3>
@@ -2021,10 +2223,48 @@ export default function ITestApp() {
                     const student = store.users.find(u => u.id === sub?.studentId);
                     if (!sub || !assignment || !student) return null;
                     return (
-                      <Card className="border-none shadow-2xl rounded-3xl overflow-hidden">
-                        <CardHeader className="bg-white border-b p-8">
-                           <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
-                           <CardDescription>Odevzdal: {student.name}</CardDescription>
+                      <Card className="border-none shadow-2xl rounded-3xl overflow-hidden print-container">
+                        <style>{`
+                          @media print {
+                            body {
+                              visibility: hidden !important;
+                              background: white !important;
+                            }
+                            .print-container, .print-container * {
+                              visibility: visible !important;
+                            }
+                            .print-container {
+                              position: absolute !important;
+                              left: 0 !important;
+                              top: 0 !important;
+                              width: 100% !important;
+                              max-width: 100% !important;
+                              padding: 0 !important;
+                              margin: 0 !important;
+                              box-shadow: none !important;
+                              border: none !important;
+                            }
+                            .print-exclude, button, textarea, input, .dialog, [role="dialog"], header, nav {
+                              display: none !important;
+                              visibility: hidden !important;
+                            }
+                            .print-show {
+                              display: block !important;
+                              visibility: visible !important;
+                            }
+                          }
+                        `}</style>
+                        <CardHeader className="bg-white border-b p-8 flex flex-row items-center justify-between gap-4">
+                          <div>
+                            <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
+                            <CardDescription>Odevzdal: {student.name}</CardDescription>
+                          </div>
+                          <Button 
+                            onClick={() => window.print()} 
+                            className="print-exclude rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                          >
+                            🖨️ Tisk / Uložit PDF
+                          </Button>
                         </CardHeader>
                         <CardContent className="p-8 space-y-8">
                           {assignment.questions && assignment.questions.length > 0 && (
@@ -2078,7 +2318,6 @@ export default function ITestApp() {
                                         )}
                                       </div>
 
-                                      {/* Points Picker */}
                                       <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border self-stretch md:self-auto justify-center md:justify-start">
                                         <span className="text-sm font-bold text-muted-foreground">Body:</span>
                                         <input 
@@ -2146,7 +2385,7 @@ export default function ITestApp() {
                             );
                           })()}
 
-                          <div className="space-y-4 pt-4">
+                          <div className="space-y-4 pt-4 print-exclude">
                             <Textarea 
                                 placeholder="Slovní hodnocení..." 
                                 value={evalFeedback}
@@ -2156,6 +2395,20 @@ export default function ITestApp() {
                               store.gradeSubmission(sub.id, evalGrade || 0, evalFeedback, evalScores);
                               setViewingSubmission(null);
                             }}>Uložit hodnocení v cloudu</Button>
+                          </div>
+
+                          {/* Výsledky pro tiskovou verzi */}
+                          <div className="hidden print:block space-y-6 border-t pt-6 mt-6">
+                            <div className="flex justify-between items-center bg-gray-50 p-5 rounded-2xl border">
+                              <span className="font-bold text-lg text-gray-700">Výsledná známka:</span>
+                              <span className="text-4xl font-black text-primary">{evalGrade || sub.grade || 'Nehodnoceno'}</span>
+                            </div>
+                            {evalFeedback && (
+                              <div className="space-y-2">
+                                <span className="font-bold text-sm text-gray-500 uppercase block">Slovní hodnocení:</span>
+                                <p className="p-5 bg-gray-50 rounded-2xl border font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">{evalFeedback}</p>
+                              </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
