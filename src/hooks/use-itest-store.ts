@@ -180,6 +180,7 @@ export function useITestStore() {
       body: JSON.stringify(newAssignment)
     })
     .then(async res => {
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         toast({ title: "Práce publikována", description: "Úkol byl úspěšně uložen." });
         setAssignments(prev => [...prev, newAssignment]);
@@ -189,7 +190,11 @@ export function useITestStore() {
           setDoc(doc(db, 'assignments', id), cleanData(newAssignment)).catch(console.error);
         }
       } else {
-        toast({ title: "Chyba", description: "Nepodařilo se uložit zadání.", variant: "destructive" });
+        toast({ 
+          title: "Chyba při ukládání", 
+          description: data.error || "Nepodařilo se uložit zadání.", 
+          variant: "destructive" 
+        });
       }
     })
     .catch(console.error);
