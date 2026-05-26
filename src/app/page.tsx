@@ -75,6 +75,7 @@ export default function ITestApp() {
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
   const [viewingAssignment, setViewingAssignment] = useState<string | null>(null);
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
+  const [viewingAssignmentSubs, setViewingAssignmentSubs] = useState<string | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
   const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
@@ -2547,7 +2548,7 @@ export default function ITestApp() {
             <TabsContent value="submissions">
               {viewingSubmission ? (
                 <div className="space-y-6">
-                  <Button variant="ghost" className="rounded-full" onClick={() => setViewingSubmission(null)}>← Zpět</Button>
+                  <Button variant="ghost" className="rounded-full" onClick={() => setViewingSubmission(null)}>← Zpět na žáky</Button>
                   {(() => {
                     const sub = store.submissions.find(s => s.id === viewingSubmission);
                     const assignment = store.assignments.find(a => a.id === sub?.assignmentId);
@@ -2746,46 +2747,150 @@ export default function ITestApp() {
                     );
                   })()}
                 </div>
-              ) : (
-                <div className="grid gap-4">
-                  {store.submissions.filter(s => {
-                    const a = store.assignments.find(as => as.id === s.assignmentId);
-                    return a?.classId === selectedClassId;
-                  }).map(s => {
-                    const student = store.users.find(u => u.id === s.studentId);
-                    const assignment = store.assignments.find(a => a.id === s.assignmentId);
-                    
-                    const totalMax = assignment?.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                    
-                    let earned = 0;
-                    if (s.questionScores) {
-                      if (s.questionScores instanceof Map) {
-                        s.questionScores.forEach(val => { earned += val; });
-                      } else {
-                        Object.values(s.questionScores).forEach(val => { earned += val as number; });
-                      }
-                    }
-                    const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+              ) : viewingAssignmentSubs ? (() => {
+                // === SEZNAM ŽÁKŮ PRO ZVOLENÝ TEST ===
+                const selAssignment = store.assignments.find(a => a.id === viewingAssignmentSubs);
+                if (!selAssignment) return null;
 
-                    return (
-                      <div key={s.id} onClick={() => setViewingSubmission(s.id)} className="p-6 bg-white shadow-sm rounded-2xl flex items-center justify-between hover:shadow-lg cursor-pointer transition-all">
-                        <div>
-                          <p className="font-bold text-lg">{student?.name}</p>
-                          <p className="text-sm text-muted-foreground">{assignment?.title}</p>
+                // Všichni žáci, pro které je test určen
+                const classStudents = store.users.filter(u => {
+                  if (u.role !== 'student') return false;
+                  if (selAssignment.studentIds && selAssignment.studentIds.length > 0) {
+                    return selAssignment.studentIds.includes(u.id);
+                  }
+                  return u.classId === selectedClassId;
+                });
+
+                return (
+                  <div className="space-y-4">
+                    <Button variant="ghost" className="rounded-full" onClick={() => { setViewingAssignmentSubs(null); }}>← Zpět na testy</Button>
+                    <Card className="border-none shadow-lg rounded-2xl overflow-hidden">
+                      <CardHeader className="bg-primary/5 border-b px-6 py-4">
+                        <CardTitle className="text-xl font-headline text-primary">{selAssignment.title}</CardTitle>
+                        <CardDescription>
+                          {selAssignment.subject && `${selAssignment.subject} · `}
+                          {classStudents.length} žáků celkem
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="divide-y">
+                          {classStudents.length === 0 ? (
+                            <div className="p-8 text-center text-muted-foreground">
+                              <span className="text-3xl block mb-2">👤</span>
+                              <p className="font-medium">Žádní žáci v této třídě</p>
+                            </div>
+                          ) : (
+                            classStudents.map(student => {
+                              const sub = store.submissions.find(s => s.assignmentId === selAssignment.id && s.studentId === student.id);
+                              const totalMax = selAssignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                              let earned = 0;
+                              if (sub?.questionScores) {
+                                if (sub.questionScores instanceof Map) {
+                                  sub.questionScores.forEach(v => { earned += v; });
+                                } else {
+                                  Object.values(sub.questionScores).forEach(v => { earned += v as number; });
+                                }
+                              }
+                              const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+
+                              return (
+                                <div
+                                  key={student.id}
+                                  className={`p-5 flex items-center justify-between transition-all ${sub ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-60'}`}
+                                  onClick={() => {
+                                    if (!sub) return;
+                                    setEvalScores(sub.questionScores ? { ...(sub.questionScores as Record<string, number>) } : {});
+                                    setEvalGrade(sub.grade);
+                                    setEvalFeedback(sub.feedback || '');
+                                    setIsGradeManuallySet(!!sub.grade);
+                                    setViewingSubmission(sub.id);
+                                  }}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sub ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                    <div>
+                                      <p className="font-bold text-gray-800">{student.name}</p>
+                                      <p className="text-xs text-muted-foreground">{student.username}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {sub ? (
+                                      <>
+                                        <Badge variant={sub.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
+                                          {sub.grade
+                                            ? `Zn: ${sub.grade} (${earned}/${totalMax}b · ${pct}%)`
+                                            : earned > 0
+                                              ? `Body: ${earned}/${totalMax} (${pct}%)`
+                                              : 'Neopraveno'}
+                                        </Badge>
+                                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                                      </>
+                                    ) : (
+                                      <Badge variant="secondary" className="text-gray-400">Neodevzdáno</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
                         </div>
-                        <Badge variant={s.grade ? "default" : earned > 0 ? "outline" : "secondary"}>
-                          {s.grade
-                            ? `Známka: ${s.grade} (${earned} / ${totalMax} b · ${pct} %)`
-                            : earned > 0
-                              ? `Body: ${earned} / ${totalMax} (${pct} %) · Neohodnoceno`
-                              : 'Neopraveno'}
-                        </Badge>
-                      </div>
-                    );
-                  })}
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })() : (
+                // === SEZNAM TESTŮ ===
+                <div className="space-y-3">
+                  {store.assignments.filter(a => a.classId === selectedClassId).length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <span className="text-4xl block mb-3">📋</span>
+                      <p className="font-medium">Žádné testy pro tuto třídu</p>
+                    </div>
+                  ) : (
+                    store.assignments
+                      .filter(a => a.classId === selectedClassId)
+                      .map(a => {
+                        const classStudents = store.users.filter(u => {
+                          if (u.role !== 'student') return false;
+                          if (a.studentIds && a.studentIds.length > 0) return a.studentIds.includes(u.id);
+                          return u.classId === selectedClassId;
+                        });
+                        const subs = store.submissions.filter(s => s.assignmentId === a.id);
+                        const submittedCount = subs.length;
+                        const totalCount = classStudents.length;
+                        const gradedCount = subs.filter(s => s.grade).length;
+
+                        return (
+                          <div
+                            key={a.id}
+                            onClick={() => setViewingAssignmentSubs(a.id)}
+                            className="p-5 bg-white shadow-sm rounded-2xl flex items-center justify-between hover:shadow-md cursor-pointer transition-all border border-transparent hover:border-primary/20"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-gray-800 truncate">{a.title}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {a.subject && `${a.subject} · `}
+                                {a.endTime ? `Do: ${formatDateTime(a.endTime)}` : 'Bez termínu'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-primary">{submittedCount} / {totalCount}</p>
+                                <p className="text-[10px] text-muted-foreground">odevzdáno</p>
+                              </div>
+                              {gradedCount > 0 && (
+                                <Badge variant="default" className="font-bold text-xs">{gradedCount} ohodnoceno</Badge>
+                              )}
+                              <ChevronRight className="w-4 h-4 text-gray-400" />
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
                 </div>
               )}
             </TabsContent>
+
           </Tabs>
 
           <Dialog open={isAddingStudent} onOpenChange={(open) => {
