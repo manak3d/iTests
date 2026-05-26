@@ -1625,8 +1625,12 @@ export default function ITestApp() {
                                             <p className="text-xs text-muted-foreground mt-0.5">{student?.username}</p>
                                           </div>
                                           <div className="flex items-center gap-3">
-                                            <Badge variant={s.grade ? "default" : "secondary"} className="font-bold">
-                                              {s.grade ? `Známka: ${s.grade} (${earned}/${totalMax}b · ${pct}%)` : 'Neopraveno'}
+                                            <Badge variant={s.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
+                                              {s.grade
+                                                ? `Známka: ${s.grade} (${earned}/${totalMax}b · ${pct}%)`
+                                                : earned > 0
+                                                  ? `Body: ${earned}/${totalMax} (${pct}%) · Neohodnoceno`
+                                                  : 'Neopraveno'}
                                             </Badge>
                                             <ChevronRight className="w-4 h-4 text-gray-400" />
                                           </div>
@@ -2769,8 +2773,12 @@ export default function ITestApp() {
                           <p className="font-bold text-lg">{student?.name}</p>
                           <p className="text-sm text-muted-foreground">{assignment?.title}</p>
                         </div>
-                        <Badge variant={s.grade ? "default" : "secondary"}>
-                          {s.grade ? `Známka: ${s.grade} (${earned} / ${totalMax} b - ${pct} %)` : 'Neopraveno'}
+                        <Badge variant={s.grade ? "default" : earned > 0 ? "outline" : "secondary"}>
+                          {s.grade
+                            ? `Známka: ${s.grade} (${earned} / ${totalMax} b · ${pct} %)`
+                            : earned > 0
+                              ? `Body: ${earned} / ${totalMax} (${pct} %) · Neohodnoceno`
+                              : 'Neopraveno'}
                         </Badge>
                       </div>
                     );
