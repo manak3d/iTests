@@ -23,7 +23,7 @@ export interface Question {
   type: QuestionType;
   text: string;
   options?: string[];
-  correctAnswer?: string | number | boolean;
+  correctAnswer?: string | number | boolean | number[]; // number[] pro multiple_selection
   points?: number; // Body za otázku
 }
 

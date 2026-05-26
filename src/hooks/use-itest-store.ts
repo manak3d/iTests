@@ -334,7 +334,40 @@ export function useITestStore() {
 
   const submitWork = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'>) => {
     const id = Math.random().toString(36).substring(2, 11);
-    const newSubmission = { ...submission, id, submittedAt: new Date().toISOString() };
+
+    // Auto-hodnocení: pokud má otázka correctAnswer, porovnáme s odpovědí žáka
+    const assignment = assignments.find(a => a.id === submission.assignmentId);
+    const autoScores: Record<string, number> = {};
+    if (assignment?.questions) {
+      for (const q of assignment.questions) {
+        if (q.correctAnswer === undefined || q.correctAnswer === null) continue;
+        const studentAnswer = submission.answers?.[q.id];
+        const points = q.points ?? 1;
+        let isCorrect = false;
+        if (q.type === 'multiple_choice') {
+          isCorrect = studentAnswer === q.correctAnswer;
+        } else if (q.type === 'multiple_selection') {
+          const correct = Array.isArray(q.correctAnswer) ? [...(q.correctAnswer as number[])].sort((a,b)=>a-b) : [];
+          const given = Array.isArray(studentAnswer) ? [...studentAnswer].sort((a:number,b:number)=>a-b) : [];
+          isCorrect = JSON.stringify(correct) === JSON.stringify(given);
+        } else if (q.type === 'true_false') {
+          isCorrect = studentAnswer === q.correctAnswer;
+        }
+        autoScores[q.id] = isCorrect ? points : 0;
+      }
+    }
+
+    // Sloučit auto-skóry s existujícími (auto přepíše jen ty, kde je correctAnswer)
+    const mergedScores = Object.keys(autoScores).length > 0
+      ? { ...(submission.questionScores || {}), ...autoScores }
+      : submission.questionScores;
+
+    const newSubmission = {
+      ...submission,
+      id,
+      submittedAt: new Date().toISOString(),
+      ...(mergedScores ? { questionScores: mergedScores } : {}),
+    };
     
     // Zápis do MongoDB primárně
     fetch('/api/submissions', {
@@ -355,7 +388,7 @@ export function useITestStore() {
       }
     })
     .catch(console.error);
-  }, [db, toast]);
+  }, [db, toast, assignments]);
 
   const gradeSubmission = useCallback((id: string, grade: number, feedback: string, questionScores?: Record<string, number>) => {
     // Aktualizace v MongoDB primárně

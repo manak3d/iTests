@@ -357,21 +357,88 @@ export function AssignmentCreator({
                 />
                 
                 {(q.type === 'multiple_choice' || q.type === 'multiple_selection') && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                    {q.options?.map((opt, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{String.fromCharCode(65 + i)}</div>
-                        <Input 
-                          placeholder={`Možnost ${i + 1}`} 
-                          value={opt} 
-                          onChange={e => {
-                            const newOpts = [...(q.options || [])];
-                            newOpts[i] = e.target.value;
-                            updateQuestion(q.id, { options: newOpts });
-                          }}
-                        />
-                      </div>
-                    ))}
+                  <div className="space-y-3 mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {q.options?.map((opt, i) => {
+                        const isCorrect = q.type === 'multiple_choice'
+                          ? q.correctAnswer === i
+                          : Array.isArray(q.correctAnswer) && (q.correctAnswer as number[]).includes(i);
+                        return (
+                          <div key={i} className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              title="Kliknutím označit jako správnou odpověď"
+                              onClick={() => {
+                                if (q.type === 'multiple_choice') {
+                                  updateQuestion(q.id, { correctAnswer: isCorrect ? undefined : i });
+                                } else {
+                                  // multiple_selection – toggle
+                                  const prev: number[] = Array.isArray(q.correctAnswer) ? (q.correctAnswer as number[]) : [];
+                                  const next = isCorrect
+                                    ? prev.filter(v => v !== i)
+                                    : [...prev, i].sort((a, b) => a - b);
+                                  updateQuestion(q.id, { correctAnswer: next.length > 0 ? next : undefined });
+                                }
+                              }}
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all flex-shrink-0 ${
+                                isCorrect
+                                  ? 'bg-green-500 text-white shadow-md scale-110 ring-2 ring-green-300'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 hover:scale-105'
+                              }`}
+                            >
+                              {String.fromCharCode(65 + i)}
+                            </button>
+                            <Input
+                              placeholder={`Možnost ${i + 1}`}
+                              value={opt}
+                              onChange={e => {
+                                const newOpts = [...(q.options || [])];
+                                newOpts[i] = e.target.value;
+                                updateQuestion(q.id, { options: newOpts });
+                              }}
+                              className={isCorrect ? 'border-green-400 focus-visible:ring-green-300' : ''}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <span className="inline-block w-3 h-3 rounded-full bg-green-500" />
+                      Kliknutím na písmeno označíte správnou odpověď
+                    </p>
+                  </div>
+                )}
+
+                {q.type === 'true_false' && (
+                  <div className="space-y-2 mt-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Správná odpověď:</p>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => updateQuestion(q.id, { correctAnswer: q.correctAnswer === true ? undefined : true })}
+                        className={`flex-1 py-2.5 rounded-xl border-2 font-bold text-sm transition-all ${
+                          q.correctAnswer === true
+                            ? 'bg-green-500 border-green-500 text-white shadow-md'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-700'
+                        }`}
+                      >
+                        ✓ Ano
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateQuestion(q.id, { correctAnswer: q.correctAnswer === false ? undefined : false })}
+                        className={`flex-1 py-2.5 rounded-xl border-2 font-bold text-sm transition-all ${
+                          q.correctAnswer === false
+                            ? 'bg-red-500 border-red-500 text-white shadow-md'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-red-400 hover:text-red-700'
+                        }`}
+                      >
+                        ✗ Ne
+                      </button>
+                    </div>
+                    {q.correctAnswer === undefined && (
+                      <p className="text-[10px] text-muted-foreground">Kliknutím vyberte správnou odpověď (volitelné)</p>
+                    )}
                   </div>
                 )}
               </CardContent>
