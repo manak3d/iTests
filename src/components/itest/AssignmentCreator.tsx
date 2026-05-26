@@ -342,54 +342,97 @@ export function AssignmentCreator({
             </div>
 
             {useCustomThresholds && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 1 (od %)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={threshold1}
-                    onChange={(e) => setThreshold1(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
-                  />
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
+                {/* Známka 1 */}
+                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-primary block">Známka 1 (Výborně)</span>
+                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od 100% do</span>
+                  </div>
+                  <div className="relative mt-3 flex items-center">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={threshold1}
+                      onChange={(e) => setThreshold1(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                    />
+                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 2 (od %)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={threshold2}
-                    onChange={(e) => setThreshold2(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
-                  />
+
+                {/* Známka 2 */}
+                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-primary block">Známka 2 (Chvalitebně)</span>
+                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold1}% do</span>
+                  </div>
+                  <div className="relative mt-3 flex items-center">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={threshold2}
+                      onChange={(e) => setThreshold2(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                    />
+                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 3 (od %)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={threshold3}
-                    onChange={(e) => setThreshold3(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
-                  />
+
+                {/* Známka 3 */}
+                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-primary block">Známka 3 (Dobře)</span>
+                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold2}% do</span>
+                  </div>
+                  <div className="relative mt-3 flex items-center">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={threshold3}
+                      onChange={(e) => setThreshold3(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                    />
+                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 4 (od %)</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={threshold4}
-                    onChange={(e) => setThreshold4(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
-                  />
+
+                {/* Známka 4 */}
+                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-bold text-primary block">Známka 4 (Dostatečně)</span>
+                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold3}% do</span>
+                  </div>
+                  <div className="relative mt-3 flex items-center">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={threshold4}
+                      onChange={(e) => setThreshold4(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                    />
+                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                  </div>
                 </div>
-                <div className="col-span-2 md:col-span-4 text-[10px] text-muted-foreground mt-1">
-                  💡 Známka 5 (nedostatečně) bude navržena při skóre nižším než {threshold4} %. 
-                  Mezní hodnoty musí sestupovat: Výborně &gt; Chvalitebně &gt; Dobře &gt; Dostatečně.
+
+                {/* Známka 5 */}
+                <div className="bg-slate-100/50 p-3 rounded-xl border border-slate-200/60 flex flex-col justify-between select-none">
+                  <div>
+                    <span className="text-xs font-bold text-muted-foreground block">Známka 5 (Nedostatečně)</span>
+                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold4}% do</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-center bg-slate-200/50 rounded-md border h-10 border-slate-200">
+                    <span className="text-sm font-black text-muted-foreground">0 %</span>
+                  </div>
+                </div>
+
+                <div className="col-span-2 sm:col-span-5 text-[10px] text-muted-foreground mt-1 px-1">
+                  💡 Mezní hodnoty musí sestupovat: Výborně &gt; Chvalitebně &gt; Dobře &gt; Dostatečně. 
+                  Změnou předchozích hodnot se automaticky přepočítají a přizpůsobí začátky dalších rozsahů.
                 </div>
               </div>
             )}
