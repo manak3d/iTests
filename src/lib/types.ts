@@ -41,6 +41,7 @@ export interface Assignment {
   endTime?: string;
   studentIds?: string[];
   sharedWithClassIds?: string[]; // Sdílení do dalších tříd
+  gradeThresholds?: number[]; // [t1, t2, t3, t4] např. [85, 65, 45, 25]
 }
 
 export interface Submission {

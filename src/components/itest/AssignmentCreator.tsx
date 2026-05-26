@@ -43,6 +43,13 @@ export function AssignmentCreator({
   const [assignType, setAssignType] = useState<'all' | 'specific'>('all');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
+  // Grade thresholds state
+  const [useCustomThresholds, setUseCustomThresholds] = useState(false);
+  const [threshold1, setThreshold1] = useState(85);
+  const [threshold2, setThreshold2] = useState(65);
+  const [threshold3, setThreshold3] = useState(45);
+  const [threshold4, setThreshold4] = useState(25);
+
   const SUBJECTS = [
     'Matematika',
     'Český jazyk',
@@ -128,10 +135,21 @@ export function AssignmentCreator({
 
   const handleSave = () => {
     if (!title) return toast({ title: "Název je povinný", variant: "destructive" });
+    
+    if (useCustomThresholds) {
+      if (threshold1 <= threshold2 || threshold2 <= threshold3 || threshold3 <= threshold4) {
+        return toast({
+          title: "Neplatné rozmezí známek",
+          description: "Hodnoty musí sestupovat (1 > 2 > 3 > 4).",
+          variant: "destructive"
+        });
+      }
+    }
+
     onSave({
       title,
       description,
-            classId: targetClassId,
+      classId: targetClassId,
       subject,
       questions,
       fileUri,
@@ -139,6 +157,7 @@ export function AssignmentCreator({
       startTime: startTime || undefined,
       endTime: endTime || undefined,
       studentIds: assignType === 'specific' ? selectedStudentIds : [],
+      gradeThresholds: useCustomThresholds ? [threshold1, threshold2, threshold3, threshold4] : undefined,
     });
   };
 
@@ -297,6 +316,83 @@ export function AssignmentCreator({
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Klasifikace / Hodnocení */}
+          <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100/80 space-y-4">
+            <h4 className="font-bold text-sm text-primary uppercase tracking-wider flex items-center gap-2">
+              <span>📊 Klasifikace / Procentuální rozmezí známek</span>
+            </h4>
+            
+            <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 max-w-md">
+              <button
+                type="button"
+                onClick={() => setUseCustomThresholds(false)}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!useCustomThresholds ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+              >
+                Výchozí stupnice (85% · 65% · 45% · 25%)
+              </button>
+              <button
+                type="button"
+                onClick={() => setUseCustomThresholds(true)}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${useCustomThresholds ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+              >
+                Vlastní stupnice
+              </button>
+            </div>
+
+            {useCustomThresholds && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 1 (od %)</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={threshold1}
+                    onChange={(e) => setThreshold1(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 2 (od %)</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={threshold2}
+                    onChange={(e) => setThreshold2(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 3 (od %)</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={threshold3}
+                    onChange={(e) => setThreshold3(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Známka 4 (od %)</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={threshold4}
+                    onChange={(e) => setThreshold4(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                    className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary"
+                  />
+                </div>
+                <div className="col-span-2 md:col-span-4 text-[10px] text-muted-foreground mt-1">
+                  💡 Známka 5 (nedostatečně) bude navržena při skóre nižším než {threshold4} %. 
+                  Mezní hodnoty musí sestupovat: Výborně &gt; Chvalitebně &gt; Dobře &gt; Dostatečně.
+                </div>
+              </div>
+            )}
           </div>
 
           {fileUri && (

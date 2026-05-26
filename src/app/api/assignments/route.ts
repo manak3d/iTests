@@ -27,7 +27,8 @@ export async function POST(request: Request) {
       startTime: body.startTime || undefined,
       endTime: body.endTime || undefined,
       studentIds: body.studentIds || [],
-      sharedWithClassIds: body.sharedWithClassIds || []
+      sharedWithClassIds: body.sharedWithClassIds || [],
+      gradeThresholds: body.gradeThresholds || undefined
     });
 
     return NextResponse.json({ success: true, data: newAssignment }, { status: 201 });
@@ -42,7 +43,7 @@ export async function PUT(request: Request) {
   try {
     await dbConnect();
     const body = await request.json();
-    const { id, startTime, endTime, studentIds, sharedWithClassIds } = body;
+    const { id, startTime, endTime, studentIds, sharedWithClassIds, gradeThresholds } = body;
     
     if (!id) {
       return NextResponse.json({ success: false, error: "Missing assignment ID" }, { status: 400 });
@@ -56,7 +57,8 @@ export async function PUT(request: Request) {
           endTime: endTime || undefined,
           studentIds: studentIds || [],
           // classId se NIKDY nemění — test zůstává v původní třídě
-          sharedWithClassIds: sharedWithClassIds || []
+          sharedWithClassIds: sharedWithClassIds || [],
+          gradeThresholds: gradeThresholds || undefined
         }
       },
       { new: true }

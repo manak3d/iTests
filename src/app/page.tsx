@@ -458,11 +458,12 @@ export default function ITestApp() {
     const totalEarned = assignment.questions?.reduce((acc, q) => acc + (evalScores[q.id] || 0), 0) || 0;
     const pct = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
 
+    const thresholds = assignment.gradeThresholds || [85, 65, 45, 25];
     let suggested = 5;
-    if (pct >= 85) suggested = 1;
-    else if (pct >= 65) suggested = 2;
-    else if (pct >= 45) suggested = 3;
-    else if (pct >= 25) suggested = 4;
+    if (pct >= (thresholds[0] ?? 85)) suggested = 1;
+    else if (pct >= (thresholds[1] ?? 65)) suggested = 2;
+    else if (pct >= (thresholds[2] ?? 45)) suggested = 3;
+    else if (pct >= (thresholds[3] ?? 25)) suggested = 4;
 
     if (!isGradeManuallySet) {
       setEvalGrade(suggested);
@@ -2684,11 +2685,12 @@ export default function ITestApp() {
                             const totalEarned = assignment.questions?.reduce((acc, q) => acc + (evalScores[q.id] || 0), 0) || 0;
                             const pct = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
                             
+                            const thresholds = assignment.gradeThresholds || [85, 65, 45, 25];
                             let suggestedGrade = 5;
-                            if (pct >= 85) suggestedGrade = 1;
-                            else if (pct >= 65) suggestedGrade = 2;
-                            else if (pct >= 45) suggestedGrade = 3;
-                            else if (pct >= 25) suggestedGrade = 4;
+                            if (pct >= (thresholds[0] ?? 85)) suggestedGrade = 1;
+                            else if (pct >= (thresholds[1] ?? 65)) suggestedGrade = 2;
+                            else if (pct >= (thresholds[2] ?? 45)) suggestedGrade = 3;
+                            else if (pct >= (thresholds[3] ?? 25)) suggestedGrade = 4;
 
                             return (
                               <div className="space-y-6">
