@@ -34,7 +34,21 @@ export async function GET() {
     // Přemapování _id na id pro frontend
     const mappedClasses = classes.map(c => ({ ...c, id: c._id }));
     const mappedAssignments = assignments.map(a => ({ ...a, id: a._id }));
-    const mappedSubmissions = submissions.map(s => ({ ...s, id: s._id }));
+    // Helper: Mongoose Map → plain object
+    const mapToObj = (m: any): Record<string, any> => {
+      if (!m) return {};
+      if (m instanceof Map) return Object.fromEntries(m);
+      if (typeof m === 'object') return m;
+      return {};
+    };
+
+    const mappedSubmissions = submissions.map(s => ({
+      ...s,
+      id: s._id,
+      answers: mapToObj((s as any).answers),
+      questionDrawings: mapToObj((s as any).questionDrawings),
+      questionScores: mapToObj((s as any).questionScores),
+    }));
 
     return NextResponse.json({ 
       success: true, 

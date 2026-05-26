@@ -14,7 +14,8 @@ export async function POST(request: Request) {
       answers: body.answers || {},
       questionDrawings: body.questionDrawings || {},
       mainWorkDrawing: body.mainWorkDrawing,
-      submittedAt: body.submittedAt
+      submittedAt: body.submittedAt,
+      questionScores: body.questionScores || {},
     });
 
     return NextResponse.json({ success: true, data: newSubmission }, { status: 201 });
