@@ -405,10 +405,27 @@ export function useITestStore() {
     .then(async res => {
       if (res.ok) {
         toast({ title: "Oznámkováno", description: "Hodnocení uloženo." });
-        setSubmissions(prev => prev.map(s => s.id === id ? { ...s, grade, feedback, questionScores } : s));
+        setSubmissions(prev => prev.map(s => {
+          if (s.id === id) {
+            const updated = { ...s, feedback, questionScores };
+            if (grade === 0 || grade === null || grade === undefined) {
+              delete updated.grade;
+            } else {
+              updated.grade = grade;
+            }
+            return updated;
+          }
+          return s;
+        }));
         
         if (db) {
-          updateDoc(doc(db, 'submissions', id), cleanData({ grade, feedback, questionScores })).catch(console.error);
+          const fbUpdate: any = { feedback, questionScores };
+          if (grade === 0 || grade === null || grade === undefined) {
+            fbUpdate.grade = null;
+          } else {
+            fbUpdate.grade = grade;
+          }
+          updateDoc(doc(db, 'submissions', id), cleanData(fbUpdate)).catch(console.error);
         }
       } else {
         toast({ title: "Chyba", description: "Uložení hodnocení selhalo.", variant: "destructive" });

@@ -1862,7 +1862,6 @@ export default function ITestApp() {
                                           {assignment.questions.map((q, index) => {
                                             const answer = sub.answers?.[q.id];
                                             const drawing = sub.questionDrawings?.[q.id];
-                                            const score = evalScores[q.id] !== undefined ? evalScores[q.id] : (sub.questionScores?.[q.id] || 0);
                                             return (
                                               <div key={q.id} className="p-4 bg-gray-50 rounded-xl border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                 <div className="flex-1 space-y-2">
@@ -1904,9 +1903,19 @@ export default function ITestApp() {
                                                     </div>
                                                   )}
                                                 </div>
-                                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border self-stretch md:self-auto justify-center">
+                                                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border self-stretch md:self-auto justify-center md:justify-start">
                                                   <span className="text-sm font-bold text-muted-foreground">Body:</span>
-                                                  <span className="w-12 text-center font-bold text-primary border bg-gray-50 rounded p-1">{score}</span>
+                                                  <input 
+                                                    type="number"
+                                                    min="0"
+                                                    max={q.points || 1}
+                                                    value={evalScores[q.id] !== undefined ? evalScores[q.id] : 0}
+                                                    onChange={(e) => {
+                                                      const val = Math.min(q.points || 1, Math.max(0, parseInt(e.target.value) || 0));
+                                                      setEvalScores(prev => ({ ...prev, [q.id]: val }));
+                                                    }}
+                                                    className="w-12 text-center font-bold text-primary border bg-gray-50 rounded p-1"
+                                                  />
                                                   <span className="text-sm font-bold text-muted-foreground">/ {q.points || 1}</span>
                                                 </div>
                                               </div>
@@ -1924,29 +1933,86 @@ export default function ITestApp() {
                                     {/* Výsledky hodnocení */}
                                     {(() => {
                                       const totalMax = assignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                                      let earned = 0;
-                                      if (sub.questionScores) {
-                                        Object.values(sub.questionScores).forEach(val => { earned += val as number; });
-                                      }
-                                      const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+                                      const totalEarned = assignment.questions?.reduce((acc, q) => acc + (evalScores[q.id] || 0), 0) || 0;
+                                      const pct = totalMax > 0 ? Math.round((totalEarned / totalMax) * 100) : 0;
+                                      
+                                      const thresholds = assignment.gradeThresholds || [85, 65, 45, 25];
+                                      let suggestedGrade = 5;
+                                      if (pct >= (thresholds[0] ?? 85)) suggestedGrade = 1;
+                                      else if (pct >= (thresholds[1] ?? 65)) suggestedGrade = 2;
+                                      else if (pct >= (thresholds[2] ?? 45)) suggestedGrade = 3;
+                                      else if (pct >= (thresholds[3] ?? 25)) suggestedGrade = 4;
+
                                       return (
-                                        <div className="space-y-4 border-t pt-6">
+                                        <div className="space-y-6 border-t pt-6">
                                           <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 flex justify-between items-center">
                                             <span className="font-bold text-primary">Celkové skóre:</span>
-                                            <span className="text-2xl font-black text-primary">{earned} / {totalMax} bodů ({pct} %)</span>
+                                            <span className="text-2xl font-black text-primary">{totalEarned} / {totalMax} bodů ({pct} %)</span>
                                           </div>
-                                          {sub.grade && (
-                                            <div className="bg-gray-50 p-5 rounded-2xl border flex justify-between items-center">
+
+                                          <div className="space-y-2">
+                                            <div className="flex justify-between items-end">
+                                              <label className="text-sm font-bold uppercase text-primary">Hodnocení (Známka)</label>
+                                              <span className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                                                Návrh: známka {suggestedGrade} ({pct} %)
+                                              </span>
+                                            </div>
+                                            <GradePicker 
+                                              selected={evalGrade} 
+                                              suggested={suggestedGrade}
+                                              onSelect={(v) => {
+                                                setEvalGrade(v);
+                                                setIsGradeManuallySet(true);
+                                              }} 
+                                            />
+                                          </div>
+
+                                          <div className="space-y-4 pt-4 print-exclude">
+                                            <Textarea 
+                                              placeholder="Slovní hodnocení..." 
+                                              value={evalFeedback}
+                                              onChange={(e) => setEvalFeedback(e.target.value)}
+                                            />
+                                            <div className="flex flex-col sm:flex-row gap-3">
+                                              <Button 
+                                                className="flex-1 h-12 rounded-full font-bold shadow-md bg-primary hover:bg-primary/95 text-white" 
+                                                onClick={() => {
+                                                  store.gradeSubmission(sub.id, evalGrade || 0, evalFeedback, evalScores);
+                                                  setViewingSubmission(null);
+                                                }}
+                                              >
+                                                Uložit hodnocení v cloudu
+                                              </Button>
+                                              {store.currentUser?.role === 'admin' && (
+                                                <Button 
+                                                  variant="destructive" 
+                                                  className="h-12 px-6 rounded-full font-bold shadow-md flex items-center gap-2"
+                                                  onClick={() => {
+                                                    if (confirm("Opravdu chcete smazat známku z tohoto testu? Test se vrátí do neohodnoceného stavu.")) {
+                                                      store.gradeSubmission(sub.id, 0, "", {});
+                                                      setViewingSubmission(null);
+                                                    }
+                                                  }}
+                                                >
+                                                  Odstranit známku
+                                                </Button>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Výsledky pro tiskovou verzi */}
+                                          <div className="hidden print:block space-y-6 border-t pt-6 mt-6">
+                                            <div className="flex justify-between items-center bg-gray-50 p-5 rounded-2xl border">
                                               <span className="font-bold text-lg text-gray-700">Výsledná známka:</span>
-                                              <span className="text-4xl font-black text-primary">{sub.grade}</span>
+                                              <span className="text-4xl font-black text-primary">{evalGrade || sub.grade || 'Nehodnoceno'}</span>
                                             </div>
-                                          )}
-                                          {sub.feedback && (
-                                            <div className="space-y-2">
-                                              <span className="font-bold text-sm text-gray-500 uppercase block">Slovní hodnocení:</span>
-                                              <p className="p-5 bg-gray-50 rounded-2xl border font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">{sub.feedback}</p>
-                                            </div>
-                                          )}
+                                            {evalFeedback && (
+                                              <div className="space-y-2">
+                                                <span className="font-bold text-sm text-gray-500 uppercase block">Slovní hodnocení:</span>
+                                                <p className="p-5 bg-gray-50 rounded-2xl border font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">{evalFeedback}</p>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       );
                                     })()}

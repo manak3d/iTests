@@ -31,13 +31,20 @@ export async function PUT(request: Request) {
     
     if (!body.id) throw new Error("Missing submission ID");
 
+    const updateObj: any = {
+      feedback: body.feedback,
+      questionScores: body.questionScores
+    };
+
+    if (body.grade === 0 || body.grade === null || body.grade === undefined) {
+      updateObj.$unset = { grade: "" };
+    } else {
+      updateObj.grade = body.grade;
+    }
+
     const updatedSubmission = await Submission.findByIdAndUpdate(
       body.id,
-      { 
-        grade: body.grade, 
-        feedback: body.feedback, 
-        questionScores: body.questionScores 
-      },
+      updateObj,
       { new: true }
     );
 
