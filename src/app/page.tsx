@@ -79,6 +79,7 @@ export default function ITestApp() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [selectedGradebookStudent, setSelectedGradebookStudent] = useState<User | null>(null);
   const [selectedGradebookSubject, setSelectedGradebookSubject] = useState<string>('Matematika');
+  const [selectedTeacherSubject, setSelectedTeacherSubject] = useState<string>('Matematika');
   const [gradebookViewMode, setGradebookViewMode] = useState<'child' | 'teacher'>('child');
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
   const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
@@ -2280,6 +2281,26 @@ export default function ITestApp() {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
     const selectedClass = store.classes.find(c => c.id === selectedClassId);
 
+    const predefinedSubjects = [
+      'Matematika',
+      'Český jazyk',
+      'Anglický jazyk',
+      'Fyzika',
+      'Chemie',
+      'Dějepis',
+      'Zeměpis',
+      'Přírodopis',
+      'Informatika',
+      'Jiný'
+    ];
+
+    const classStudents = store.users.filter(u => u.role === 'student' && u.classId === selectedClassId);
+    const subjectAssignments = store.assignments.filter(a =>
+      a.classId === selectedClassId &&
+      !a.isDraft &&
+      (selectedTeacherSubject === 'Jiný' ? (!a.subject || a.subject === 'Jiný') : (a.subject === selectedTeacherSubject))
+    );
+
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Navbar user={currentUser} onLogout={() => store.logout()} />
@@ -2502,6 +2523,7 @@ export default function ITestApp() {
               <TabsTrigger value="assignments" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Zadané práce</TabsTrigger>
               <TabsTrigger value="students" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Žáci</TabsTrigger>
               <TabsTrigger value="submissions" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Odevzdáno</TabsTrigger>
+              <TabsTrigger value="grades" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Známky</TabsTrigger>
             </TabsList>
 
             <TabsContent value="classes" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -3316,6 +3338,171 @@ export default function ITestApp() {
                   )}
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="grades" className="space-y-6">
+              {/* Horizontal Subject Folders */}
+              <div className="flex flex-wrap gap-2 pb-4 border-b border-gray-100 animate-fade-in">
+                {predefinedSubjects.map(subj => {
+                  const isActive = selectedTeacherSubject === subj;
+                  
+                  // Compute count of published assignments in this subject for badges!
+                  const count = store.assignments.filter(a =>
+                    a.classId === selectedClassId &&
+                    !a.isDraft &&
+                    (subj === 'Jiný' ? (!a.subject || a.subject === 'Jiný') : (a.subject === subj))
+                  ).length;
+
+                  return (
+                    <button
+                      key={subj}
+                      type="button"
+                      onClick={() => setSelectedTeacherSubject(subj)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm flex items-center gap-2 border ${
+                        isActive
+                          ? 'bg-primary border-primary text-white font-bold'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{subj}</span>
+                      {count > 0 && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                          isActive ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
+                        }`}>
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Grades grid table card */}
+              <Card className="border-none shadow-xl rounded-3xl overflow-hidden bg-white animate-fade-in">
+                <CardHeader className="bg-slate-50/50 border-b p-6">
+                  <CardTitle className="text-xl font-headline font-bold text-slate-800 flex items-center gap-2">
+                    📊 Přehled klasifikace třídy — {selectedTeacherSubject}
+                  </CardTitle>
+                  <CardDescription>
+                    Klikněte na jméno žáka pro zobrazení celé jeho žákovské knížky, nebo na „Opravit“ pro rychlé ohodnocení testu.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {classStudents.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground">
+                      <span className="text-3xl block mb-2">👤</span>
+                      <p className="font-medium">Tato třída nemá žádné zapsané žáky.</p>
+                    </div>
+                  ) : subjectAssignments.length === 0 ? (
+                    <div className="p-12 text-center text-muted-foreground">
+                      <span className="text-3xl block mb-2">📭</span>
+                      <p className="font-medium">V předmětu {selectedTeacherSubject} zatím nebyly vytvořeny žádné publikované testy.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[700px]">
+                        <thead>
+                          <tr className="bg-slate-50/50 border-b text-slate-700 text-xs uppercase tracking-wider font-bold">
+                            <th className="p-4 font-extrabold w-64">Celé jméno žáka</th>
+                            {subjectAssignments.map(a => (
+                              <th key={a.id} className="p-4 font-extrabold max-w-[200px] truncate text-center" title={a.title}>
+                                {a.title}
+                              </th>
+                            ))}
+                            <th className="p-4 font-extrabold text-center w-24">Průměr</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y text-sm">
+                          {classStudents.map(student => {
+                            // Calculate averages specifically for selected subject assignments
+                            const studentSubmissions = store.submissions.filter(s =>
+                              s.studentId === student.id &&
+                              s.grade !== undefined &&
+                              s.grade !== null &&
+                              subjectAssignments.some(a => a.id === s.assignmentId)
+                            );
+                            const sum = studentSubmissions.reduce((acc, s) => acc + (s.grade || 0), 0);
+                            const avg = studentSubmissions.length > 0 ? (sum / studentSubmissions.length) : null;
+
+                            return (
+                              <tr key={student.id} className="hover:bg-slate-50/30 transition-colors">
+                                {/* Student name is clickable and opens their Gradebook! */}
+                                <td 
+                                  className="p-4 font-bold text-slate-800 hover:text-primary cursor-pointer flex items-center gap-2 group"
+                                  onClick={() => {
+                                    setSelectedGradebookStudent(student);
+                                    setSelectedGradebookSubject(selectedTeacherSubject);
+                                    setGradebookViewMode('child');
+                                  }}
+                                  title="Otevřít žákovskou knížku žáka"
+                                >
+                                  <GraduationCap className="w-4 h-4 text-slate-400 group-hover:text-primary transition-colors shrink-0" />
+                                  <span className="group-hover:underline">{student.name}</span>
+                                </td>
+
+                                {/* Individual assignment grades */}
+                                {subjectAssignments.map(a => {
+                                  const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === student.id);
+                                  
+                                  let earned = 0;
+                                  if (sub?.questionScores) {
+                                    Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                                  }
+                                  const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                                  const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+
+                                  return (
+                                    <td key={a.id} className="p-4 text-center">
+                                      {sub ? (
+                                        sub.grade ? (
+                                          <Badge className="font-extrabold text-xs px-2.5 py-1 bg-primary hover:bg-primary shadow-sm">
+                                            {sub.grade}
+                                          </Badge>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              // Instantly jump to grading submission!
+                                              setEvalScores(sub.questionScores ? { ...sub.questionScores as Record<string, number> } : {});
+                                              setEvalGrade(sub.grade);
+                                              setEvalFeedback(sub.feedback || '');
+                                              setIsGradeManuallySet(!!sub.grade);
+                                              setViewingSubmission(sub.id);
+                                              
+                                              setActiveTab('submissions');
+                                            }}
+                                            className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-250 px-2 py-0.5 rounded-lg hover:bg-amber-100 hover:text-amber-800 transition-colors shadow-sm animate-pulse"
+                                            title={`Odevzdáno bez známky (${earned}/${totalMax} bodů · ${pct}%). Kliknutím opravíte.`}
+                                          >
+                                            Opravit ✍️
+                                          </button>
+                                        )
+                                      ) : (
+                                        <span className="text-slate-300 font-medium">-</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+
+                                {/* Subject Average */}
+                                <td className="p-4 text-center">
+                                  {avg !== null ? (
+                                    <span className="font-black text-primary bg-primary/5 px-2.5 py-1 rounded-full border border-primary/10">
+                                      {avg.toFixed(2).replace('.', ',')}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 italic text-xs">--</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
           </Tabs>
