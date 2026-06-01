@@ -28,7 +28,8 @@ export async function POST(request: Request) {
       endTime: body.endTime || undefined,
       studentIds: body.studentIds || [],
       sharedWithClassIds: body.sharedWithClassIds || [],
-      gradeThresholds: body.gradeThresholds || undefined
+      gradeThresholds: body.gradeThresholds || undefined,
+      isDraft: body.isDraft === true // false = publikováno, true = koncept
     });
 
     return NextResponse.json({ success: true, data: newAssignment }, { status: 201 });
@@ -43,7 +44,7 @@ export async function PUT(request: Request) {
   try {
     await dbConnect();
     const body = await request.json();
-    const { id, startTime, endTime, studentIds, sharedWithClassIds, gradeThresholds } = body;
+    const { id, startTime, endTime, studentIds, sharedWithClassIds, gradeThresholds, isDraft } = body;
     
     if (!id) {
       return NextResponse.json({ success: false, error: "Missing assignment ID" }, { status: 400 });
@@ -53,12 +54,12 @@ export async function PUT(request: Request) {
       { _id: id },
       {
         $set: {
-          startTime: startTime || undefined,
-          endTime: endTime || undefined,
-          studentIds: studentIds || [],
-          // classId se NIKDY nemění — test zůstává v původní třídě
-          sharedWithClassIds: sharedWithClassIds || [],
-          gradeThresholds: gradeThresholds || undefined
+          startTime: startTime !== undefined ? (startTime || undefined) : undefined,
+          endTime: endTime !== undefined ? (endTime || undefined) : undefined,
+          studentIds: studentIds !== undefined ? (studentIds || []) : undefined,
+          sharedWithClassIds: sharedWithClassIds !== undefined ? (sharedWithClassIds || []) : undefined,
+          gradeThresholds: gradeThresholds || undefined,
+          ...(isDraft !== undefined ? { isDraft } : {})
         }
       },
       { new: true }

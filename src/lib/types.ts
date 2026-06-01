@@ -42,6 +42,7 @@ export interface Assignment {
   studentIds?: string[];
   sharedWithClassIds?: string[]; // Sdílení do dalších tříd
   gradeThresholds?: number[]; // [t1, t2, t3, t4] např. [85, 65, 45, 25]
+  isDraft?: boolean; // Koncept — není viditelný pro žáky
 }
 
 export interface Submission {

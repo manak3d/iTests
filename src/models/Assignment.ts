@@ -34,6 +34,7 @@ export interface IAssignment extends Document<string> {
   studentIds?: string[];
   sharedWithClassIds?: string[]; // Sdílení do dalších tříd (původní classId zůstává)
   gradeThresholds?: number[];
+  isDraft?: boolean; // Koncept — není viditelný pro žáky
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,7 +54,8 @@ const AssignmentSchema: Schema = new Schema(
     endTime: { type: String },
     studentIds: { type: [String], default: [] },
     sharedWithClassIds: { type: [String], default: [] },
-    gradeThresholds: { type: [Number], default: [85, 65, 45, 25] }
+    gradeThresholds: { type: [Number], default: [85, 65, 45, 25] },
+    isDraft: { type: Boolean, default: false }
   },
   {
     timestamps: true,

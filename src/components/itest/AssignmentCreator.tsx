@@ -158,6 +158,27 @@ export function AssignmentCreator({
       endTime: endTime || undefined,
       studentIds: assignType === 'specific' ? selectedStudentIds : [],
       gradeThresholds: useCustomThresholds ? [threshold1, threshold2, threshold3, threshold4] : undefined,
+      isDraft: false,
+    });
+  };
+
+  const handleSaveDraft = () => {
+    if (!title.trim()) {
+      return toast({ title: "Chybí název", description: "Zadejte název konceptu.", variant: "destructive" });
+    }
+    onSave({
+      title,
+      description,
+      classId: targetClassId,
+      subject,
+      questions,
+      fileUri,
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      startTime: startTime || undefined,
+      endTime: endTime || undefined,
+      studentIds: assignType === 'specific' ? selectedStudentIds : [],
+      gradeThresholds: useCustomThresholds ? [threshold1, threshold2, threshold3, threshold4] : undefined,
+      isDraft: true,
     });
   };
 
@@ -607,7 +628,10 @@ export function AssignmentCreator({
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-8 border-t">
+      <div className="flex flex-col md:flex-row justify-end gap-3 pt-8 border-t">
+        <Button size="lg" variant="outline" className="w-full md:w-auto px-10 h-14 text-lg font-headline text-gray-600 border-gray-300" onClick={handleSaveDraft} disabled={isProcessing}>
+          💾 Uložit jako koncept
+        </Button>
         <Button size="lg" className="w-full md:w-auto px-16 h-14 text-xl font-headline" onClick={handleSave} disabled={isProcessing}>
           Publikovat a uložit v cloudu
         </Button>

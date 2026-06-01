@@ -182,7 +182,7 @@ export function useITestStore() {
     .then(async res => {
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        toast({ title: "Práce publikována", description: "Úkol byl úspěšně uložen." });
+        toast({ title: newAssignment.isDraft ? "Koncept uložen" : "Práce publikována", description: newAssignment.isDraft ? "Úkol byl uložen jako koncept. Žáci ho ještě nevidí." : "Úkol byl úspěšně uložen." });
         setAssignments(prev => [...prev, newAssignment]);
         
         // Firebase záloha
@@ -200,7 +200,7 @@ export function useITestStore() {
     .catch(console.error);
   }, [db, currentUser, toast]);
 
-  const updateAssignment = useCallback((id: string, updates: { startTime?: string; endTime?: string; studentIds?: string[]; sharedWithClassIds?: string[] }) => {
+  const updateAssignment = useCallback((id: string, updates: { startTime?: string; endTime?: string; studentIds?: string[]; sharedWithClassIds?: string[]; isDraft?: boolean }) => {
     return fetch('/api/assignments', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -209,7 +209,7 @@ export function useITestStore() {
     .then(async res => {
       const data = await res.json();
       if (res.ok) {
-        toast({ title: "Zadání upraveno", description: "Nastavení úkolu bylo úspěšně uloženo." });
+        toast({ title: updates.isDraft === false ? "Práce publikována" : "Zadání upraveno", description: updates.isDraft === false ? "Úkol je nyní viditelný pro žáky." : "Nastavení úkolu bylo úspěšně uloženo." });
         setAssignments(prev => prev.map(a => a.id === id ? { ...a, ...updates } : a));
         
         if (db) {

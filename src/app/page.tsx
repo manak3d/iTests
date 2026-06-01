@@ -1334,12 +1334,18 @@ export default function ITestApp() {
                                       classAssignments.map(a => {
                                         const subCount = submissions.filter(s => s.assignmentId === a.id).length;
                                         return (
-                                          <div key={a.id} className="p-3 flex justify-between items-center text-sm">
+                                          <div key={a.id} className={`p-3 flex justify-between items-center text-sm ${a.isDraft ? 'bg-amber-50/50' : ''}`}>
                                             <div className="space-y-0.5">
-                                              <p className="font-bold text-gray-800">{a.title}</p>
+                                              <p className="font-bold text-gray-800 flex items-center gap-2">
+                                                {a.title}
+                                                {a.isDraft && <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-full">KONCEPT</span>}
+                                              </p>
                                               <p className="text-[10px] text-muted-foreground">Předmět: {a.subject || 'Obecný'}</p>
                                             </div>
-                                            <Badge variant="outline" className="font-bold text-primary bg-primary/5">{subCount} odevzdání</Badge>
+                                            {a.isDraft
+                                              ? <Badge variant="outline" className="font-bold text-amber-600 bg-amber-50 border-amber-200">Neuveřejněno</Badge>
+                                              : <Badge variant="outline" className="font-bold text-primary bg-primary/5">{subCount} odevzdání</Badge>
+                                            }
                                           </div>
                                         );
                                       })
@@ -2163,8 +2169,30 @@ export default function ITestApp() {
                     if (!a) return null;
                     return (
                       <Card className="border-none shadow-xl bg-white p-8">
-                                                <h2 className="text-3xl font-headline font-bold text-primary">{a.title}</h2>
+                                                <h2 className="text-3xl font-headline font-bold text-primary flex items-center gap-3">
+                                                  {a.title}
+                                                  {a.isDraft && (
+                                                    <span className="text-sm font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-full border border-amber-200">💾 KONCEPT</span>
+                                                  )}
+                                                </h2>
                         <p className="text-muted-foreground mt-2 text-lg">{a.description}</p>
+
+                        {/* Banner pro koncept */}
+                        {a.isDraft && (
+                          <div className="mt-4 flex items-center gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+                            <div className="flex-1">
+                              <p className="font-bold text-amber-800 text-sm">Tento úkol je uložen jako koncept</p>
+                              <p className="text-xs text-amber-600 mt-0.5">Žáci ho zatím nevidí. Kliknutím na „Publikovat" ho zveřejníte.</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              className="font-bold bg-amber-500 hover:bg-amber-600 text-white shrink-0"
+                              onClick={() => store.updateAssignment(a.id, { isDraft: false })}
+                            >
+                              🚀 Publikovat
+                            </Button>
+                          </div>
+                        )}
 
                         {/* Assignment Details & Settings */}
                         <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-100 mt-6 space-y-4">
@@ -2464,11 +2492,14 @@ export default function ITestApp() {
                     </Button>
                   </div>
                   {store.assignments.filter(a => a.classId === selectedClassId && (a.teacherId === currentUser.id || !a.teacherId)).map(a => (
-                    <Card key={a.id} className="hover:border-primary cursor-pointer transition-all border-none shadow-sm bg-white" onClick={() => setViewingAssignment(a.id)}>
+                    <Card key={a.id} className={`hover:border-primary cursor-pointer transition-all border-none shadow-sm ${a.isDraft ? 'bg-amber-50/40 border border-amber-200' : 'bg-white'}`} onClick={() => setViewingAssignment(a.id)}>
                       <CardContent className="p-5 flex justify-between items-center">
                         <div className="flex items-center gap-5">
-                          <ClipboardList className="w-6 h-6 text-primary" />
-                          <h4 className="font-bold text-xl">{a.title}</h4>
+                          <ClipboardList className={`w-6 h-6 ${a.isDraft ? 'text-amber-500' : 'text-primary'}`} />
+                          <div>
+                            <h4 className="font-bold text-xl">{a.title}</h4>
+                            {a.isDraft && <span className="text-xs font-bold text-amber-600">💾 Koncept — neuveřejněno</span>}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button 
