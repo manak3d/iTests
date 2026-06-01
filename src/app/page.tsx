@@ -11,7 +11,7 @@ import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, 
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
-import { Assignment } from '@/lib/types';
+import { Assignment, User } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
@@ -77,6 +77,9 @@ export default function ITestApp() {
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
   const [viewingAssignmentSubs, setViewingAssignmentSubs] = useState<string | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [selectedGradebookStudent, setSelectedGradebookStudent] = useState<User | null>(null);
+  const [selectedGradebookSubject, setSelectedGradebookSubject] = useState<string>('Matematika');
+  const [gradebookViewMode, setGradebookViewMode] = useState<'child' | 'teacher'>('child');
   const [mainWorkDrawing, setMainWorkDrawing] = useState<string | undefined>();
   const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
   const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
@@ -469,6 +472,374 @@ export default function ITestApp() {
       setEvalGrade(suggested);
     }
   }, [evalScores, isGradeManuallySet, viewingSubmission, store.submissions, store.assignments]);
+
+  const renderGradebookDialog = () => {
+    if (!selectedGradebookStudent) return null;
+
+    const student = selectedGradebookStudent;
+    const classroom = store.classes.find(c => c.id === student.classId);
+    const className = classroom ? classroom.name : 'Bez třídy';
+
+    // Get assignments available to the student
+    const studentAssignments = store.assignments.filter(a =>
+      a.classId === student.classId &&
+      (!a.studentIds || a.studentIds.length === 0 || a.studentIds.includes(student.id))
+    );
+
+    // Get submissions by the student
+    const studentSubmissions = store.submissions.filter(s =>
+      s.studentId === student.id
+    );
+
+    const predefinedSubjects = [
+      'Matematika',
+      'Český jazyk',
+      'Anglický jazyk',
+      'Fyzika',
+      'Chemie',
+      'Dějepis',
+      'Zeměpis',
+      'Přírodopis',
+      'Informatika',
+      'Jiný'
+    ];
+
+    // Calculate overall average
+    const allGradedSubmissions = studentSubmissions.filter(s => s.grade !== undefined && s.grade !== null);
+    const overallSum = allGradedSubmissions.reduce((sum, s) => sum + (s.grade || 0), 0);
+    const overallAverage = allGradedSubmissions.length > 0 ? (overallSum / allGradedSubmissions.length) : null;
+
+    // Filter assignments of the selected subject
+    const selectedSubjectAssignments = studentAssignments.filter(a =>
+      selectedGradebookSubject === 'Jiný' ? (!a.subject || a.subject === 'Jiný') : (a.subject === selectedGradebookSubject)
+    );
+
+    // Calculate stats for the selected subject
+    const selectedSubjectGradedSubmissions = studentSubmissions.filter(s => {
+      const a = store.assignments.find(as => as.id === s.assignmentId);
+      if (!a) return false;
+      const isCorrectSubject = selectedGradebookSubject === 'Jiný' ? (!a.subject || a.subject === 'Jiný') : (a.subject === selectedGradebookSubject);
+      return isCorrectSubject && s.grade !== undefined && s.grade !== null;
+    });
+    const subjectSum = selectedSubjectGradedSubmissions.reduce((sum, s) => sum + (s.grade || 0), 0);
+    const subjectAverage = selectedSubjectGradedSubmissions.length > 0 ? (subjectSum / selectedSubjectGradedSubmissions.length) : null;
+
+    // Calculate subject averages for display in the sidebar
+    const subjectAverages = predefinedSubjects.reduce((acc, subj) => {
+      const graded = studentSubmissions.filter(s => {
+        const a = store.assignments.find(as => as.id === s.assignmentId);
+        if (!a) return false;
+        const isCorrectSubject = subj === 'Jiný' ? (!a.subject || a.subject === 'Jiný') : (a.subject === subj);
+        return isCorrectSubject && s.grade !== undefined && s.grade !== null;
+      });
+      const sum = graded.reduce((sumVal, s) => sumVal + (s.grade || 0), 0);
+      acc[subj] = graded.length > 0 ? (sum / graded.length) : null;
+      return acc;
+    }, {} as Record<string, number | null>);
+
+    // Overall performance description and emoji
+    let overallEmoji = '✨';
+    let overallText = 'Zatím bez známek';
+    if (overallAverage !== null) {
+      if (overallAverage <= 1.5) { overallEmoji = '🤩'; overallText = 'Výborný pokrok!'; }
+      else if (overallAverage <= 2.5) { overallEmoji = '😊'; overallText = 'Dobrá práce!'; }
+      else if (overallAverage <= 3.5) { overallEmoji = '😐'; overallText = 'Jde to, ale přidej.'; }
+      else if (overallAverage <= 4.5) { overallEmoji = '😟'; overallText = 'Měl bys zabrat.'; }
+      else { overallEmoji = '😢'; overallText = 'Potřebuješ pomoc.'; }
+    }
+
+    // Subject performance description and emoji
+    let subjectEmoji = '📚';
+    let subjectText = 'Zatím bez známek';
+    if (subjectAverage !== null) {
+      if (subjectAverage <= 1.5) { subjectEmoji = '🤩'; subjectText = 'Skvělý výsledek!'; }
+      else if (subjectAverage <= 2.5) { subjectEmoji = '😊'; subjectText = 'Pěkná práce!'; }
+      else if (subjectAverage <= 3.5) { subjectEmoji = '😐'; subjectText = 'Dobré výsledky.'; }
+      else if (subjectAverage <= 4.5) { subjectEmoji = '😟'; subjectText = 'Zkus to vylepšit.'; }
+      else { subjectEmoji = '😢'; subjectText = 'Je potřeba procvičovat.'; }
+    }
+
+    const formatDateSimple = (dateStr?: string) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('cs-CZ', { 
+        day: 'numeric', 
+        month: 'numeric', 
+        year: 'numeric' 
+      });
+    };
+
+    const isTeacherOrAdmin = store.currentUser?.role === 'teacher' || store.currentUser?.role === 'admin';
+
+    return (
+      <Dialog open={selectedGradebookStudent !== null} onOpenChange={(open) => { if (!open) setSelectedGradebookStudent(null); }}>
+        <DialogContent className="max-w-4xl bg-white rounded-3xl border-none shadow-2xl overflow-hidden p-0 max-h-[90vh] flex flex-col">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-700 text-white p-6 md:p-8 shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3.5 rounded-2xl">
+                <GraduationCap className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-200">Žákovská Knížka</span>
+                <h2 className="text-2xl md:text-3xl font-headline font-black tracking-tight">{student.name}</h2>
+                <p className="text-sm text-indigo-100 font-medium">Třída: <span className="font-bold">{className}</span> · Login: <span className="font-mono bg-white/10 px-1.5 py-0.5 rounded text-xs">{student.username}</span></p>
+              </div>
+            </div>
+
+            {/* Overall average */}
+            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3 border border-white/10 shrink-0 self-stretch sm:self-auto">
+              <div className="text-4xl">{overallEmoji}</div>
+              <div>
+                <span className="text-[10px] font-black uppercase text-indigo-200 tracking-wider block">Celkový Průměr</span>
+                <span className="text-2xl font-black text-white">{overallAverage !== null ? overallAverage.toFixed(2).replace('.', ',') : '--'}</span>
+                <span className="text-xs text-indigo-100 block font-medium">{overallText}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Layout Grid */}
+          <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+            {/* Sidebar with subjects */}
+            <div className="w-full md:w-64 bg-slate-50 border-r overflow-y-auto shrink-0 max-h-48 md:max-h-none flex md:flex-col border-b md:border-b-0">
+              <div className="p-4 border-b hidden md:block">
+                <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Výběr předmětu</span>
+              </div>
+              <div className="flex md:flex-col gap-1 p-2 md:p-3 overflow-x-auto md:overflow-x-visible w-full">
+                {predefinedSubjects.map(subj => {
+                  const isActive = selectedGradebookSubject === subj;
+                  const avg = subjectAverages[subj];
+                  return (
+                    <button
+                      key={subj}
+                      type="button"
+                      onClick={() => setSelectedGradebookSubject(subj)}
+                      className={`flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-left text-sm font-semibold transition-all shrink-0 md:shrink ${
+                        isActive
+                          ? 'bg-primary text-white shadow-md font-bold'
+                          : 'bg-white md:bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 border md:border-transparent'
+                      }`}
+                    >
+                      <span className="truncate">{subj}</span>
+                      {avg !== null ? (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                          isActive 
+                            ? 'bg-white/20 text-white' 
+                            : 'bg-primary/10 text-primary'
+                        }`}>
+                          {avg.toFixed(1).replace('.', ',')}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-normal italic">--</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Subject content area */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col gap-6 bg-slate-50/20">
+              {/* Header inside right column */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Detail předmětu</span>
+                  <h3 className="text-2xl font-headline font-bold text-gray-800 flex items-center gap-2">
+                    <BookOpen className="w-6 h-6 text-primary" /> {selectedGradebookSubject}
+                  </h3>
+                </div>
+
+                {/* Teacher / Admin switch */}
+                {isTeacherOrAdmin && (
+                  <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setGradebookViewMode('child')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        gradebookViewMode === 'child' ? 'bg-white text-primary shadow-sm font-black' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      👶 Pohled žáka
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGradebookViewMode('teacher')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        gradebookViewMode === 'teacher' ? 'bg-white text-primary shadow-sm font-black' : 'text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      👩‍🏫 Pohled učitele
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Subject Summary Card */}
+              <div className={`p-5 rounded-2xl border transition-all ${
+                subjectAverage !== null 
+                  ? 'bg-gradient-to-br from-white to-slate-50 border-slate-200' 
+                  : 'bg-slate-50 border-dashed border-2 text-center py-8'
+              }`}>
+                {subjectAverage !== null ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <span className="text-5xl">{subjectEmoji}</span>
+                      <div>
+                        <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Průměrná známka</span>
+                        <h4 className="text-2xl font-black text-primary mt-0.5">
+                          {subjectAverage.toFixed(2).replace('.', ',')}
+                        </h4>
+                        <span className="text-xs text-muted-foreground font-semibold">{subjectText}</span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-black text-slate-700">{selectedSubjectGradedSubmissions.length}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Klasifikovaných testů</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <span className="text-4xl block">📖</span>
+                    <h4 className="font-bold text-slate-700 text-lg">Zatím neklasifikováno</h4>
+                    <p className="text-sm text-slate-400">V předmětu {selectedGradebookSubject} student zatím neobdržel žádné známky.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Individual Tests Grades List */}
+              <div className="space-y-3">
+                <span className="text-xs font-black uppercase text-slate-400 tracking-wider block">Přehled odevzdaných prací</span>
+                
+                {selectedSubjectAssignments.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 bg-white border border-dashed rounded-2xl">
+                    <p className="font-medium text-sm">V tomto předmětu nebyly zadané žádné testy.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedSubjectAssignments.map(a => {
+                      const sub = studentSubmissions.find(s => s.assignmentId === a.id);
+                      
+                      let earned = 0;
+                      if (sub?.questionScores) {
+                        Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                      }
+                      const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                      const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+
+                      return (
+                        <div 
+                          key={a.id}
+                          className="bg-white p-5 rounded-2xl border border-slate-150 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:shadow-md"
+                        >
+                          <div className="space-y-1">
+                            <p className="font-bold text-slate-800 text-lg">{a.title}</p>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
+                              {sub ? (
+                                <span>Odevzdáno: {formatDateSimple(sub.submittedAt)}</span>
+                              ) : (
+                                <span className="text-amber-600 font-semibold">⌛ Neodevzdáno (Uzávěrka: {formatDateSimple(a.dueDate)})</span>
+                              )}
+                              {sub && sub.feedback && (
+                                <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-bold">💬 Slovní hodnocení přiloženo</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-3 md:pt-0">
+                            {/* Rendering based on View Mode (Child vs Teacher) */}
+                            {gradebookViewMode === 'child' ? (
+                              <div className="flex items-center gap-3">
+                                {sub ? (
+                                  sub.grade ? (
+                                    (() => {
+                                      const emoji = sub.grade === 1 ? '🤩' : sub.grade === 2 ? '😊' : sub.grade === 3 ? '😐' : sub.grade === 4 ? '😟' : '😢';
+                                      return (
+                                        <Badge className="bg-primary hover:bg-primary text-white font-black text-sm px-3.5 py-1.5 rounded-full shadow-sm flex items-center gap-1.5">
+                                          Známka: {sub.grade} {emoji}
+                                        </Badge>
+                                      );
+                                    })()
+                                  ) : (
+                                    <Badge variant="outline" className="text-indigo-600 bg-indigo-50 border-indigo-200 font-bold px-3 py-1">
+                                      Odevzdáno (Neopraveno)
+                                    </Badge>
+                                  )
+                                ) : (
+                                  <Badge variant="secondary" className="text-slate-400 font-bold px-3 py-1 bg-slate-100">
+                                    Neodevzdáno
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              /* Teacher View Details */
+                              <div className="flex flex-wrap items-center gap-3">
+                                {sub ? (
+                                  <>
+                                    <div className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border font-mono">
+                                      Body: <span className="font-bold text-slate-800">{earned} / {totalMax} b.</span>
+                                    </div>
+                                    <div className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border font-mono">
+                                      Úspěšnost: <span className="font-bold text-slate-800">{pct} %</span>
+                                    </div>
+                                    <Badge variant={sub.grade ? "default" : "secondary"} className="font-black text-xs px-2.5 py-1">
+                                      {sub.grade ? `Známka: ${sub.grade}` : 'Neohodnoceno'}
+                                    </Badge>
+
+                                    {/* Action link to view/grade submission */}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-xl text-xs font-bold gap-1 px-3 text-indigo-700 bg-indigo-50 border-indigo-150 hover:bg-indigo-100"
+                                      onClick={() => {
+                                        // Open detailed view
+                                        setEvalScores(sub.questionScores ? { ...sub.questionScores as Record<string, number> } : {});
+                                        setEvalGrade(sub.grade);
+                                        setEvalFeedback(sub.feedback || '');
+                                        setIsGradeManuallySet(!!sub.grade);
+                                        setViewingSubmission(sub.id);
+                                        
+                                        // Set corresponding navigation
+                                        setSelectedClassId(student.classId!);
+                                        setActiveTab('submissions');
+                                        if (store.currentUser?.role === 'admin') {
+                                          setAdminViewingAssignmentId(a.id);
+                                        }
+                                        
+                                        // Close gradebook modal
+                                        setSelectedGradebookStudent(null);
+                                      }}
+                                    >
+                                      Zobrazit práci →
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Badge variant="secondary" className="text-slate-400 font-bold px-3 py-1 bg-slate-100">
+                                    Neodevzdáno
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer containing overall stats/notes */}
+          <DialogFooter className="bg-slate-50 p-4 border-t shrink-0 flex items-center justify-between gap-4">
+            <p className="text-[11px] text-slate-400 font-medium leading-normal">Klasifikace a známkování odpovídá standardním testům v platformě iTest Cloud.</p>
+            <Button variant="outline" className="rounded-full font-bold px-4 h-9 text-xs" onClick={() => setSelectedGradebookStudent(null)}>
+              Zavřít
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   if (!store.isLoaded) {
     return (
@@ -1899,6 +2270,7 @@ export default function ITestApp() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          {renderGradebookDialog()}
         </main>
       </div>
     );
@@ -3207,6 +3579,7 @@ export default function ITestApp() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          {renderGradebookDialog()}
         </main>
       </div>
     );
@@ -3831,7 +4204,27 @@ export default function ITestApp() {
               </div>
             </div>
           ) : (
-            <div className="space-y-10">
+            <div className="space-y-10 animate-fade-in">
+              {/* Moje Žákovská knížka premium card */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-150 shadow-sm">
+                <div>
+                  <h3 className="text-xl font-headline font-bold text-primary flex items-center gap-2">
+                    📖 Moje Žákovská knížka
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">Podívej se na své známky, průměry a hodnocení ze všech testů.</p>
+                </div>
+                <Button 
+                  className="w-full md:w-auto rounded-xl px-6 h-12 text-sm font-headline font-bold shadow-md bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setSelectedGradebookStudent(currentUser);
+                    setSelectedGradebookSubject('Matematika');
+                    setGradebookViewMode('child');
+                  }}
+                >
+                  <BookOpen className="w-4 h-4" /> Zobrazit známky
+                </Button>
+              </div>
+
               {/* Sekce 1: Předměty */}
               <div className="space-y-6">
                 <h2 className="text-3xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-3">
@@ -3911,6 +4304,7 @@ export default function ITestApp() {
               </div>
             </div>
           )}
+          {renderGradebookDialog()}
         </main>
       </div>
     );
