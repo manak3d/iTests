@@ -2374,8 +2374,8 @@ export default function ITestApp() {
                                 <select value={copyTargetClassId} onChange={e => { setCopyTargetClassId(e.target.value); setCopySelectedStudentIds([]); }}
                                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm">
                                   <option value="">— Vyberte třídu —</option>
-                                  {store.classes.filter(c => c.id !== a.classId).map(c => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  {store.classes.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}{c.id === a.classId ? ' (stejná třída — nový ročník)' : ''}</option>
                                   ))}
                                 </select>
                               </div>
@@ -2435,7 +2435,29 @@ export default function ITestApp() {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-xs text-blue-500/70">Kopie testu umožňuje nastavit jiný časový limit pro každou třídu zvlášť.</p>
+                            <div className="space-y-2">
+                              <p className="text-xs text-blue-500/70">Kopie testu umožňuje nastavit jiný časový limit pro každou třídu zvlášť. Lze použít i pro stejnou třídu — např. příští rok.</p>
+                              <Button
+                                variant="outline" size="sm"
+                                className="w-full h-9 text-xs font-bold text-gray-600 border-gray-200 hover:bg-gray-50"
+                                onClick={() => {
+                                  store.addAssignment({
+                                    title: `${a.title} (kopie)`,
+                                    description: a.description,
+                                    classId: a.classId,
+                                    teacherId: a.teacherId,
+                                    subject: a.subject || 'Jiný',
+                                    questions: a.questions,
+                                    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                                    fileUri: a.fileUri,
+                                    studentIds: [],
+                                    isDraft: true,
+                                  });
+                                }}
+                              >
+                                📋 Duplikovat jako koncept (stejná třída)
+                              </Button>
+                            </div>
                           )}
                         </div>
 
