@@ -16,15 +16,17 @@ export interface Class {
   studentIds: string[];
 }
 
-export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'multiple_selection' | 'true_false' | 'drawing';
+export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'multiple_selection' | 'true_false' | 'drawing' | 'graph';
 
 export interface Question {
   id: string;
   type: QuestionType;
   text: string;
   options?: string[];
-  correctAnswer?: string | number | boolean | number[]; // number[] pro multiple_selection
+  correctAnswer?: any; // mixed type for graph and other questions
   points?: number; // Body za otázku
+  graphType?: 'pie' | 'bar' | 'linear' | 'inverse';
+  graphData?: any;
 }
 
 export interface Assignment {

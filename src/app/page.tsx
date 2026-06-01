@@ -11,6 +11,7 @@ import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, 
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
+import { GraphQuestionStudent, GraphQuestionEvaluation } from '@/components/itest/GraphQuestion';
 import { Assignment, User } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -238,6 +239,10 @@ export default function ITestApp() {
               ansText = answer !== undefined && answer !== null && answer !== ''
                 ? (answer ? '✓ Ano' : '✗ Ne')
                 : 'Neodpovězeno';
+            } else if (q.type === 'graph') {
+              ansText = answer !== undefined && answer !== null && answer !== ''
+                ? (Array.isArray(answer) ? JSON.stringify(answer) : String(answer))
+                : 'Neodpovězeno';
             } else if (answer !== undefined && answer !== null && answer !== '') {
               ansText = String(answer);
             }
@@ -248,7 +253,8 @@ export default function ITestApp() {
                                q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                q.type === 'multiple_selection' ? 'Více výběrů' : 
                                q.type === 'true_false' ? 'Ano / Ne' : 
-                               q.type === 'drawing' ? 'Kresba' : q.type;
+                               q.type === 'drawing' ? 'Kresba' : 
+                               q.type === 'graph' ? 'Graf' : q.type;
                                
             const qLines = doc.splitTextToSize(`${idx + 1}. ${q.text} [${qTypeLabel}]`, 122); // Necháme místo pro body pill
             const aLines = q.type !== 'drawing' ? doc.splitTextToSize(`Odpověď: ${ansText}`, 168) : [];
@@ -1873,10 +1879,11 @@ export default function ITestApp() {
                                                        q.type === 'multiple_choice' ? 'Výběr z možností' :
                                                        q.type === 'multiple_selection' ? 'Více výběrů' :
                                                        q.type === 'true_false' ? 'Ano / Ne' :
-                                                       q.type === 'drawing' ? 'Kresba' : q.type}
+                                                       q.type === 'drawing' ? 'Kresba' : 
+                                                       q.type === 'graph' ? 'Graf' : q.type}
                                                     </Badge>
                                                   </div>
-                                                  {q.type !== 'drawing' && (
+                                                  {q.type !== 'drawing' && q.type !== 'graph' && (
                                                     <div className="mt-2">
                                                       <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                                       {answer === undefined || answer === null || answer === '' ? (
@@ -1894,6 +1901,16 @@ export default function ITestApp() {
                                                       ) : (
                                                         <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
                                                       )}
+                                                    </div>
+                                                  )}
+                                                  {q.type === 'graph' && (
+                                                    <div className="mt-2 w-full">
+                                                      <GraphQuestionEvaluation
+                                                        question={q}
+                                                        studentAnswer={answer}
+                                                        score={evalScores[q.id]}
+                                                        maxPoints={q.points || 1}
+                                                      />
                                                     </div>
                                                   )}
                                                   {drawing && (
@@ -2934,7 +2951,8 @@ export default function ITestApp() {
                                      q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                      q.type === 'multiple_selection' ? 'Více výběrů' : 
                                      q.type === 'true_false' ? 'Ano / Ne' : 
-                                     q.type === 'drawing' ? 'Kresba' : q.type}
+                                     q.type === 'drawing' ? 'Kresba' : 
+                                     q.type === 'graph' ? 'Graf' : q.type}
                                   </Badge>
                                 </div>
                               ))}
@@ -3131,11 +3149,12 @@ export default function ITestApp() {
                                               q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                               q.type === 'multiple_selection' ? 'Více výběrů' : 
                                               q.type === 'true_false' ? 'Ano / Ne' : 
-                                              q.type === 'drawing' ? 'Kresba' : q.type}
+                                              q.type === 'drawing' ? 'Kresba' : 
+                                              q.type === 'graph' ? 'Graf' : q.type}
                                            </Badge>
                                         </div>
                                         
-                                        {q.type !== 'drawing' && (
+                                        {q.type !== 'drawing' && q.type !== 'graph' && (
                                           <div className="mt-2">
                                             <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                             {answer === undefined || answer === null || answer === '' ? (
@@ -3153,6 +3172,17 @@ export default function ITestApp() {
                                             ) : (
                                               <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
                                             )}
+                                          </div>
+                                        )}
+
+                                        {q.type === 'graph' && (
+                                          <div className="mt-2 w-full">
+                                            <GraphQuestionEvaluation
+                                              question={q}
+                                              studentAnswer={answer}
+                                              score={evalScores[q.id]}
+                                              maxPoints={q.points || 1}
+                                            />
                                           </div>
                                         )}
 
@@ -4013,7 +4043,7 @@ export default function ITestApp() {
                                       </div>
 
                                       {/* Odpověď */}
-                                      {q.type !== 'drawing' && (
+                                      {q.type !== 'drawing' && q.type !== 'graph' && (
                                         <div className="bg-white/80 p-3.5 rounded-xl border border-gray-100 space-y-1">
                                           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moje odpověď:</span>
                                           <div>
@@ -4039,6 +4069,18 @@ export default function ITestApp() {
                                               </span>
                                             )}
                                           </div>
+                                        </div>
+                                      )}
+
+                                      {/* Grafické vyhodnocení pro typ graph */}
+                                      {q.type === 'graph' && (
+                                        <div className="mt-2">
+                                          <GraphQuestionEvaluation
+                                            question={q}
+                                            studentAnswer={answer}
+                                            score={score}
+                                            maxPoints={maxPoints}
+                                          />
                                         </div>
                                       )}
 
@@ -4224,8 +4266,18 @@ export default function ITestApp() {
                                     />
                                   )}
 
-                                  {/* Toggle: Dokreslit perem (pro všechny typy kromě drawing) */}
-                                  {q.type !== 'drawing' && !hasEnded && (
+                                  {/* Grafická otázka student solver */}
+                                  {q.type === 'graph' && (
+                                    <GraphQuestionStudent
+                                      question={q}
+                                      disabled={hasEnded}
+                                      value={studentAnswers[q.id]}
+                                      onChange={(val) => setStudentAnswers(prev => ({ ...prev, [q.id]: val }))}
+                                    />
+                                  )}
+
+                                  {/* Toggle: Dokreslit perem (pro všechny typy kromě drawing a graph) */}
+                                  {q.type !== 'drawing' && q.type !== 'graph' && !hasEnded && (
                                     <div className="pt-1">
                                       <button
                                         type="button"

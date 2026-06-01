@@ -3,11 +3,13 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 // Question Sub-Schema
 export interface IQuestion {
   id: string; // Vlastní ID uvnitř testu
-  type: string; // 'short_answer' | 'long_answer' | 'multiple_choice' | 'true_false' | 'drawing'
+  type: string; // 'short_answer' | 'long_answer' | 'multiple_choice' | 'true_false' | 'drawing' | 'graph'
   text: string;
   options?: string[];
   correctAnswer?: mongoose.Schema.Types.Mixed;
   points?: number;
+  graphType?: string; // 'pie' | 'bar' | 'linear' | 'inverse'
+  graphData?: any;
 }
 
 const QuestionSchema = new Schema({
@@ -16,7 +18,9 @@ const QuestionSchema = new Schema({
   text: { type: String, required: true },
   options: { type: [String] },
   correctAnswer: { type: Schema.Types.Mixed },
-  points: { type: Number, default: 1 }
+  points: { type: Number, default: 1 },
+  graphType: { type: String },
+  graphData: { type: Schema.Types.Mixed }
 }, { _id: false }); // Vypnutí _id pro pod-dokumenty, protože používáme vlastní id z Firebase pole
 
 export interface IAssignment extends Document<string> {

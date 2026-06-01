@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera } from 'lucide-react';
+import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera, BarChart4 } from 'lucide-react';
 import { Question, QuestionType, Assignment, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { GraphQuestionCreator } from '@/components/itest/GraphQuestion';
 
 import { Class } from '@/lib/types';
 
@@ -91,6 +92,17 @@ export function AssignmentCreator({
       text: '',
       points: 1,
       options: (type === 'multiple_choice' || type === 'multiple_selection') ? ['', '', '', ''] : undefined,
+      ...(type === 'graph' ? {
+        graphType: 'pie',
+        graphData: {
+          categories: [
+            { label: 'Kategorie A', color: '#3B82F6' },
+            { label: 'Kategorie B', color: '#10B981' },
+            { label: 'Kategorie C', color: '#EF4444' },
+          ]
+        },
+        correctAnswer: [40, 30, 30]
+      } : {})
     };
     setQuestions([...questions, newQuestion]);
   };
@@ -486,12 +498,13 @@ export function AssignmentCreator({
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className="bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded">
-                      {q.type === 'short_answer' ? 'Krátká odp.' : 
-                       q.type === 'long_answer' ? 'Dlouhá odp.' : 
-                       q.type === 'multiple_choice' ? 'Výběr (A-D)' : 
-                       q.type === 'multiple_selection' ? 'Více výběrů' : 
-                       q.type === 'true_false' ? 'Ano / Ne' : 
-                       q.type === 'drawing' ? 'Kresba' : q.type}
+                       {q.type === 'short_answer' ? 'Krátká odp.' : 
+                        q.type === 'long_answer' ? 'Dlouhá odp.' : 
+                        q.type === 'multiple_choice' ? 'Výběr (A-D)' : 
+                        q.type === 'multiple_selection' ? 'Více výběrů' : 
+                        q.type === 'true_false' ? 'Ano / Ne' : 
+                        q.type === 'drawing' ? 'Kresba' : 
+                        q.type === 'graph' ? 'Graf' : q.type}
                     </span>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-gray-50 border px-2 py-1 rounded-md">
                       <span className="font-semibold">Body:</span>
@@ -601,6 +614,13 @@ export function AssignmentCreator({
                     )}
                   </div>
                 )}
+
+                {q.type === 'graph' && (
+                  <GraphQuestionCreator
+                    question={q}
+                    onChange={(updates) => updateQuestion(q.id, updates)}
+                  />
+                )}
               </CardContent>
             </Card>
           ))}
@@ -624,6 +644,9 @@ export function AssignmentCreator({
           </Button>
           <Button variant="secondary" size="sm" className="rounded-full bg-accent/10 text-accent hover:bg-accent/20" onClick={() => addQuestion('drawing')}>
             <PenTool className="w-4 h-4 mr-2" /> Kresba
+          </Button>
+          <Button variant="secondary" size="sm" className="rounded-full bg-primary/10 text-primary hover:bg-primary/20" onClick={() => addQuestion('graph')}>
+            <BarChart4 className="w-4 h-4 mr-2" /> Grafická otázka
           </Button>
         </div>
       </div>
