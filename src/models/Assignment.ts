@@ -3,7 +3,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 // Question Sub-Schema
 export interface IQuestion {
   id: string; // Vlastní ID uvnitř testu
-  type: string; // 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'true_false' | 'drawing' | 'graph'
+  type: string; // 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'number_line' | 'true_false' | 'drawing' | 'graph'
   text: string;
   options?: string[];
   correctAnswer?: mongoose.Schema.Types.Mixed;

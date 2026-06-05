@@ -1566,3 +1566,536 @@ export function AxisQuestionEvaluation({
     </div>
   );
 }
+
+// ==========================================
+// 4. NUMBER LINE (ČÍSELNÁ OSA) HELPERS
+// ==========================================
+
+function getX(v: number, min: number, max: number, width = 600): number {
+  const paddingLeft = 40;
+  const paddingRight = 40;
+  const range = max - min;
+  if (range <= 0) return paddingLeft;
+  return paddingLeft + ((v - min) / range) * (width - paddingLeft - paddingRight);
+}
+
+function getClosestTick(svgX: number, min: number, max: number, step: number, width = 600): number {
+  const paddingLeft = 40;
+  const paddingRight = 40;
+  const usableWidth = width - paddingLeft - paddingRight;
+  
+  // Convert coordinate to value space
+  const pct = (svgX - paddingLeft) / usableWidth;
+  const rawVal = min + pct * (max - min);
+  
+  // Find nearest tick index
+  const index = Math.round((rawVal - min) / step);
+  const clampedIndex = Math.max(0, Math.min(Math.round((max - min) / step), index));
+  return min + clampedIndex * step;
+}
+
+function formatValue(v: number): string {
+  return parseFloat(v.toFixed(2)).toString();
+}
+
+// ==========================================
+// 5. NUMBER LINE (ČÍSELNÁ OSA) COMPONENTS
+// ==========================================
+
+export function NumberLineQuestionCreator({
+  question,
+  onChange
+}: {
+  question: Question;
+  onChange: (updates: Partial<Question>) => void;
+}) {
+  const graphData = question.graphData || { min: -10, max: 10, step: 1, labelPeriod: 2 };
+  const correctPoints = Array.isArray(question.correctAnswer) ? question.correctAnswer : [];
+  
+  const min = Number(graphData.min ?? -10);
+  const max = Number(graphData.max ?? 10);
+  const step = Number(graphData.step ?? 1);
+  const labelPeriod = Number(graphData.labelPeriod ?? 2);
+
+  const [hoverValue, setHoverValue] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  // Generate tick marks
+  const ticks: number[] = [];
+  const range = max - min;
+  if (range > 0 && step > 0) {
+    const ticksCount = Math.min(200, Math.round(range / step));
+    for (let i = 0; i <= ticksCount; i++) {
+      ticks.push(min + i * step);
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current || range <= 0 || step <= 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) / rect.width) * 600;
+    
+    const closest = getClosestTick(px, min, max, step, 600);
+    setHoverValue(closest);
+  };
+
+  const handleMouseLeave = () => {
+    setHoverValue(null);
+  };
+
+  const handleGridClick = () => {
+    if (hoverValue === null) return;
+    
+    // Toggle correct point
+    const exists = correctPoints.some(v => Math.abs(v - hoverValue) < 0.0001);
+    let updated: number[];
+    if (exists) {
+      updated = correctPoints.filter(v => Math.abs(v - hoverValue) >= 0.0001);
+    } else {
+      updated = [...correctPoints, hoverValue];
+    }
+    onChange({ correctAnswer: updated });
+  };
+
+  const updateParam = (key: string, value: number) => {
+    const newData = { ...graphData, [key]: value };
+    const newMin = Number(newData.min ?? -10);
+    const newMax = Number(newData.max ?? 10);
+    const newStep = Number(newData.step ?? 1);
+    
+    // Filter existing correct answers that don't match the new ticks
+    const alignedPoints = correctPoints.filter(pt => {
+      if (pt < newMin || pt > newMax) return false;
+      const stepIndex = (pt - newMin) / newStep;
+      const roundedIndex = Math.round(stepIndex);
+      return Math.abs(stepIndex - roundedIndex) < 0.001;
+    });
+
+    onChange({
+      graphData: newData,
+      correctAnswer: alignedPoints
+    });
+  };
+
+  return (
+    <div className="space-y-6 mt-4 p-5 bg-white border border-gray-100 rounded-2xl shadow-sm">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-gray-500 uppercase">Minimum (osa od)</label>
+          <Input
+            type="number"
+            value={min}
+            onChange={(e) => updateParam('min', parseFloat(e.target.value) || 0)}
+            className="font-bold"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-gray-500 uppercase">Maximum (osa do)</label>
+          <Input
+            type="number"
+            value={max}
+            onChange={(e) => updateParam('max', parseFloat(e.target.value) || 0)}
+            className="font-bold"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-gray-500 uppercase">Krok (dělení)</label>
+          <Input
+            type="number"
+            min="0.1"
+            step="0.1"
+            value={step}
+            onChange={(e) => updateParam('step', Math.max(0.1, parseFloat(e.target.value) || 1))}
+            className="font-bold"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-bold text-gray-500 uppercase">Perioda popisků</label>
+          <Input
+            type="number"
+            min="1"
+            step="1"
+            value={labelPeriod}
+            onChange={(e) => updateParam('labelPeriod', Math.max(1, parseInt(e.target.value) || 1))}
+            className="font-bold"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-4 justify-center">
+        <div className="relative w-full max-w-2xl bg-slate-50/50 p-4 rounded-xl border border-slate-100">
+          <svg
+            ref={svgRef}
+            width="100%"
+            height="100"
+            viewBox="0 0 600 100"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onClick={handleGridClick}
+            className="cursor-crosshair overflow-visible"
+          >
+            {/* Main Axis Line */}
+            <line x1="20" y1="40" x2="570" y2="40" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" />
+            <polygon points="582,40 570,35 570,45" fill="#374151" />
+
+            {/* Render Ticks and Labels */}
+            {ticks.map((val, i) => {
+              const x = getX(val, min, max);
+              const showLabel = i % labelPeriod === 0;
+              return (
+                <g key={i}>
+                  <line x1={x} y1="32" x2={x} y2="48" stroke="#374151" strokeWidth="1.5" />
+                  {showLabel && (
+                    <text x={x} y="72" fontSize="11" fill="#4B5563" fontWeight="bold" textAnchor="middle">
+                      {formatValue(val)}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+
+            {/* Hover Indicator */}
+            {hoverValue !== null && (
+              <circle
+                cx={getX(hoverValue, min, max)}
+                cy="40"
+                r="6"
+                fill="#10B981"
+                opacity="0.5"
+              />
+            )}
+
+            {/* Selected Correct Points */}
+            {correctPoints.map((val, idx) => {
+              const x = getX(val, min, max);
+              return (
+                <g key={idx}>
+                  <circle
+                    cx={x}
+                    cy="40"
+                    r="8"
+                    fill="#10B981"
+                    stroke="#FFFFFF"
+                    strokeWidth="2.5"
+                    className="shadow transition-all hover:scale-125 cursor-pointer"
+                  />
+                  <text x={x} y="20" fontSize="10" fontWeight="black" fill="#047857" textAnchor="middle">
+                    {formatValue(val)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+
+        <div className="w-full max-w-2xl bg-slate-50 p-4 rounded-xl border space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-xs font-bold text-gray-500 uppercase">Správné body ({correctPoints.length}):</span>
+            {correctPoints.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => onChange({ correctAnswer: [] })} className="h-7 text-xs text-destructive hover:bg-destructive/5 font-bold">
+                Smazat vše
+              </Button>
+            )}
+          </div>
+          
+          {correctPoints.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+              {[...correctPoints].sort((a, b) => a - b).map((val, i) => (
+                <Badge key={i} className="bg-green-50 text-green-700 hover:bg-green-100 border-green-200 font-bold text-[10px]">
+                  {formatValue(val)}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-xs italic text-gray-400 block py-1">Klikněte na osu pro označení správných bodů.</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function NumberLineQuestionStudent({
+  question,
+  value,
+  onChange,
+  disabled = false
+}: {
+  question: Question;
+  value: any;
+  onChange: (val: any) => void;
+  disabled?: boolean;
+}) {
+  const graphData = question.graphData || { min: -10, max: 10, step: 1, labelPeriod: 2 };
+  const studentPoints = Array.isArray(value) ? value : [];
+  
+  const min = Number(graphData.min ?? -10);
+  const max = Number(graphData.max ?? 10);
+  const step = Number(graphData.step ?? 1);
+  const labelPeriod = Number(graphData.labelPeriod ?? 2);
+
+  const [hoverValue, setHoverValue] = useState<number | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  // Initialize value if empty
+  useEffect(() => {
+    if (value === undefined || value === null) {
+      onChange([]);
+    }
+  }, [value, onChange]);
+
+  // Generate tick marks
+  const ticks: number[] = [];
+  const range = max - min;
+  if (range > 0 && step > 0) {
+    const ticksCount = Math.min(200, Math.round(range / step));
+    for (let i = 0; i <= ticksCount; i++) {
+      ticks.push(min + i * step);
+    }
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (disabled || !svgRef.current || range <= 0 || step <= 0) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const px = ((e.clientX - rect.left) / rect.width) * 600;
+    
+    const closest = getClosestTick(px, min, max, step, 600);
+    setHoverValue(closest);
+  };
+
+  const handleMouseLeave = () => {
+    setHoverValue(null);
+  };
+
+  const handleGridClick = () => {
+    if (disabled || hoverValue === null) return;
+    
+    // Toggle student point
+    const exists = studentPoints.some(v => Math.abs(v - hoverValue) < 0.0001);
+    let updated: number[];
+    if (exists) {
+      updated = studentPoints.filter(v => Math.abs(v - hoverValue) >= 0.0001);
+    } else {
+      updated = [...studentPoints, hoverValue];
+    }
+    onChange(updated);
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-4 p-4 bg-white rounded-2xl border justify-center">
+      <div className="relative w-full max-w-2xl bg-slate-50/30 p-4 rounded-xl border border-slate-100">
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100"
+          viewBox="0 0 600 100"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onClick={handleGridClick}
+          className={`overflow-visible ${disabled ? 'cursor-not-allowed' : 'cursor-crosshair'}`}
+        >
+          {/* Main Axis Line */}
+          <line x1="20" y1="40" x2="570" y2="40" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" />
+          <polygon points="582,40 570,35 570,45" fill="#374151" />
+
+          {/* Render Ticks and Labels */}
+          {ticks.map((val, i) => {
+            const x = getX(val, min, max);
+            const showLabel = i % labelPeriod === 0;
+            return (
+              <g key={i}>
+                <line x1={x} y1="32" x2={x} y2="48" stroke="#374151" strokeWidth="1.5" />
+                {showLabel && (
+                  <text x={x} y="72" fontSize="11" fill="#4B5563" fontWeight="bold" textAnchor="middle">
+                    {formatValue(val)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Hover Indicator */}
+          {!disabled && hoverValue !== null && (
+            <circle
+              cx={getX(hoverValue, min, max)}
+              cy="40"
+              r="6"
+              fill="#EF4444"
+              opacity="0.5"
+            />
+          )}
+
+          {/* Student Selected Points */}
+          {studentPoints.map((val, idx) => {
+            const x = getX(val, min, max);
+            return (
+              <g key={idx}>
+                <circle
+                  cx={x}
+                  cy="40"
+                  r="8"
+                  fill="#EF4444"
+                  stroke="#FFFFFF"
+                  strokeWidth="2.5"
+                  className="shadow transition-all hover:scale-125"
+                />
+                <text x={x} y="20" fontSize="10" fontWeight="black" fill="#B91C1C" textAnchor="middle">
+                  {formatValue(val)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Info panel */}
+      <div className="w-full max-w-2xl bg-slate-50 p-4 rounded-xl border space-y-2">
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold text-gray-500 uppercase">Zaznamenané body ({studentPoints.length}):</span>
+          {!disabled && studentPoints.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onChange([])}
+              className="h-7 text-xs font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/5 rounded-xl border-dashed"
+            >
+              <RefreshCw className="w-3.5 h-3.5 mr-1" /> Resetovat body
+            </Button>
+          )}
+        </div>
+        
+        {studentPoints.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+            {[...studentPoints].sort((a, b) => a - b).map((val, i) => (
+              <Badge key={i} className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200 font-bold text-[10px]">
+                {formatValue(val)}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <span className="text-xs italic text-gray-400 block">Zatím nebyly zvoleny žádné body.</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function NumberLineQuestionEvaluation({
+  question,
+  studentAnswer,
+  score,
+  maxPoints = 1
+}: {
+  question: Question;
+  studentAnswer: any;
+  score?: number;
+  maxPoints?: number;
+}) {
+  const graphData = question.graphData || { min: -10, max: 10, step: 1, labelPeriod: 2 };
+  const studentPoints = Array.isArray(studentAnswer) ? studentAnswer : [];
+  const correctPoints = Array.isArray(question.correctAnswer) ? question.correctAnswer : [];
+
+  const min = Number(graphData.min ?? -10);
+  const max = Number(graphData.max ?? 10);
+  const step = Number(graphData.step ?? 1);
+  const labelPeriod = Number(graphData.labelPeriod ?? 2);
+
+  // Generate tick marks
+  const ticks: number[] = [];
+  const range = max - min;
+  if (range > 0 && step > 0) {
+    const ticksCount = Math.min(200, Math.round(range / step));
+    for (let i = 0; i <= ticksCount; i++) {
+      ticks.push(min + i * step);
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50/50 rounded-2xl border justify-center">
+      {/* Student answer view */}
+      <div className="flex flex-col items-center bg-white p-4 rounded-xl border space-y-2">
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Odpověď žáka</span>
+        <div className="relative w-full overflow-hidden">
+          <svg width="100%" height="90" viewBox="0 0 600 90" className="overflow-visible">
+            {/* Main Axis Line */}
+            <line x1="20" y1="40" x2="570" y2="40" stroke="#374151" strokeWidth="2" strokeLinecap="round" />
+            <polygon points="580,40 570,36 570,44" fill="#374151" />
+
+            {/* Render Ticks and Labels */}
+            {ticks.map((val, i) => {
+              const x = getX(val, min, max);
+              const showLabel = i % labelPeriod === 0;
+              return (
+                <g key={i}>
+                  <line x1={x} y1="34" x2={x} y2="46" stroke="#4B5563" strokeWidth="1.2" />
+                  {showLabel && (
+                    <text x={x} y="68" fontSize="10" fill="#6B7280" fontWeight="bold" textAnchor="middle">
+                      {formatValue(val)}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+
+            {/* Student Selected Points */}
+            {studentPoints.map((val, idx) => {
+              const x = getX(val, min, max);
+              return (
+                <g key={idx}>
+                  <circle cx={x} cy="40" r="7" fill="#EF4444" stroke="#FFFFFF" strokeWidth="2" className="shadow" />
+                  <text x={x} y="22" fontSize="9" fontWeight="black" fill="#B91C1C" textAnchor="middle">{formatValue(val)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <div className="text-center pt-1 text-[11px] font-semibold text-gray-500 max-h-12 overflow-y-auto w-full">
+          Zvolené body: {studentPoints.length > 0 ? [...studentPoints].sort((a, b) => a - b).map(formatValue).join(', ') : 'Žádné'}
+        </div>
+      </div>
+
+      {/* Correct answer view */}
+      <div className="flex flex-col items-center bg-white p-4 rounded-xl border space-y-2">
+        <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Správné řešení</span>
+        <div className="relative w-full overflow-hidden">
+          <svg width="100%" height="90" viewBox="0 0 600 90" className="overflow-visible">
+            {/* Main Axis Line */}
+            <line x1="20" y1="40" x2="570" y2="40" stroke="#374151" strokeWidth="2" strokeLinecap="round" />
+            <polygon points="580,40 570,36 570,44" fill="#374151" />
+
+            {/* Render Ticks and Labels */}
+            {ticks.map((val, i) => {
+              const x = getX(val, min, max);
+              const showLabel = i % labelPeriod === 0;
+              return (
+                <g key={i}>
+                  <line x1={x} y1="34" x2={x} y2="46" stroke="#4B5563" strokeWidth="1.2" />
+                  {showLabel && (
+                    <text x={x} y="68" fontSize="10" fill="#6B7280" fontWeight="bold" textAnchor="middle">
+                      {formatValue(val)}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+
+            {/* Correct Points */}
+            {correctPoints.map((val, idx) => {
+              const x = getX(val, min, max);
+              return (
+                <g key={idx}>
+                  <circle cx={x} cy="40" r="7" fill="#10B981" stroke="#FFFFFF" strokeWidth="2" className="shadow" />
+                  <text x={x} y="22" fontSize="9" fontWeight="black" fill="#047857" textAnchor="middle">{formatValue(val)}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+        <div className="text-center pt-1 text-[11px] font-bold text-green-700 max-h-12 overflow-y-auto w-full">
+          Očekávané body: {correctPoints.length > 0 ? [...correctPoints].sort((a, b) => a - b).map(formatValue).join(', ') : 'Žádné'}
+        </div>
+      </div>
+    </div>
+  );
+}
+

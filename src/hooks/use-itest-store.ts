@@ -359,6 +359,14 @@ export function useITestStore() {
               given.some(([gx, gy]) => gx === cx && gy === cy)
             );
           }
+        } else if (q.type === 'number_line') {
+          const correct = Array.isArray(q.correctAnswer) ? q.correctAnswer : [];
+          const given = Array.isArray(studentAnswer) ? studentAnswer : [];
+          if (correct.length === given.length) {
+            const sortedCorrect = [...correct].sort((a, b) => a - b);
+            const sortedGiven = [...given].sort((a, b) => a - b);
+            isCorrect = sortedCorrect.every((val, idx) => Math.abs(val - sortedGiven[idx]) < 0.0001);
+          }
         } else if (q.type === 'true_false') {
           isCorrect = studentAnswer === q.correctAnswer;
         } else if (q.type === 'graph') {

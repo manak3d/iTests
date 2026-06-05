@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera, BarChart4 } from 'lucide-react';
 import { Question, QuestionType, Assignment, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { GraphQuestionCreator, AxisQuestionCreator } from '@/components/itest/GraphQuestion';
+import { GraphQuestionCreator, AxisQuestionCreator, NumberLineQuestionCreator } from '@/components/itest/GraphQuestion';
 
 import { Class } from '@/lib/types';
 
@@ -104,6 +104,10 @@ export function AssignmentCreator({
         correctAnswer: [40, 30, 30]
       } : {}),
       ...(type === 'axis' ? {
+        correctAnswer: []
+      } : {}),
+      ...(type === 'number_line' ? {
+        graphData: { min: -10, max: 10, step: 1, labelPeriod: 2 },
         correctAnswer: []
       } : {})
     };
@@ -505,6 +509,7 @@ export function AssignmentCreator({
                         q.type === 'long_answer' ? 'Dlouhá odp.' : 
                         q.type === 'multiple_choice' ? 'Výběr (A-D)' : 
                         q.type === 'axis' ? 'Osa X/Y' : 
+                        q.type === 'number_line' ? 'Číselná osa' : 
                         q.type === 'true_false' ? 'Ano / Ne' : 
                         q.type === 'drawing' ? 'Kresba' : 
                         q.type === 'graph' ? 'Graf' : q.type}
@@ -620,6 +625,13 @@ export function AssignmentCreator({
                     onChange={(updates) => updateQuestion(q.id, updates)}
                   />
                 )}
+
+                {q.type === 'number_line' && (
+                  <NumberLineQuestionCreator
+                    question={q}
+                    onChange={(updates) => updateQuestion(q.id, updates)}
+                  />
+                )}
               </CardContent>
             </Card>
           ))}
@@ -637,6 +649,9 @@ export function AssignmentCreator({
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('axis')}>
             <BarChart4 className="w-4 h-4 mr-2" /> Osa X/Y
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('number_line')}>
+            <BarChart4 className="w-4 h-4 mr-2" /> Číselná osa
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('true_false')}>
             <Plus className="w-4 h-4 mr-2" /> Ano / Ne

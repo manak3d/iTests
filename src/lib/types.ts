@@ -16,7 +16,7 @@ export interface Class {
   studentIds: string[];
 }
 
-export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'true_false' | 'drawing' | 'graph';
+export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'number_line' | 'true_false' | 'drawing' | 'graph';
 
 export interface Question {
   id: string;

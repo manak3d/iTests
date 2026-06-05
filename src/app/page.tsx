@@ -11,7 +11,7 @@ import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, 
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
-import { GraphQuestionStudent, GraphQuestionEvaluation, AxisQuestionStudent, AxisQuestionEvaluation } from '@/components/itest/GraphQuestion';
+import { GraphQuestionStudent, GraphQuestionEvaluation, AxisQuestionStudent, AxisQuestionEvaluation, NumberLineQuestionStudent, NumberLineQuestionEvaluation } from '@/components/itest/GraphQuestion';
 import { Assignment, User } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -235,6 +235,10 @@ export default function ITestApp() {
               ansText = Array.isArray(answer) && answer.length > 0
                 ? answer.map(([x, y]) => `[${x}, ${y}]`).join(', ')
                 : 'Neodpovězeno';
+            } else if (q.type === 'number_line') {
+              ansText = Array.isArray(answer) && answer.length > 0
+                ? answer.map(val => parseFloat(Number(val).toFixed(2)).toString()).join(', ')
+                : 'Neodpovězeno';
             } else if (q.type === 'true_false') {
               ansText = answer !== undefined && answer !== null && answer !== ''
                 ? (answer ? '✓ Ano' : '✗ Ne')
@@ -252,7 +256,7 @@ export default function ITestApp() {
                                q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                q.type === 'axis' ? 'Osa X/Y' : 
-                               q.type === 'true_false' ? 'Ano / Ne' : 
+                               q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                q.type === 'drawing' ? 'Kresba' : 
                                q.type === 'graph' ? 'Graf' : q.type;
                                
@@ -1878,12 +1882,12 @@ export default function ITestApp() {
                                                        q.type === 'long_answer' ? 'Dlouhá odpověď' :
                                                        q.type === 'multiple_choice' ? 'Výběr z možností' :
                                                        q.type === 'axis' ? 'Osa X/Y' :
-                                                       q.type === 'true_false' ? 'Ano / Ne' :
+                                                       q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' :
                                                        q.type === 'drawing' ? 'Kresba' : 
                                                        q.type === 'graph' ? 'Graf' : q.type}
                                                     </Badge>
                                                   </div>
-                                                  {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && (
+                                                  {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && (
                                                     <div className="mt-2">
                                                       <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                                       {answer === undefined || answer === null || answer === '' ? (
@@ -1917,6 +1921,36 @@ export default function ITestApp() {
                                                        maxPoints={q.points || 1}
                                                      />
                                                    </div>
+                                                 )}
+
+
+                                                 {q.type === 'number_line' && (
+
+
+                                                   <div className="mt-2 w-full">
+
+
+                                                     <NumberLineQuestionEvaluation
+
+
+                                                       question={q}
+
+
+                                                       studentAnswer={answer}
+
+
+                                                       score={evalScores[q.id]}
+
+
+                                                       maxPoints={q.points || 1}
+
+
+                                                     />
+
+
+                                                   </div>
+
+
                                                  )}
                                                   {drawing && (
                                                     <div className="mt-3">
@@ -2955,7 +2989,7 @@ export default function ITestApp() {
                                      q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                      q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                      q.type === 'axis' ? 'Osa X/Y' : 
-                                     q.type === 'true_false' ? 'Ano / Ne' : 
+                                     q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                      q.type === 'drawing' ? 'Kresba' : 
                                      q.type === 'graph' ? 'Graf' : q.type}
                                   </Badge>
@@ -3153,13 +3187,13 @@ export default function ITestApp() {
                                               q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                               q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                               q.type === 'axis' ? 'Osa X/Y' : 
-                                              q.type === 'true_false' ? 'Ano / Ne' : 
+                                              q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                               q.type === 'drawing' ? 'Kresba' : 
                                               q.type === 'graph' ? 'Graf' : q.type}
                                            </Badge>
                                         </div>
                                         
-                                        {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && (
+                                        {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && (
                                           <div className="mt-2">
                                             <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                             {answer === undefined || answer === null || answer === '' ? (
@@ -3194,6 +3228,36 @@ export default function ITestApp() {
                                                        maxPoints={q.points || 1}
                                                      />
                                                    </div>
+                                                 )}
+
+
+                                                 {q.type === 'number_line' && (
+
+
+                                                   <div className="mt-2 w-full">
+
+
+                                                     <NumberLineQuestionEvaluation
+
+
+                                                       question={q}
+
+
+                                                       studentAnswer={answer}
+
+
+                                                       score={evalScores[q.id]}
+
+
+                                                       maxPoints={q.points || 1}
+
+
+                                                     />
+
+
+                                                   </div>
+
+
                                                  )}
 
                                         {drawing && (
@@ -4053,7 +4117,7 @@ export default function ITestApp() {
                                       </div>
 
                                       {/* Odpověď */}
-                                      {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && (
+                                      {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && (
                                         <div className="bg-white/80 p-3.5 rounded-xl border border-gray-100 space-y-1">
                                           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moje odpověď:</span>
                                           <div>
@@ -4092,6 +4156,16 @@ export default function ITestApp() {
                                        {q.type === 'axis' && (
                                          <div className="mt-2">
                                            <AxisQuestionEvaluation
+                                             question={q}
+                                             studentAnswer={answer}
+                                             score={score}
+                                             maxPoints={maxPoints}
+                                           />
+                                         </div>
+                                       )}
+                                       {q.type === 'number_line' && (
+                                         <div className="mt-2">
+                                           <NumberLineQuestionEvaluation
                                              question={q}
                                              studentAnswer={answer}
                                              score={score}
@@ -4159,7 +4233,7 @@ export default function ITestApp() {
                                        q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                        q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                        q.type === 'axis' ? 'Osa X/Y' : 
-                                       q.type === 'true_false' ? 'Ano / Ne' : 
+                                       q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                        q.type === 'drawing' ? 'Kresba' : q.type}
                                     </Badge>
                                   </div>
@@ -4208,6 +4282,15 @@ export default function ITestApp() {
                                    {/* Osa X/Y solver */}
                                    {q.type === 'axis' && (
                                      <AxisQuestionStudent
+                                       question={q}
+                                       disabled={hasEnded}
+                                       value={studentAnswers[q.id]}
+                                       onChange={(val) => setStudentAnswers(prev => ({ ...prev, [q.id]: val }))}
+                                     />
+                                   )}
+                                   {/* Číselná osa solver */}
+                                   {q.type === 'number_line' && (
+                                     <NumberLineQuestionStudent
                                        question={q}
                                        disabled={hasEnded}
                                        value={studentAnswers[q.id]}
