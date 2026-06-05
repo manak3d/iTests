@@ -15,7 +15,7 @@ export interface IQuestion {
 const QuestionSchema = new Schema({
   id: { type: String, required: true },
   type: { type: String, required: true },
-  text: { type: String, required: true },
+  text: { type: String, default: "" },
   options: { type: [String] },
   correctAnswer: { type: Schema.Types.Mixed },
   points: { type: Number, default: 1 },
