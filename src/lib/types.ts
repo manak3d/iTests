@@ -16,7 +16,7 @@ export interface Class {
   studentIds: string[];
 }
 
-export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'multiple_selection' | 'true_false' | 'drawing' | 'graph';
+export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'true_false' | 'drawing' | 'graph';
 
 export interface Question {
   id: string;
@@ -25,7 +25,7 @@ export interface Question {
   options?: string[];
   correctAnswer?: any; // mixed type for graph and other questions
   points?: number; // Body za otázku
-  graphType?: 'pie' | 'bar' | 'linear' | 'inverse';
+  graphType?: 'pie' | 'bar' | 'linear';
   graphData?: any;
 }
 

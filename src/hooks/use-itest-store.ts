@@ -351,10 +351,14 @@ export function useITestStore() {
         let isCorrect = false;
         if (q.type === 'multiple_choice') {
           isCorrect = studentAnswer === q.correctAnswer;
-        } else if (q.type === 'multiple_selection') {
-          const correct = Array.isArray(q.correctAnswer) ? [...(q.correctAnswer as number[])].sort((a,b)=>a-b) : [];
-          const given = Array.isArray(studentAnswer) ? [...studentAnswer].sort((a:number,b:number)=>a-b) : [];
-          isCorrect = JSON.stringify(correct) === JSON.stringify(given);
+        } else if (q.type === 'axis') {
+          const correct = Array.isArray(q.correctAnswer) ? q.correctAnswer : [];
+          const given = Array.isArray(studentAnswer) ? studentAnswer : [];
+          if (correct.length === given.length) {
+            isCorrect = correct.every(([cx, cy]) =>
+              given.some(([gx, gy]) => gx === cx && gy === cy)
+            );
+          }
         } else if (q.type === 'true_false') {
           isCorrect = studentAnswer === q.correctAnswer;
         } else if (q.type === 'graph') {
@@ -372,24 +376,13 @@ export function useITestStore() {
           } else if (gType === 'linear') {
             const given = Array.isArray(studentAnswer) ? studentAnswer : [];
             const targetA = q.graphData?.a ?? 1;
-            const targetB = q.graphData?.isDirect ? 0 : (q.graphData?.b ?? 0);
+            const targetB = q.graphData?.b ?? 0;
             
             // Student must place exactly 2 points to define the line
             if (given.length === 2) {
               isCorrect = given.every(([px, py]) => {
                 // Check if py = targetA * px + targetB
                 return Math.abs(py - (targetA * px + targetB)) < 0.01;
-              });
-            }
-          } else if (gType === 'inverse') {
-            const given = Array.isArray(studentAnswer) ? studentAnswer : [];
-            const targetK = q.graphData?.k ?? 6;
-            
-            // Student must place at least 2 points to define/confirm the hyperbola
-            if (given.length >= 2) {
-              isCorrect = given.every(([px, py]) => {
-                // Check if px * py = targetK
-                return px * py === targetK;
               });
             }
           }

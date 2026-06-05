@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera, BarChart4 } from 'lucide-react';
 import { Question, QuestionType, Assignment, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { GraphQuestionCreator } from '@/components/itest/GraphQuestion';
+import { GraphQuestionCreator, AxisQuestionCreator } from '@/components/itest/GraphQuestion';
 
 import { Class } from '@/lib/types';
 
@@ -91,7 +91,7 @@ export function AssignmentCreator({
       type,
       text: '',
       points: 1,
-      options: (type === 'multiple_choice' || type === 'multiple_selection') ? ['', '', '', ''] : undefined,
+      options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
       ...(type === 'graph' ? {
         graphType: 'pie',
         graphData: {
@@ -102,6 +102,9 @@ export function AssignmentCreator({
           ]
         },
         correctAnswer: [40, 30, 30]
+      } : {}),
+      ...(type === 'axis' ? {
+        correctAnswer: []
       } : {})
     };
     setQuestions([...questions, newQuestion]);
@@ -501,7 +504,7 @@ export function AssignmentCreator({
                        {q.type === 'short_answer' ? 'Krátká odp.' : 
                         q.type === 'long_answer' ? 'Dlouhá odp.' : 
                         q.type === 'multiple_choice' ? 'Výběr (A-D)' : 
-                        q.type === 'multiple_selection' ? 'Více výběrů' : 
+                        q.type === 'axis' ? 'Osa X/Y' : 
                         q.type === 'true_false' ? 'Ano / Ne' : 
                         q.type === 'drawing' ? 'Kresba' : 
                         q.type === 'graph' ? 'Graf' : q.type}
@@ -529,29 +532,18 @@ export function AssignmentCreator({
                   className="font-medium border-none shadow-none focus-visible:ring-0 text-lg px-0"
                 />
                 
-                {(q.type === 'multiple_choice' || q.type === 'multiple_selection') && (
+                {q.type === 'multiple_choice' && (
                   <div className="space-y-3 mt-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {q.options?.map((opt, i) => {
-                        const isCorrect = q.type === 'multiple_choice'
-                          ? q.correctAnswer === i
-                          : Array.isArray(q.correctAnswer) && (q.correctAnswer as number[]).includes(i);
+                        const isCorrect = q.correctAnswer === i;
                         return (
                           <div key={i} className="flex items-center gap-2">
                             <button
                               type="button"
                               title="Kliknutím označit jako správnou odpověď"
                               onClick={() => {
-                                if (q.type === 'multiple_choice') {
-                                  updateQuestion(q.id, { correctAnswer: isCorrect ? undefined : i });
-                                } else {
-                                  // multiple_selection – toggle
-                                  const prev: number[] = Array.isArray(q.correctAnswer) ? (q.correctAnswer as number[]) : [];
-                                  const next = isCorrect
-                                    ? prev.filter(v => v !== i)
-                                    : [...prev, i].sort((a, b) => a - b);
-                                  updateQuestion(q.id, { correctAnswer: next.length > 0 ? next : undefined });
-                                }
+                                updateQuestion(q.id, { correctAnswer: isCorrect ? undefined : i });
                               }}
                               className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all flex-shrink-0 ${
                                 isCorrect
@@ -621,6 +613,13 @@ export function AssignmentCreator({
                     onChange={(updates) => updateQuestion(q.id, updates)}
                   />
                 )}
+
+                {q.type === 'axis' && (
+                  <AxisQuestionCreator
+                    question={q}
+                    onChange={(updates) => updateQuestion(q.id, updates)}
+                  />
+                )}
               </CardContent>
             </Card>
           ))}
@@ -636,8 +635,8 @@ export function AssignmentCreator({
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('multiple_choice')}>
             <Plus className="w-4 h-4 mr-2" /> Výběr (A-D)
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('multiple_selection')}>
-            <Plus className="w-4 h-4 mr-2" /> Více výběrů (A-D)
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('axis')}>
+            <BarChart4 className="w-4 h-4 mr-2" /> Osa X/Y
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('true_false')}>
             <Plus className="w-4 h-4 mr-2" /> Ano / Ne

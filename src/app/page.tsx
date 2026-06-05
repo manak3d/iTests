@@ -11,7 +11,7 @@ import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, 
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
-import { GraphQuestionStudent, GraphQuestionEvaluation } from '@/components/itest/GraphQuestion';
+import { GraphQuestionStudent, GraphQuestionEvaluation, AxisQuestionStudent, AxisQuestionEvaluation } from '@/components/itest/GraphQuestion';
 import { Assignment, User } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -231,9 +231,9 @@ export default function ITestApp() {
               ansText = answer !== undefined && answer !== null && answer !== '' 
                 ? `${String.fromCharCode(65 + Number(answer))}. ${q.options?.[Number(answer)] || ''}` 
                 : 'Neodpovězeno';
-            } else if (q.type === 'multiple_selection') {
+            } else if (q.type === 'axis') {
               ansText = Array.isArray(answer) && answer.length > 0
-                ? answer.map((val: number) => `${String.fromCharCode(65 + val)}. ${q.options?.[val] || ''}`).join(', ')
+                ? answer.map(([x, y]) => `[${x}, ${y}]`).join(', ')
                 : 'Neodpovězeno';
             } else if (q.type === 'true_false') {
               ansText = answer !== undefined && answer !== null && answer !== ''
@@ -251,7 +251,7 @@ export default function ITestApp() {
             const qTypeLabel = q.type === 'short_answer' ? 'Krátká odpověď' : 
                                q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                q.type === 'multiple_choice' ? 'Výběr z možností' : 
-                               q.type === 'multiple_selection' ? 'Více výběrů' : 
+                               q.type === 'axis' ? 'Osa X/Y' : 
                                q.type === 'true_false' ? 'Ano / Ne' : 
                                q.type === 'drawing' ? 'Kresba' : 
                                q.type === 'graph' ? 'Graf' : q.type;
@@ -1877,26 +1877,20 @@ export default function ITestApp() {
                                                       {q.type === 'short_answer' ? 'Krátká odpověď' :
                                                        q.type === 'long_answer' ? 'Dlouhá odpověď' :
                                                        q.type === 'multiple_choice' ? 'Výběr z možností' :
-                                                       q.type === 'multiple_selection' ? 'Více výběrů' :
+                                                       q.type === 'axis' ? 'Osa X/Y' :
                                                        q.type === 'true_false' ? 'Ano / Ne' :
                                                        q.type === 'drawing' ? 'Kresba' : 
                                                        q.type === 'graph' ? 'Graf' : q.type}
                                                     </Badge>
                                                   </div>
-                                                  {q.type !== 'drawing' && q.type !== 'graph' && (
+                                                  {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && (
                                                     <div className="mt-2">
                                                       <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                                       {answer === undefined || answer === null || answer === '' ? (
                                                         <span className="italic text-gray-400">Neodpovězeno</span>
                                                       ) : q.type === 'multiple_choice' ? (
                                                         <span className="font-bold">{String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}</span>
-                                                      ) : q.type === 'multiple_selection' ? (
-                                                        <span className="font-bold">
-                                                          {Array.isArray(answer) && answer.length > 0
-                                                            ? answer.map((val: number) => `${String.fromCharCode(65 + val)}. ${q.options?.[val]}`).join(', ')
-                                                            : <span className="italic text-gray-400">Žádná možnost nevybrána</span>}
-                                                        </span>
-                                                      ) : q.type === 'true_false' ? (
+                                                      )  : q.type === 'true_false' ? (
                                                         <span className="font-bold">{answer ? '✓ Ano' : '✗ Ne'}</span>
                                                       ) : (
                                                         <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
@@ -1913,6 +1907,17 @@ export default function ITestApp() {
                                                       />
                                                     </div>
                                                   )}
+
+                                                 {q.type === 'axis' && (
+                                                   <div className="mt-2 w-full">
+                                                     <AxisQuestionEvaluation
+                                                       question={q}
+                                                       studentAnswer={answer}
+                                                       score={evalScores[q.id]}
+                                                       maxPoints={q.points || 1}
+                                                     />
+                                                   </div>
+                                                 )}
                                                   {drawing && (
                                                     <div className="mt-3">
                                                       <span className="text-sm font-medium text-muted-foreground block mb-1">Přiložená kresba:</span>
@@ -2949,7 +2954,7 @@ export default function ITestApp() {
                                     {q.type === 'short_answer' ? 'Krátká odpověď' : 
                                      q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                      q.type === 'multiple_choice' ? 'Výběr z možností' : 
-                                     q.type === 'multiple_selection' ? 'Více výběrů' : 
+                                     q.type === 'axis' ? 'Osa X/Y' : 
                                      q.type === 'true_false' ? 'Ano / Ne' : 
                                      q.type === 'drawing' ? 'Kresba' : 
                                      q.type === 'graph' ? 'Graf' : q.type}
@@ -3147,27 +3152,21 @@ export default function ITestApp() {
                                              {q.type === 'short_answer' ? 'Krátká odpověď' : 
                                               q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                               q.type === 'multiple_choice' ? 'Výběr z možností' : 
-                                              q.type === 'multiple_selection' ? 'Více výběrů' : 
+                                              q.type === 'axis' ? 'Osa X/Y' : 
                                               q.type === 'true_false' ? 'Ano / Ne' : 
                                               q.type === 'drawing' ? 'Kresba' : 
                                               q.type === 'graph' ? 'Graf' : q.type}
                                            </Badge>
                                         </div>
                                         
-                                        {q.type !== 'drawing' && q.type !== 'graph' && (
+                                        {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && (
                                           <div className="mt-2">
                                             <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                             {answer === undefined || answer === null || answer === '' ? (
                                               <span className="italic text-gray-400">Neodpovězeno</span>
                                             ) : q.type === 'multiple_choice' ? (
                                                <span className="font-bold">{String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}</span>
-                                             ) : q.type === 'multiple_selection' ? (
-                                               <span className="font-bold">
-                                                 {Array.isArray(answer) && answer.length > 0
-                                                   ? answer.map((val: number) => `${String.fromCharCode(65 + val)}. ${q.options?.[val]}`).join(', ')
-                                                   : <span className="italic text-gray-400">Žádná možnost nevybrána</span>}
-                                               </span>
-                                             ) : q.type === 'true_false' ? (
+                                             )  : q.type === 'true_false' ? (
                                               <span className="font-bold">{answer ? '✓ Ano' : '✗ Ne'}</span>
                                             ) : (
                                               <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
@@ -3185,6 +3184,17 @@ export default function ITestApp() {
                                             />
                                           </div>
                                         )}
+
+                                                 {q.type === 'axis' && (
+                                                   <div className="mt-2 w-full">
+                                                     <AxisQuestionEvaluation
+                                                       question={q}
+                                                       studentAnswer={answer}
+                                                       score={evalScores[q.id]}
+                                                       maxPoints={q.points || 1}
+                                                     />
+                                                   </div>
+                                                 )}
 
                                         {drawing && (
                                           <div className="mt-3">
@@ -4043,7 +4053,7 @@ export default function ITestApp() {
                                       </div>
 
                                       {/* Odpověď */}
-                                      {q.type !== 'drawing' && q.type !== 'graph' && (
+                                      {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && (
                                         <div className="bg-white/80 p-3.5 rounded-xl border border-gray-100 space-y-1">
                                           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moje odpověď:</span>
                                           <div>
@@ -4053,13 +4063,7 @@ export default function ITestApp() {
                                                <span className="font-semibold text-gray-800">
                                                  {String.fromCharCode(65 + Number(answer))}. {q.options?.[Number(answer)]}
                                                </span>
-                                             ) : q.type === 'multiple_selection' ? (
-                                               <span className="font-semibold text-gray-800">
-                                                 {Array.isArray(answer) && answer.length > 0
-                                                   ? answer.map((val: number) => `${String.fromCharCode(65 + val)}. ${q.options?.[val]}`).join(', ')
-                                                   : <span className="italic text-gray-400">Žádná možnost nevybrána</span>}
-                                               </span>
-                                             ) : q.type === 'true_false' ? (
+                                             )  : q.type === 'true_false' ? (
                                               <span className="font-semibold text-gray-800">
                                                 {answer ? '✓ Ano' : '✗ Ne'}
                                               </span>
@@ -4083,6 +4087,18 @@ export default function ITestApp() {
                                           />
                                         </div>
                                       )}
+
+                                       {/* Osa X/Y vyhodnocení */}
+                                       {q.type === 'axis' && (
+                                         <div className="mt-2">
+                                           <AxisQuestionEvaluation
+                                             question={q}
+                                             studentAnswer={answer}
+                                             score={score}
+                                             maxPoints={maxPoints}
+                                           />
+                                         </div>
+                                       )}
 
                                       {/* Kresba k otázce */}
                                       {drawing && (
@@ -4142,7 +4158,7 @@ export default function ITestApp() {
                                       {q.type === 'short_answer' ? 'Krátká odpověď' : 
                                        q.type === 'long_answer' ? 'Dlouhá odpověď' : 
                                        q.type === 'multiple_choice' ? 'Výběr z možností' : 
-                                       q.type === 'multiple_selection' ? 'Více výběrů' : 
+                                       q.type === 'axis' ? 'Osa X/Y' : 
                                        q.type === 'true_false' ? 'Ano / Ne' : 
                                        q.type === 'drawing' ? 'Kresba' : q.type}
                                     </Badge>
@@ -4189,43 +4205,14 @@ export default function ITestApp() {
                                      </div>
                                    )}
 
-                                   {q.type === 'multiple_selection' && q.options && (
-                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                       {q.options.map((opt, i) => {
-                                         const currentAnswers = Array.isArray(studentAnswers[q.id]) ? studentAnswers[q.id] : [];
-                                         const isSelected = currentAnswers.includes(i);
-                                         return (
-                                           <button
-                                             key={i}
-                                             type="button"
-                                             disabled={hasEnded}
-                                             className={`p-3 rounded-lg border text-left transition-all flex items-center justify-between ${
-                                               isSelected
-                                                 ? 'bg-primary text-white border-primary shadow-md font-bold'
-                                                 : 'bg-white hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-white'
-                                             }`}
-                                             onClick={() => {
-                                               if (hasEnded) return;
-                                               let nextAnswers;
-                                               if (isSelected) {
-                                                 nextAnswers = currentAnswers.filter((val: number) => val !== i);
-                                               } else {
-                                                 nextAnswers = [...currentAnswers, i].sort((a: number, b: number) => a - b);
-                                               }
-                                               setStudentAnswers(prev => ({ ...prev, [q.id]: nextAnswers }));
-                                             }}
-                                           >
-                                             <div>
-                                               <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                                               {opt}
-                                             </div>
-                                             <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? 'bg-white text-primary border-white' : 'border-gray-300'}`}>
-                                               {isSelected && '✓'}
-                                             </div>
-                                           </button>
-                                         );
-                                       })}
-                                     </div>
+                                   {/* Osa X/Y solver */}
+                                   {q.type === 'axis' && (
+                                     <AxisQuestionStudent
+                                       question={q}
+                                       disabled={hasEnded}
+                                       value={studentAnswers[q.id]}
+                                       onChange={(val) => setStudentAnswers(prev => ({ ...prev, [q.id]: val }))}
+                                     />
                                    )}
 
                                   {q.type === 'true_false' && (
