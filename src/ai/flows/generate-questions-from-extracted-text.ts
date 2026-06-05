@@ -29,7 +29,8 @@ const TrueFalseQuestionSchema = z.object({
 });
 
 const GenerateQuestionsInputSchema = z.object({
-  extractedText: z.string().describe('The text extracted from a document, used to generate questions.'),
+  extractedText: z.string().optional().describe('The text extracted from a document, used to generate questions.'),
+  topic: z.string().optional().describe('The topic to generate questions from directly.'),
 });
 export type GenerateQuestionsInput = z.infer<typeof GenerateQuestionsInputSchema>;
 
@@ -48,11 +49,20 @@ const prompt = ai.definePrompt({
   input: { schema: GenerateQuestionsInputSchema },
   output: { schema: GenerateQuestionsOutputSchema },
   prompt: `You are an AI assistant specialized in creating engaging and diverse comprehension questions for educational purposes.
-Based on the provided text, generate a set of questions including short answer, multiple choice, and true/false.
-Ensure the questions are relevant to the text and cover key information.
+Based on the provided text or topic, generate a set of questions including short answer, multiple choice, and true/false.
+Ensure the questions are relevant and cover key information.
 
-Here is the extracted text:
+The language of all generated questions, options, and answers must be Czech.
+
+Here is the input context:
+{{#if extractedText}}
+Extracted Text:
 {{{extractedText}}}
+{{/if}}
+{{#if topic}}
+Topic / Topics:
+{{{topic}}}
+{{/if}}
 
 Please output a JSON array of questions, adhering to the following schema for each question type:
 
@@ -77,7 +87,7 @@ True/False:
   "correctAnswer": true
 }
 
-Make sure to provide at least one question of each type, and a variety of questions overall to test comprehension comprehensively.`,
+Make sure to provide at least one question of each type if possible, and a variety of questions overall to test comprehension comprehensively.`,
 });
 
 export async function generateQuestionsFromExtractedText(input: GenerateQuestionsInput): Promise<GenerateQuestionsOutput> {

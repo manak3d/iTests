@@ -10,6 +10,8 @@ import { FileUp, Plus, Trash2, Wand2, Loader2, BookOpen, PenTool, Camera, BarCha
 import { Question, QuestionType, Assignment, User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { GraphQuestionCreator, AxisQuestionCreator, NumberLineQuestionCreator } from '@/components/itest/GraphQuestion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 
 import { Class } from '@/lib/types';
 
@@ -38,6 +40,16 @@ export function AssignmentCreator({
   const [fileUri, setFileUri] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  // AI Generator state
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiInputMode, setAiInputMode] = useState<'topic' | 'document'>('topic');
+  const [aiTopic, setAiTopic] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isDigitizing, setIsDigitizing] = useState(false);
+  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
+  const [selectedGeneratedIds, setSelectedGeneratedIds] = useState<number[]>([]);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -112,6 +124,88 @@ export function AssignmentCreator({
       } : {})
     };
     setQuestions([...questions, newQuestion]);
+  };
+
+  const addAiQuestions = (qsToInsert: any[]) => {
+    const newQuestions = qsToInsert.map(q => {
+      let type: QuestionType = 'short_answer';
+      if (q.type === 'multiple_choice') type = 'multiple_choice';
+      else if (q.type === 'true_false') type = 'true_false';
+
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        type,
+        text: q.questionText || '',
+        points: 1,
+        options: type === 'multiple_choice' ? q.options : undefined,
+        correctAnswer: type === 'multiple_choice' 
+          ? q.correctAnswerIndex 
+          : (type === 'true_false' ? q.correctAnswer : undefined)
+      };
+    });
+    setQuestions([...questions, ...newQuestions]);
+    setIsAiModalOpen(false);
+    setGeneratedQuestions([]);
+    toast({ title: "Otázky přidány", description: `Úspěšně přidáno ${newQuestions.length} otázek do testu.` });
+  };
+
+  const handleAiGenerate = async () => {
+    setAiError(null);
+    let textToUse = '';
+
+    if (aiInputMode === 'document') {
+      if (!fileUri) {
+        setAiError('Chybí připojený soubor.');
+        return;
+      }
+      setIsDigitizing(true);
+      try {
+        const digRes = await fetch('/api/ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'digitize', fileDataUri: fileUri })
+        });
+        const digData = await digRes.json();
+        if (!digRes.ok || !digData.success) {
+          throw new Error(digData.error || 'Digitalizace selhala.');
+        }
+        textToUse = digData.extractedText || '';
+        setDescription(textToUse); 
+      } catch (err: any) {
+        setAiError(err.message || 'Nepodařilo se digitalizovat dokument.');
+        setIsDigitizing(false);
+        return;
+      }
+      setIsDigitizing(false);
+    }
+
+    setIsGenerating(true);
+    try {
+      const genRes = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate',
+          extractedText: aiInputMode === 'document' ? textToUse : undefined,
+          topic: aiInputMode === 'topic' ? aiTopic : undefined
+        })
+      });
+      const genData = await genRes.json();
+      if (!genRes.ok || !genData.success) {
+        throw new Error(genData.error || 'Generování otázek selhalo.');
+      }
+      const qs = genData.questions || [];
+      if (qs.length === 0) {
+        setAiError('Nebyla vygenerována žádná otázka. Zkuste to prosím znovu.');
+      } else {
+        setGeneratedQuestions(qs);
+        setSelectedGeneratedIds(qs.map((_: any, idx: number) => idx));
+      }
+    } catch (err: any) {
+      setAiError(err.message || 'Při generování otázek došlo k chybě.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const updateQuestion = (id: string, updates: Partial<Question>) => {
@@ -662,8 +756,255 @@ export function AssignmentCreator({
           <Button variant="secondary" size="sm" className="rounded-full bg-primary/10 text-primary hover:bg-primary/20" onClick={() => addQuestion('graph')}>
             <BarChart4 className="w-4 h-4 mr-2" /> Grafická otázka
           </Button>
+          <Button 
+            variant="default" 
+            size="sm" 
+            className="rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 text-white shadow-md hover:opacity-95" 
+            onClick={() => {
+              setGeneratedQuestions([]);
+              setSelectedGeneratedIds([]);
+              setIsAiModalOpen(true);
+            }}
+          >
+            <Wand2 className="w-4 h-4 mr-2" /> Generovat pomocí AI
+          </Button>
         </div>
       </div>
+
+      <Dialog open={isAiModalOpen} onOpenChange={setIsAiModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl border-none shadow-2xl p-6 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-violet-600 to-fuchsia-600 flex items-center gap-2">
+              <Wand2 className="w-6 h-6 text-violet-600 animate-pulse" />
+              <span>AI Generátor Otázek</span>
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500">
+              Vytvořte sadu testových otázek během několika sekund za použití umělé inteligence Gemini.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="mt-4 space-y-6">
+            {/* Input Mode Tabs */}
+            <div className="flex gap-1.5 p-1 bg-gray-100 rounded-xl border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setAiInputMode('topic')}
+                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                  aiInputMode === 'topic' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:bg-white/50'
+                }`}
+              >
+                📝 Z tématu
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiInputMode('document')}
+                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                  aiInputMode === 'document' ? 'bg-white text-violet-600 shadow-sm' : 'text-gray-500 hover:bg-white/50'
+                }`}
+              >
+                📸 Z vyfoceného textu / souboru
+              </button>
+            </div>
+
+            {/* TAB 1: TOPIC */}
+            {aiInputMode === 'topic' && (
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                  Téma, oblast učiva nebo klíčová slova
+                </label>
+                <Textarea
+                  placeholder="Např. Pythagorova věta, bitva u Stalingradu, fotosyntéza, vyjmenovaná slova..."
+                  value={aiTopic}
+                  onChange={(e) => setAiTopic(e.target.value)}
+                  className="min-h-[100px] text-base rounded-xl focus-visible:ring-violet-500"
+                />
+              </div>
+            )}
+
+            {/* TAB 2: DOCUMENT */}
+            {aiInputMode === 'document' && (
+              <div className="space-y-4">
+                {fileUri ? (
+                  <div className="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row items-center gap-4">
+                    <div className="w-20 h-20 bg-gray-200 border rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                      <img src={fileUri} alt="Dokument" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-1">
+                      <p className="text-sm font-bold text-gray-800">Připojený dokument k úkolu</p>
+                      <p className="text-xs text-gray-400">Tento soubor/fotka bude odeslán do AI k OCR přepisu a tvorbě otázek.</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFileUri(undefined)}
+                      className="text-destructive hover:bg-destructive/5 rounded-lg border-dashed flex-shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" /> Odebrat
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-8 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center text-center space-y-4 bg-slate-50/50">
+                    <div className="p-3 bg-violet-50 rounded-full text-violet-600">
+                      <Camera className="w-8 h-8" />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-bold text-gray-700">Žádaný dokument nebyl vyfocen ani nahrán</p>
+                      <p className="text-xs text-gray-400 max-w-sm">Pro vygenerování otázek z dokumentu jej nejprve vyfoťte mobilem nebo nahrajte na hlavní kartě nebo zde.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <label className="cursor-pointer">
+                        <div className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center hover:bg-gray-50 transition-colors h-10">
+                          <FileUp className="w-4 h-4 mr-2 text-gray-500" /> Nahrát soubor
+                        </div>
+                        <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} />
+                      </label>
+                      <label className="cursor-pointer">
+                        <div className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center hover:bg-gray-50 transition-colors h-10">
+                          <Camera className="w-4 h-4 mr-2 text-gray-500" /> Vyfotit mobilním
+                        </div>
+                        <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleFileUpload} />
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ERROR DISPLAY */}
+            {aiError && (
+              <div className="p-3 bg-red-50 text-red-700 border border-red-100 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <span>⚠️ {aiError}</span>
+              </div>
+            )}
+
+            {/* PREVIEW OF GENERATED QUESTIONS */}
+            {generatedQuestions.length > 0 && (
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500 block">
+                  Vygenerované otázky ({generatedQuestions.length}):
+                </label>
+                <div className="space-y-3 max-h-[300px] overflow-y-auto border rounded-xl p-3 bg-slate-50/50">
+                  {generatedQuestions.map((q, idx) => {
+                    const isSelected = selectedGeneratedIds.includes(idx);
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl border bg-white transition-all flex items-start gap-3 ${
+                          isSelected ? 'border-violet-500 shadow-sm ring-1 ring-violet-500/30' : 'border-gray-200'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {
+                            if (isSelected) {
+                              setSelectedGeneratedIds(prev => prev.filter(id => id !== idx));
+                            } else {
+                              setSelectedGeneratedIds(prev => [...prev, idx]);
+                            }
+                          }}
+                          className="mt-1 rounded text-violet-600 focus:ring-violet-500 h-4 w-4 cursor-pointer"
+                        />
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-100 text-violet-700">
+                              {q.type === 'short_answer' ? 'Krátká odpověď' :
+                               q.type === 'multiple_choice' ? 'Výběr z možností' :
+                               q.type === 'true_false' ? 'Ano/Ne' : q.type}
+                            </span>
+                          </div>
+                          <p className="text-sm font-bold text-gray-800">{q.questionText}</p>
+                          {q.type === 'multiple_choice' && q.options && (
+                            <div className="grid grid-cols-2 gap-1.5 pt-1">
+                              {q.options.map((opt: string, oIdx: number) => (
+                                <div
+                                  key={oIdx}
+                                  className={`text-xs p-1.5 rounded-lg border font-medium ${
+                                    q.correctAnswerIndex === oIdx
+                                      ? 'bg-green-50 border-green-200 text-green-700 font-bold'
+                                      : 'bg-gray-50 border-gray-100 text-gray-500'
+                                  }`}
+                                >
+                                  <span className="font-bold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
+                                  {opt}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {q.type === 'true_false' && (
+                            <p className="text-xs font-semibold text-gray-500">
+                              Správná odpověď: <span className="font-bold text-violet-600">{q.correctAnswer ? 'Ano' : 'Ne'}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-6 gap-2 sm:gap-0">
+            {generatedQuestions.length > 0 ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setGeneratedQuestions([]);
+                    setSelectedGeneratedIds([]);
+                  }}
+                  className="rounded-xl"
+                >
+                  Zrušit a začít znovu
+                </Button>
+                <Button
+                  onClick={() => {
+                    const qsToInsert = generatedQuestions.filter((_, idx) => selectedGeneratedIds.includes(idx));
+                    addAiQuestions(qsToInsert);
+                  }}
+                  disabled={selectedGeneratedIds.length === 0}
+                  className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold px-6"
+                >
+                  Přidat vybrané ({selectedGeneratedIds.length}) do testu
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsAiModalOpen(false)}
+                  className="rounded-xl"
+                >
+                  Zavřít
+                </Button>
+                <Button
+                  onClick={handleAiGenerate}
+                  disabled={
+                    isGenerating ||
+                    isDigitizing ||
+                    (aiInputMode === 'topic' && !aiTopic.trim()) ||
+                    (aiInputMode === 'document' && !fileUri)
+                  }
+                  className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white rounded-xl font-bold px-8 shadow-md"
+                >
+                  {isGenerating || isDigitizing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      {isDigitizing ? 'Přepisování textu...' : 'Generování otázek...'}
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-4 h-4 mr-2" />
+                      Vygenerovat otázky
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-col md:flex-row justify-end gap-3 pt-8 border-t">
         <Button size="lg" variant="outline" className="w-full md:w-auto px-10 h-14 text-lg font-headline text-gray-600 border-gray-300" onClick={handleSaveDraft} disabled={isProcessing}>
