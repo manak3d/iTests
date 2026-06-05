@@ -3,8 +3,23 @@ import path from 'path';
 
 // Manually parse .env file to guarantee variables are loaded during module evaluation
 try {
-  const envPath = path.join(process.cwd(), '.env');
-  if (fs.existsSync(envPath)) {
+  const pathsToCheck = [
+    path.join(process.cwd(), '.env'),
+    path.join(process.cwd(), '..', '.env'),
+    path.join(__dirname, '.env'),
+    path.join(__dirname, '..', '.env'),
+    path.join(__dirname, '..', '..', '.env'),
+    path.join(__dirname, '..', '..', '..', '.env'),
+  ];
+  let envPath = '';
+  for (const p of pathsToCheck) {
+    if (fs.existsSync(p)) {
+      envPath = p;
+      break;
+    }
+  }
+
+  if (envPath) {
     const envConfig = fs.readFileSync(envPath, 'utf8');
     envConfig.split(/\r?\n/).forEach((line) => {
       const trimmed = line.trim();
