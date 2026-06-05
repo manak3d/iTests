@@ -756,6 +756,8 @@ export function AssignmentCreator({
           <Button variant="secondary" size="sm" className="rounded-full bg-primary/10 text-primary hover:bg-primary/20" onClick={() => addQuestion('graph')}>
             <BarChart4 className="w-4 h-4 mr-2" /> Grafická otázka
           </Button>
+          {/* AI Generátor je dočasně skryt, dokud nebude nakonfigurován platný Gemini API klíč */}
+          {/*
           <Button 
             variant="default" 
             size="sm" 
@@ -768,6 +770,7 @@ export function AssignmentCreator({
           >
             <Wand2 className="w-4 h-4 mr-2" /> Generovat pomocí AI
           </Button>
+          */}
         </div>
       </div>
 
