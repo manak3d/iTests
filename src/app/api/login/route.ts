@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       // Vytvoření JWT tokenu
       const secret = process.env.JWT_SECRET || "default_secret_key";
       const token = jwt.sign(
-        { id: teacher._id, username: teacher.username, role: teacher.role, name: `${teacher.firstName} ${teacher.lastName}` },
+        { id: teacher._id, username: teacher.username, role: teacher.role, name: `${teacher.firstName} ${teacher.lastName}`, schoolId: teacher.schoolId },
         secret,
         { expiresIn: "1d" }
       );
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
         path: "/",
       });
 
-      return NextResponse.json({ success: true, user: { id: teacher._id, username: teacher.username, role: teacher.role, name: `${teacher.firstName} ${teacher.lastName}` } });
+      return NextResponse.json({ success: true, user: { id: teacher._id, username: teacher.username, role: teacher.role, name: `${teacher.firstName} ${teacher.lastName}`, schoolId: teacher.schoolId, isPremium: teacher.isPremium, premiumExpiresAt: teacher.premiumExpiresAt, createdAt: teacher.createdAt } });
     } else if (role === 'student') {
       const student = await Student.findOne({ username }).select('+password');
       if (!student || !student.password) {
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
       const secret = process.env.JWT_SECRET || "default_secret_key";
       const token = jwt.sign(
-        { id: student._id, username: student.username, role: student.role, name: `${student.firstName} ${student.lastName}` },
+        { id: student._id, username: student.username, role: student.role, name: `${student.firstName} ${student.lastName}`, schoolId: student.schoolId },
         secret,
         { expiresIn: "1d" }
       );
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         path: "/",
       });
 
-      return NextResponse.json({ success: true, user: { id: student._id, username: student.username, role: student.role, name: `${student.firstName} ${student.lastName}`, classId: student.classroomId } });
+      return NextResponse.json({ success: true, user: { id: student._id, username: student.username, role: student.role, name: `${student.firstName} ${student.lastName}`, classId: student.classroomId, schoolId: student.schoolId } });
     } else {
       return NextResponse.json({ success: false, error: "Neplatná role" }, { status: 400 });
     }

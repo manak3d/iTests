@@ -6,6 +6,7 @@ export interface IClassroom extends Document<string> {
   teacherId: string; // Třídní učitel
   year: number; // Školní rok (např. 2024 pro 2024/2025)
   studentIds: string[]; // Odkazy na žáky
+  schoolId: string; // přidáno pro multi-school
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +18,7 @@ const ClassroomSchema: Schema = new Schema(
     teacherId: { type: String, required: true },
     year: { type: Number, required: true },
     studentIds: { type: [String], default: [] },
+    schoolId: { type: String, required: true }, // povinné pro rozdělení škol
   },
   {
     timestamps: true,

@@ -83,7 +83,7 @@ export function useITestStore() {
           submissions: false
         });
       });
-  }, []);
+  }, [currentUserId]);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
@@ -158,7 +158,9 @@ export function useITestStore() {
 
   const addStudent = useCallback((classId: string, name: string, username: string, password?: string, studentId?: string) => {
     const id = studentId || Math.random().toString(36).substring(2, 11);
-    const newUser: User = { id, name, username, role: 'student', classId, password };
+    const classroom = classes.find(c => c.id === classId);
+    const schoolId = classroom?.schoolId;
+    const newUser: User = { id, name, username, role: 'student', classId, password, schoolId };
     
     // O samotný zápis studenta do MongoDB se teď stará funkce v page.tsx, 
     // zde už jen zkusíme zálohu do Firebase a upravíme lokální stav.
@@ -167,7 +169,7 @@ export function useITestStore() {
     if (db) {
       setDoc(doc(db, 'users', id), cleanData(newUser)).catch(console.error);
     }
-  }, [db]);
+  }, [db, classes]);
 
   const addAssignment = useCallback((assignment: Omit<Assignment, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 11);
@@ -498,13 +500,15 @@ export function useITestStore() {
     .then(async res => {
       if (res.ok) {
         toast({ title: "Žák přidán", description: "Žák byl úspěšně zapsán do třídy." });
-        setUsers(prev => prev.map(u => u.id === studentId ? { ...u, classId } : u));
+        const classroom = classes.find(c => c.id === classId);
+        const schoolId = classroom?.schoolId;
+        setUsers(prev => prev.map(u => u.id === studentId ? { ...u, classId, schoolId } : u));
       } else {
         toast({ title: "Chyba", description: "Nepodařilo se zapsat žáka.", variant: "destructive" });
       }
     })
     .catch(console.error);
-  }, [toast]);
+  }, [toast, classes]);
 
   const changeStudentPassword = useCallback((studentId: string, newPassword: string) => {
     return fetch('/api/students', {
@@ -529,6 +533,102 @@ export function useITestStore() {
       return false;
     });
   }, [toast]);
+
+  const activatePremium = useCallback((type: 'monthly' | 'yearly') => {
+    if (!currentUser) return Promise.resolve(false);
+    return fetch('/api/teachers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'activatePremium', type })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Premium aktivováno", description: "Děkujeme! Všechny limity byly zrušeny." });
+        
+        const updatedUser = { 
+          ...currentUser, 
+          isPremium: true, 
+          premiumExpiresAt: data.data.premiumExpiresAt 
+        };
+        
+        setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+        
+        if (mongoUser && mongoUser.id === currentUser.id) {
+          setMongoUser(updatedUser);
+          sessionStorage.setItem('itest_mongo_user', JSON.stringify(updatedUser));
+        }
+        
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Aktivace Premium selhala.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [currentUser, mongoUser, toast]);
+
+  const toggleUserPremium = useCallback((userId: string, isPremium: boolean) => {
+    return fetch('/api/teachers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        id: userId, 
+        action: isPremium ? 'deactivatePremium' : 'activatePremium', 
+        type: 'yearly'
+      })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ 
+          title: isPremium ? "Premium deaktivováno" : "Premium aktivováno", 
+          description: isPremium ? "Učitelský účet byl převeden na zkušební verzi." : "Učitelský účet byl úspěšně povýšen na Premium." 
+        });
+        
+        const targetUser = users.find(u => u.id === userId);
+        const updatedUser = { 
+          id: userId,
+          name: targetUser?.name || '',
+          username: targetUser?.username || '',
+          role: targetUser?.role || 'teacher',
+          schoolId: targetUser?.schoolId,
+          createdAt: targetUser?.createdAt,
+          classId: targetUser?.classId,
+          isPremium: !isPremium, 
+          premiumExpiresAt: data.data.premiumExpiresAt 
+        };
+        
+        setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+        
+        if (currentUser && currentUser.id === userId) {
+          const updatedCurrentUser = {
+            ...currentUser,
+            isPremium: !isPremium,
+            premiumExpiresAt: data.data.premiumExpiresAt
+          };
+          if (mongoUser && mongoUser.id === userId) {
+            setMongoUser(updatedCurrentUser);
+            sessionStorage.setItem('itest_mongo_user', JSON.stringify(updatedCurrentUser));
+          }
+        }
+        
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Změna Premium stavu selhala.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [users, currentUser, mongoUser, toast]);
 
   const renameClassroom = useCallback((classId: string, newName: string) => {
     return fetch('/api/classrooms', {
@@ -565,6 +665,6 @@ export function useITestStore() {
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, activatePremium, toggleUserPremium
   };
 }

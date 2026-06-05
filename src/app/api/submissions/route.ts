@@ -1,21 +1,34 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Submission } from "@/models/Submission";
+import { getUserSession } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
     await dbConnect();
+    const session = await getUserSession();
+
+    if (!session) {
+      return NextResponse.json({ success: false, error: "Nepřihlášený uživatel." }, { status: 401 });
+    }
+
     const body = await request.json();
-    
+    const schoolId = session.role === "admin" ? body.schoolId : session.schoolId;
+
+    if (!schoolId) {
+      return NextResponse.json({ success: false, error: "Chybí ID školy." }, { status: 400 });
+    }
+
     const newSubmission = await Submission.create({
       _id: body.id,
       assignmentId: body.assignmentId,
-      studentId: body.studentId,
+      studentId: body.studentId || session.id,
       answers: body.answers || {},
       questionDrawings: body.questionDrawings || {},
       mainWorkDrawing: body.mainWorkDrawing,
       submittedAt: body.submittedAt,
       questionScores: body.questionScores || {},
+      schoolId: schoolId,
     });
 
     return NextResponse.json({ success: true, data: newSubmission }, { status: 201 });
@@ -27,26 +40,40 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     await dbConnect();
+    const session = await getUserSession();
+
+    if (!session || (session.role !== "teacher" && session.role !== "admin")) {
+      return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
+    }
+
     const body = await request.json();
     
     if (!body.id) throw new Error("Missing submission ID");
 
-    const updateObj: any = {
-      feedback: body.feedback,
-      questionScores: body.questionScores
+    const updateQuery: any = {
+      $set: {
+        feedback: body.feedback,
+        questionScores: body.questionScores
+      }
     };
 
     if (body.grade === 0 || body.grade === null || body.grade === undefined) {
-      updateObj.$unset = { grade: "" };
+      updateQuery.$unset = { grade: "" };
     } else {
-      updateObj.grade = body.grade;
+      updateQuery.$set.grade = body.grade;
     }
 
-    const updatedSubmission = await Submission.findByIdAndUpdate(
-      body.id,
-      updateObj,
+    const filter = session.role === "admin" ? { _id: body.id } : { _id: body.id, schoolId: session.schoolId };
+
+    const updatedSubmission = await Submission.findOneAndUpdate(
+      filter,
+      updateQuery,
       { new: true }
     );
+
+    if (!updatedSubmission) {
+      return NextResponse.json({ success: false, error: "Odevzdaná práce nebyla nalezena nebo na ni nemáte práva." }, { status: 404 });
+    }
 
     return NextResponse.json({ success: true, data: updatedSubmission });
   } catch (error: any) {

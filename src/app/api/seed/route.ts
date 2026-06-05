@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
+import { School } from "@/models/School";
 import { Teacher } from "@/models/Teacher";
 import { Classroom } from "@/models/Classroom";
 import { Student } from "@/models/Student";
+import { Assignment } from "@/models/Assignment";
+import { Submission } from "@/models/Submission";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
@@ -10,17 +13,27 @@ export async function GET() {
     await dbConnect();
 
     // 1. Vyčištění předchozích testovacích dat
+    await School.deleteMany({});
     await Teacher.deleteMany({});
     await Classroom.deleteMany({});
     await Student.deleteMany({});
+    await Assignment.deleteMany({});
+    await Submission.deleteMany({});
 
-    // 2. Hashování hesel
+    // 2. Vytvoření testovací školy
+    const school = await School.create({
+      name: "Základní škola Komenského",
+      inviteCode: "testskola",
+    });
+    const schoolId = school._id.toString();
+
+    // 3. Hashování hesel
     const teacherPasswordHash = await bcrypt.hash("heslo", 10);
     const adminPasswordHash = await bcrypt.hash("admin123", 10);
     const studentPasswordHash1 = await bcrypt.hash("123456", 10);
     const studentPasswordHash2 = await bcrypt.hash("QWERT135", 10);
 
-    // 3. Vytvoření testovacího učitele (testu)
+    // 4. Vytvoření testovacího učitele (testu)
     const teacher = await Teacher.create({
       firstName: "Jan",
       lastName: "Komenský",
@@ -29,9 +42,10 @@ export async function GET() {
       password: teacherPasswordHash,
       role: "teacher",
       subjects: ["Matematika", "Fyzika"],
+      schoolId: schoolId,
     });
 
-    // 3.1. Vytvoření administrátora (v modelu Teacher s role: "admin")
+    // 4.1. Vytvoření administrátora (v modelu Teacher s role: "admin", bez schoolId)
     const adminUser = await Teacher.create({
       firstName: "Hlavní",
       lastName: "Administrátor",
@@ -42,16 +56,17 @@ export async function GET() {
       subjects: ["Všechny"],
     });
 
-    // 4. Vytvoření testovací třídy
+    // 5. Vytvoření testovací třídy
     const classroom = await Classroom.create({
       _id: "0.A",
       name: "0.A",
       teacherId: teacher._id.toString(),
       year: 2024,
-      studentIds: ["tests1", "nina.sekerkova"]
+      studentIds: ["tests1", "nina.sekerkova"],
+      schoolId: schoolId,
     });
 
-    // 5. Vytvoření testovacích žáků
+    // 6. Vytvoření testovacích žáků
     const student1 = await Student.create({
       _id: "tests1",
       firstName: "tests1",
@@ -62,6 +77,7 @@ export async function GET() {
       passwordPlain: "123456",
       role: "student",
       classroomId: classroom._id.toString(),
+      schoolId: schoolId,
     });
 
     const student2 = await Student.create({
@@ -74,11 +90,13 @@ export async function GET() {
       passwordPlain: "QWERT135",
       role: "student",
       classroomId: classroom._id.toString(),
+      schoolId: schoolId,
     });
 
     return NextResponse.json({
       message: "Data byla úspěšně uložena do databáze!",
       data: {
+        school,
         teacher,
         classroom,
         students: [student1, student2],

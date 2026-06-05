@@ -6,9 +6,22 @@ import { Classroom } from "@/models/Classroom";
 import { Assignment } from "@/models/Assignment";
 import { Submission } from "@/models/Submission";
 
+import { getUserSession } from "@/lib/auth";
+
 export async function GET() {
   try {
     await dbConnect();
+    const session = await getUserSession();
+
+    if (!session) {
+      return NextResponse.json({ 
+        success: true, 
+        users: [], 
+        classes: [], 
+        assignments: [], 
+        submissions: [] 
+      });
+    }
     
     // Automatické čistenie databázy - vymazanie dát starších ako 30 dní
     const limitDate = new Date();
@@ -18,17 +31,40 @@ export async function GET() {
     await Submission.deleteMany({ createdAt: { $lt: limitDate } });
     await Assignment.deleteMany({ createdAt: { $lt: limitDate } });
 
-    // Načteme všechna data z MongoDB
-    const teachers = await Teacher.find({}).lean();
-    const students = await Student.find({}).lean();
-    const classes = await Classroom.find({}).lean();
-    const assignments = await Assignment.find({}).lean();
-    const submissions = await Submission.find({}).lean();
+    let teachers: any[] = [];
+    let students: any[] = [];
+    let classes: any[] = [];
+    let assignments: any[] = [];
+    let submissions: any[] = [];
+
+    if (session.role === 'admin') {
+      // Admin vidí všechno ze všech škol
+      teachers = await Teacher.find({}).lean();
+      students = await Student.find({}).lean();
+      classes = await Classroom.find({}).lean();
+      assignments = await Assignment.find({}).lean();
+      submissions = await Submission.find({}).lean();
+    } else {
+      // Běžný učitel / student vidí jen data své školy
+      const schoolId = session.schoolId || "";
+      teachers = await Teacher.find({ schoolId }).lean();
+      students = await Student.find({ schoolId }).lean();
+      classes = await Classroom.find({ schoolId }).lean();
+      assignments = await Assignment.find({ schoolId }).lean();
+
+      if (session.role === 'student') {
+        // Student vidí pouze své vlastní odevzdané práce
+        submissions = await Submission.find({ schoolId, studentId: session.id }).lean();
+      } else {
+        // Učitel vidí všechny odevzdané práce své školy
+        submissions = await Submission.find({ schoolId }).lean();
+      }
+    }
 
     // Sjednotíme učitele a žáky do jednoho pole "users", aby to sedělo s původním frontendem
     const users = [
-      ...teachers.map(t => ({ id: t._id, name: `${t.firstName} ${t.lastName}`, username: t.username, role: t.role })),
-      ...students.map(s => ({ id: s._id, name: `${s.firstName} ${s.lastName}`, username: s.username, role: s.role, classId: s.classroomId, password: s.passwordPlain }))
+      ...teachers.map(t => ({ id: t._id, name: `${t.firstName} ${t.lastName}`, username: t.username, role: t.role, schoolId: t.schoolId, isPremium: t.isPremium, premiumExpiresAt: t.premiumExpiresAt, createdAt: t.createdAt })),
+      ...students.map(s => ({ id: s._id, name: `${s.firstName} ${s.lastName}`, username: s.username, role: s.role, classId: s.classroomId, password: s.passwordPlain, schoolId: s.schoolId }))
     ];
 
     // Přemapování _id na id pro frontend

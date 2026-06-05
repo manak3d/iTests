@@ -5,12 +5,24 @@ import { Student } from "@/models/Student";
 import { Classroom } from "@/models/Classroom";
 import { Assignment } from "@/models/Assignment";
 import { Submission } from "@/models/Submission";
+import { School } from "@/models/School";
+import { getUserSession } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
 export async function POST(request: Request) {
   try {
     await dbConnect();
     const body = await request.json();
+
+    const inviteCode = body.inviteCode;
+    if (!inviteCode) {
+      return NextResponse.json({ success: false, error: "Zadejte kód školy (zvací kód)." }, { status: 400 });
+    }
+
+    const school = await School.findOne({ inviteCode: inviteCode.trim().toLowerCase() });
+    if (!school) {
+      return NextResponse.json({ success: false, error: "Zadaný kód školy není platný." }, { status: 400 });
+    }
 
     // Kontrola, zda uživatelské jméno již neexistuje mezi žáky (globální unikátnost loginu)
     const existingStudent = await Student.findOne({ username: body.username });
@@ -38,6 +50,7 @@ export async function POST(request: Request) {
       username: body.username,
       password: hashedPassword,
       subjects: Array.isArray(body.subjects) ? body.subjects : (body.subjects ? body.subjects.split(',').map((s: string) => s.trim()) : []),
+      schoolId: school._id.toString(),
     });
 
     // Nechceme vracet heslo v odpovědi
@@ -75,6 +88,64 @@ export async function DELETE(request: Request) {
     await Teacher.deleteOne({ _id: id });
 
     return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    await dbConnect();
+    const session = await getUserSession();
+
+    if (!session || (session.role !== "teacher" && session.role !== "admin")) {
+      return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const teacherId = session.role === "admin" ? body.id : session.id;
+
+    if (!teacherId) {
+      return NextResponse.json({ success: false, error: "Chybí ID učitele." }, { status: 400 });
+    }
+
+    const teacher = await Teacher.findOne({ _id: teacherId });
+    if (!teacher) {
+      return NextResponse.json({ success: false, error: "Učitel nebyl nalezen." }, { status: 404 });
+    }
+
+    const updateData: any = {};
+    if (body.action === "activatePremium") {
+      updateData.isPremium = true;
+      const now = new Date();
+      if (body.type === "yearly") {
+        updateData.premiumExpiresAt = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+      } else {
+        updateData.premiumExpiresAt = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      }
+    } else if (body.action === "deactivatePremium") {
+      updateData.isPremium = false;
+      updateData.premiumExpiresAt = null;
+    } else {
+      if (body.firstName !== undefined) updateData.firstName = body.firstName;
+      if (body.lastName !== undefined) updateData.lastName = body.lastName;
+      if (body.subjects !== undefined) updateData.subjects = body.subjects;
+    }
+
+    const updatedTeacher = await Teacher.findOneAndUpdate(
+      { _id: teacherId },
+      { $set: updateData },
+      { new: true }
+    );
+
+    if (!updatedTeacher) {
+      return NextResponse.json({ success: false, error: "Učitel nebyl nalezen při ukládání." }, { status: 404 });
+    }
+
+    const teacherData = updatedTeacher.toObject();
+    delete teacherData.password;
+
+    return NextResponse.json({ success: true, data: teacherData });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }

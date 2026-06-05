@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3 } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -33,8 +33,75 @@ export default function ITestApp() {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+
+  const [schools, setSchools] = useState<any[]>([]);
+  const [isLoadingSchools, setIsLoadingSchools] = useState(false);
+  const [newSchoolName, setNewSchoolName] = useState('');
+  const [newSchoolInviteCode, setNewSchoolInviteCode] = useState('');
+
+  const fetchSchools = async () => {
+    try {
+      setIsLoadingSchools(true);
+      const res = await fetch('/api/schools');
+      const data = await res.json();
+      if (data.success) {
+        setSchools(data.schools);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingSchools(false);
+    }
+  };
+
+  const handleCreateSchool = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSchoolName.trim() || !newSchoolInviteCode.trim()) {
+      toast({ title: "Chyba", description: "Vyplňte název školy i zvací kód.", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch('/api/schools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newSchoolName, inviteCode: newSchoolInviteCode })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Úspěch", description: "Škola byla úspěšně vytvořena." });
+        setNewSchoolName('');
+        setNewSchoolInviteCode('');
+        fetchSchools();
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se vytvořit školu.", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Chyba sítě", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSchool = async (id: string) => {
+    if (!confirm("Opravdu chcete tuto školu smazat? Data učitelů a tříd nebudou smazána, ale přijdou o přístup.")) return;
+    try {
+      const res = await fetch(`/api/schools?id=${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Úspěch", description: "Škola byla smazána." });
+        fetchSchools();
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se smazat školu.", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Chyba sítě", variant: "destructive" });
+    }
+  };
   
   const [isAddingClass, setIsAddingClass] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<{ amount: number, type: 'monthly' | 'yearly' } | null>(null);
   const [newClassName, setNewClassName] = useState('');
 
   const [isAddingStudent, setIsAddingStudent] = useState(false);
@@ -70,7 +137,17 @@ export default function ITestApp() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState('classes');
-  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools'>('overview');
+  const [adminSchoolFilter, setAdminSchoolFilter] = useState<string>('all');
+  const [adminSearchFilter, setAdminSearchFilter] = useState<string>('');
+  const [adminSortBy, setAdminSortBy] = useState<'name' | 'school' | 'default'>('default');
+  const [adminSortOrder, setAdminSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  useEffect(() => {
+    if (store.currentUser && (store.currentUser.role === 'admin' || store.currentUser.role === 'teacher')) {
+      fetchSchools();
+    }
+  }, [store.currentUser, adminTab]);
   const [adminViewingAssignmentId, setAdminViewingAssignmentId] = useState<string | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
@@ -893,6 +970,11 @@ export default function ITestApp() {
       }
     } else {
       if (name && username && password) {
+        if (!inviteCode.trim()) {
+          toast({ title: "Registrace selhala", description: "Zadejte kód školy (zvací kód).", variant: "destructive" });
+          return;
+        }
+
         // Kontrola unikátnosti loginu na klientu
         const usernameLower = username.trim().toLowerCase();
         const exists = store.users.some(u => u.username.toLowerCase() === usernameLower);
@@ -915,6 +997,7 @@ export default function ITestApp() {
               email: `${username}@skola.cz`,
               username,
               password,
+              inviteCode: inviteCode.trim(),
               subjects: []
             })
           });
@@ -1282,6 +1365,11 @@ export default function ITestApp() {
       return;
     }
 
+    if (!targetClassId) {
+      toast({ title: "Chyba", description: "Musíte vybrat cílovou třídu.", variant: "destructive" });
+      return;
+    }
+
     // Kontrola unikátnosti loginu na klientu
     const studentUsernameLower = newStudentUsername.trim().toLowerCase();
     const exists = store.users.some(u => u.username.toLowerCase() === studentUsernameLower);
@@ -1385,14 +1473,20 @@ export default function ITestApp() {
 
               <div className="space-y-4">
                 {authMode === 'register' && (
-                  <div className="space-y-2">
-                    <Label>Vaše jméno</Label>
-                    <Input placeholder="Mgr. Jan Novák" value={name} onChange={e => setName(e.target.value)} className="h-12" />
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <Label>Vaše jméno</Label>
+                      <Input placeholder="Mgr. Jan Novák" value={name} onChange={e => setName(e.target.value)} className="h-12" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Kód školy (zvací kód)</Label>
+                      <Input placeholder="např. testskola" value={inviteCode} onChange={e => setInviteCode(e.target.value)} className="h-12" />
+                    </div>
+                  </>
                 )}
                 <div className="space-y-2">
                   <Label>Uživatelské jméno</Label>
-                  <Input placeholder="ucitel1" value={username} onChange={e => setUsername(e.target.value)} className="h-12" />
+                  <Input placeholder="jan.novak" value={username} onChange={e => setUsername(e.target.value)} className="h-12" />
                 </div>
                 <div className="space-y-2">
                   <Label>Heslo</Label>
@@ -1412,11 +1506,85 @@ export default function ITestApp() {
   const currentUser = store.currentUser;
 
   if (currentUser.role === 'admin') {
-    const teachers = store.users.filter(u => u.role === 'teacher');
-    const students = store.users.filter(u => u.role === 'student');
-    const classrooms = store.classes;
-    const assignments = store.assignments;
+    const rawTeachers = store.users.filter(u => u.role === 'teacher');
+    const rawStudents = store.users.filter(u => u.role === 'student');
+    const rawClassrooms = store.classes;
+    const rawAssignments = store.assignments;
     const submissions = store.submissions;
+
+    // Apply filtering and sorting for Učitelé (Teachers)
+    const teachers = rawTeachers.filter(t => {
+      const matchesSchool = adminSchoolFilter === 'all' || t.schoolId === adminSchoolFilter;
+      const matchesSearch = !adminSearchFilter.trim() || 
+        t.name.toLowerCase().includes(adminSearchFilter.toLowerCase()) || 
+        t.username.toLowerCase().includes(adminSearchFilter.toLowerCase());
+      return matchesSchool && matchesSearch;
+    }).sort((a, b) => {
+      let comparison = 0;
+      if (adminSortBy === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (adminSortBy === 'school') {
+        const schoolA = schools.find(s => s.id === a.schoolId)?.name || '';
+        const schoolB = schools.find(s => s.id === b.schoolId)?.name || '';
+        comparison = schoolA.localeCompare(schoolB);
+      }
+      return adminSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    // Apply filtering and sorting for Žáci (Students)
+    const students = rawStudents.filter(s => {
+      const matchesSchool = adminSchoolFilter === 'all' || s.schoolId === adminSchoolFilter;
+      const matchesSearch = !adminSearchFilter.trim() || 
+        s.name.toLowerCase().includes(adminSearchFilter.toLowerCase()) || 
+        s.username.toLowerCase().includes(adminSearchFilter.toLowerCase());
+      return matchesSchool && matchesSearch;
+    }).sort((a, b) => {
+      let comparison = 0;
+      if (adminSortBy === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (adminSortBy === 'school') {
+        const schoolA = schools.find(s => s.id === a.schoolId)?.name || '';
+        const schoolB = schools.find(s => s.id === b.schoolId)?.name || '';
+        comparison = schoolA.localeCompare(schoolB);
+      }
+      return adminSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    // Apply filtering and sorting for Třídy (Classes)
+    const classrooms = rawClassrooms.filter(c => {
+      const matchesSchool = adminSchoolFilter === 'all' || c.schoolId === adminSchoolFilter;
+      const matchesSearch = !adminSearchFilter.trim() || 
+        c.name.toLowerCase().includes(adminSearchFilter.toLowerCase());
+      return matchesSchool && matchesSearch;
+    }).sort((a, b) => {
+      let comparison = 0;
+      if (adminSortBy === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (adminSortBy === 'school') {
+        const schoolA = schools.find(s => s.id === a.schoolId)?.name || '';
+        const schoolB = schools.find(s => s.id === b.schoolId)?.name || '';
+        comparison = schoolA.localeCompare(schoolB);
+      }
+      return adminSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    // Apply filtering and sorting for Úkoly (Assignments)
+    const assignments = rawAssignments.filter(a => {
+      const matchesSchool = adminSchoolFilter === 'all' || a.schoolId === adminSchoolFilter;
+      const matchesSearch = !adminSearchFilter.trim() || 
+        a.title.toLowerCase().includes(adminSearchFilter.toLowerCase());
+      return matchesSchool && matchesSearch;
+    }).sort((a, b) => {
+      let comparison = 0;
+      if (adminSortBy === 'name') {
+        comparison = a.title.localeCompare(b.title);
+      } else if (adminSortBy === 'school') {
+        const schoolA = schools.find(s => s.id === a.schoolId)?.name || '';
+        const schoolB = schools.find(s => s.id === b.schoolId)?.name || '';
+        comparison = schoolA.localeCompare(schoolB);
+      }
+      return adminSortOrder === 'asc' ? comparison : -comparison;
+    });
 
     return (
       <div className="min-h-screen flex flex-col bg-[#EFF3F7]">
@@ -1439,7 +1607,7 @@ export default function ITestApp() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             <Card 
               className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'overview' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
               onClick={() => setAdminTab('overview')}
@@ -1494,6 +1662,17 @@ export default function ITestApp() {
                 <p className="text-2xl font-black text-amber-500">{assignments.length}</p>
               </CardContent>
             </Card>
+
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'schools' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('schools')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <School className="w-8 h-8 text-violet-500" />
+                <p className="text-sm font-semibold text-muted-foreground">Školy</p>
+                <p className="text-2xl font-black text-violet-500">{schools.length}</p>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Active Tab View */}
@@ -1532,18 +1711,21 @@ export default function ITestApp() {
 
                   <div className="space-y-4">
                     <h4 className="font-bold text-lg text-gray-800">Rychlý rozcestník administrátora</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('teachers')}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('teachers')}>
                         <GraduationCap className="w-5 h-5 text-accent" /> Zobrazit učitele →
                       </Button>
-                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('classes')}>
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('classes')}>
                         <School className="w-5 h-5 text-green-500" /> Zobrazit třídy →
                       </Button>
-                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('students')}>
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('students')}>
                         <Users className="w-5 h-5 text-indigo-500" /> Zobrazit žáky →
                       </Button>
-                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3" onClick={() => setAdminTab('assignments')}>
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('assignments')}>
                         <ClipboardList className="w-5 h-5 text-amber-500" /> Zobrazit úkoly →
+                      </Button>
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('schools')}>
+                        <School className="w-5 h-5 text-violet-500" /> Zobrazit školy →
                       </Button>
                     </div>
                   </div>
@@ -1557,30 +1739,92 @@ export default function ITestApp() {
                     <p className="text-muted-foreground text-sm">Správa a přehled všech registrovaných učitelských účtů.</p>
                   </div>
 
+                  {/* Unified Search, Filter and Sort Bar */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Input 
+                          placeholder="🔍 Hledat podle jména nebo loginu..." 
+                          value={adminSearchFilter} 
+                          onChange={e => setAdminSearchFilter(e.target.value)} 
+                          className="bg-white h-10 pl-3 rounded-xl"
+                        />
+                      </div>
+                      <div className="w-full sm:w-64">
+                        <select 
+                          value={adminSchoolFilter} 
+                          onChange={e => setAdminSchoolFilter(e.target.value)}
+                          className="flex h-10 w-full rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="all">🏫 Všechny školy</option>
+                          {schools.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 w-full md:w-auto shrink-0 justify-end">
+                      <select 
+                        value={adminSortBy} 
+                        onChange={e => setAdminSortBy(e.target.value as any)}
+                        className="flex h-10 rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="default">↕️ Výchozí řazení</option>
+                        <option value="name">🔤 Podle jména</option>
+                        <option value="school">🏫 Podle školy</option>
+                      </select>
+                      
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl bg-white border border-input"
+                        onClick={() => setAdminSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        title={adminSortOrder === 'asc' ? 'Vzestupně' : 'Sestupně'}
+                      >
+                        {adminSortOrder === 'asc' ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-gray-50 border-b">
                           <th className="p-4 font-bold text-gray-700 text-sm">Jméno učitele</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Uživatelské jméno</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Škola</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Spravované třídy</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Tarif / Premium</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Akce</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {teachers.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="p-6 text-center text-muted-foreground">V systému zatím nejsou žádní učitelé.</td>
+                            <td colSpan={6} className="p-6 text-center text-muted-foreground">V systému zatím nejsou žádní učitelé.</td>
                           </tr>
                         ) : (
                           teachers.map(t => {
                             const managedClasses = classrooms.filter(c => c.teacherId === t.id);
+                            const now = new Date();
+                            const isPremium = !!(t.isPremium && (!t.premiumExpiresAt || new Date(t.premiumExpiresAt) > now));
+                            const premiumDaysLeft = t.premiumExpiresAt ? Math.max(0, Math.ceil((new Date(t.premiumExpiresAt).getTime() - now.getTime()) / (24 * 60 * 60 * 1000))) : 0;
+                            const createdTime = t.createdAt ? new Date(t.createdAt).getTime() : Date.now();
+                            const trialDurationMs = 90 * 24 * 60 * 60 * 1000;
+                            const timeSinceCreation = Date.now() - createdTime;
+                            const trialDaysLeft = Math.max(0, Math.ceil((trialDurationMs - timeSinceCreation) / (24 * 60 * 60 * 1000)));
+                            const isTrialExpired = !isPremium && (timeSinceCreation > trialDurationMs);
+
                             return (
                               <tr key={t.id} className="hover:bg-gray-50/50">
                                 <td className="p-4 font-bold text-primary flex items-center gap-2">
                                   <GraduationCap className="w-4 h-4 text-accent" /> {t.name}
                                 </td>
                                 <td className="p-4 text-sm text-gray-600 font-mono">{t.username}</td>
+                                <td className="p-4 text-sm text-gray-650 font-semibold">
+                                  {schools.find(s => s.id === t.schoolId)?.name || 'Bez školy / Admin'}
+                                </td>
                                 <td className="p-4">
                                   <div className="flex flex-wrap gap-1.5">
                                     {managedClasses.length === 0 ? (
@@ -1591,6 +1835,47 @@ export default function ITestApp() {
                                       ))
                                     )}
                                   </div>
+                                </td>
+                                <td className="p-4">
+                                  {t.role === 'admin' ? (
+                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full uppercase tracking-wider">Admin</span>
+                                  ) : (
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex flex-col">
+                                        {isPremium ? (
+                                          <>
+                                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200/50 px-2 py-0.5 rounded-full w-max flex items-center gap-1">
+                                              <Crown className="w-3 h-3 fill-amber-500 text-amber-500" /> Premium
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground mt-1 font-medium">zbývá {premiumDaysLeft} dní</span>
+                                          </>
+                                        ) : isTrialExpired ? (
+                                          <>
+                                            <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200/50 px-2 py-0.5 rounded-full w-max">
+                                              Zkušební verze vypršela
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground mt-1 font-medium">0 dní</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full w-max">
+                                              Zkušební verze
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground mt-1 font-medium">zbývá {trialDaysLeft} dní</span>
+                                          </>
+                                        )}
+                                      </div>
+
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className={`h-7 text-[10px] px-2.5 rounded-xl font-bold ${isPremium ? 'border-red-200 text-red-650 hover:bg-red-50 hover:text-red-700' : 'bg-amber-500 hover:bg-amber-600 text-white border-none'}`}
+                                        onClick={() => store.toggleUserPremium(t.id, isPremium)}
+                                      >
+                                        {isPremium ? 'Zrušit Premium' : 'Aktivovat Premium'}
+                                      </Button>
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="p-4">
                                   {t.id === currentUser.id ? (
@@ -1623,6 +1908,54 @@ export default function ITestApp() {
                     <p className="text-muted-foreground text-sm">Rozklikněte jakoukoli třídu pro detailní seznam žáků a zadaných prací.</p>
                   </div>
 
+                  {/* Unified Search, Filter and Sort Bar */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Input 
+                          placeholder="🔍 Hledat podle názvu třídy..." 
+                          value={adminSearchFilter} 
+                          onChange={e => setAdminSearchFilter(e.target.value)} 
+                          className="bg-white h-10 pl-3 rounded-xl"
+                        />
+                      </div>
+                      <div className="w-full sm:w-64">
+                        <select 
+                          value={adminSchoolFilter} 
+                          onChange={e => setAdminSchoolFilter(e.target.value)}
+                          className="flex h-10 w-full rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="all">🏫 Všechny školy</option>
+                          {schools.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 w-full md:w-auto shrink-0 justify-end">
+                      <select 
+                        value={adminSortBy} 
+                        onChange={e => setAdminSortBy(e.target.value as any)}
+                        className="flex h-10 rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="default">↕️ Výchozí řazení</option>
+                        <option value="name">🔤 Podle názvu třídy</option>
+                        <option value="school">🏫 Podle školy</option>
+                      </select>
+                      
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl bg-white border border-input"
+                        onClick={() => setAdminSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        title={adminSortOrder === 'asc' ? 'Vzestupně' : 'Sestupně'}
+                      >
+                        {adminSortOrder === 'asc' ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="grid gap-4">
                     {classrooms.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground bg-gray-50 border rounded-2xl">
@@ -1641,7 +1974,12 @@ export default function ITestApp() {
                               <div className="flex items-center gap-4">
                                 <School className="w-6 h-6 text-green-500" />
                                 <div>
-                                  <h4 className="font-black text-xl text-gray-800">{c.name}</h4>
+                                  <h4 className="font-black text-xl text-gray-800 flex items-center gap-2">
+                                    {c.name}
+                                    <Badge variant="outline" className="text-[10px] py-0 font-normal text-muted-foreground">
+                                      {schools.find(s => s.id === c.schoolId)?.name || 'Bez školy'}
+                                    </Badge>
+                                  </h4>
                                   <p className="text-xs text-muted-foreground">
                                     Třídní učitel: <span className="font-bold text-gray-700">{classTeacher ? classTeacher.name : 'Nespecifikován'}</span>
                                   </p>
@@ -1746,9 +2084,68 @@ export default function ITestApp() {
 
               {adminTab === 'students' && (
                 <div className="space-y-6 animate-fade-in">
-                  <div>
-                    <h3 className="text-2xl font-headline font-bold text-gray-800">Seznam Žáků</h3>
-                    <p className="text-muted-foreground text-sm">Přehled všech zapsaných žáků ve všech třídách platformy.</p>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h3 className="text-2xl font-headline font-bold text-gray-800">Seznam Žáků</h3>
+                      <p className="text-muted-foreground text-sm">Přehled všech zapsaných žáků ve všech třídách platformy.</p>
+                    </div>
+                    <Button 
+                      className="rounded-full shadow-md"
+                      onClick={() => {
+                        setTargetClassId(null);
+                        setIsAddingStudent(true);
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" /> Zapsat žáka
+                    </Button>
+                  </div>
+
+                  {/* Unified Search, Filter and Sort Bar */}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Input 
+                          placeholder="🔍 Hledat podle jména nebo loginu..." 
+                          value={adminSearchFilter} 
+                          onChange={e => setAdminSearchFilter(e.target.value)} 
+                          className="bg-white h-10 pl-3 rounded-xl"
+                        />
+                      </div>
+                      <div className="w-full sm:w-64">
+                        <select 
+                          value={adminSchoolFilter} 
+                          onChange={e => setAdminSchoolFilter(e.target.value)}
+                          className="flex h-10 w-full rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                        >
+                          <option value="all">🏫 Všechny školy</option>
+                          {schools.map(s => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 w-full md:w-auto shrink-0 justify-end">
+                      <select 
+                        value={adminSortBy} 
+                        onChange={e => setAdminSortBy(e.target.value as any)}
+                        className="flex h-10 rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="default">↕️ Výchozí řazení</option>
+                        <option value="name">🔤 Podle jména</option>
+                        <option value="school">🏫 Podle školy</option>
+                      </select>
+                      
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl bg-white border border-input"
+                        onClick={() => setAdminSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        title={adminSortOrder === 'asc' ? 'Vzestupně' : 'Sestupně'}
+                      >
+                        {adminSortOrder === 'asc' ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="overflow-x-auto rounded-xl border">
@@ -1757,6 +2154,7 @@ export default function ITestApp() {
                         <tr className="bg-gray-50 border-b">
                           <th className="p-4 font-bold text-gray-700 text-sm">Celé jméno žáka</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Uživatelské jméno</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Škola</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Přiřazená třída</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Přístupové heslo</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Akce</th>
@@ -1765,7 +2163,7 @@ export default function ITestApp() {
                       <tbody className="divide-y">
                         {students.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="p-6 text-center text-muted-foreground">V systému zatím nejsou registrovaní žádní žáci.</td>
+                            <td colSpan={6} className="p-6 text-center text-muted-foreground">V systému zatím nejsou registrovaní žádní žáci.</td>
                           </tr>
                         ) : (
                           students.map(s => {
@@ -1776,6 +2174,9 @@ export default function ITestApp() {
                                   <Users className="w-4 h-4 text-indigo-500" /> {s.name}
                                 </td>
                                 <td className="p-4 text-sm text-gray-600 font-mono">{s.username}</td>
+                                <td className="p-4 text-sm text-gray-650 font-semibold">
+                                  {schools.find(sc => sc.id === s.schoolId)?.name || 'Bez školy'}
+                                </td>
                                 <td className="p-4">
                                   {classroom ? (
                                     <Badge variant="outline" className="font-bold text-green-600 bg-green-50 border-green-150">{classroom.name}</Badge>
@@ -2154,12 +2555,62 @@ export default function ITestApp() {
                         <h3 className="text-2xl font-headline font-bold text-gray-800">Všechny zadané práce</h3>
                         <p className="text-muted-foreground text-sm">Klikněte na test pro zobrazení odevzdaných prací žáků.</p>
                       </div>
+
+                      {/* Unified Search, Filter and Sort Bar */}
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                        <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+                          <div className="relative flex-1">
+                            <Input 
+                              placeholder="🔍 Hledat podle názvu úkolu..." 
+                              value={adminSearchFilter} 
+                              onChange={e => setAdminSearchFilter(e.target.value)} 
+                              className="bg-white h-10 pl-3 rounded-xl"
+                            />
+                          </div>
+                          <div className="w-full sm:w-64">
+                            <select 
+                              value={adminSchoolFilter} 
+                              onChange={e => setAdminSchoolFilter(e.target.value)}
+                              className="flex h-10 w-full rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                            >
+                              <option value="all">🏫 Všechny školy</option>
+                              {schools.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 w-full md:w-auto shrink-0 justify-end">
+                          <select 
+                            value={adminSortBy} 
+                            onChange={e => setAdminSortBy(e.target.value as any)}
+                            className="flex h-10 rounded-xl border border-input bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          >
+                            <option value="default">↕️ Výchozí řazení</option>
+                            <option value="name">🔤 Podle názvu úkolu</option>
+                            <option value="school">🏫 Podle školy</option>
+                          </select>
+                          
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-10 w-10 rounded-xl bg-white border border-input"
+                            onClick={() => setAdminSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                            title={adminSortOrder === 'asc' ? 'Vzestupně' : 'Sestupně'}
+                          >
+                            {adminSortOrder === 'asc' ? <ChevronUp className="w-4 h-4 text-slate-600" /> : <ChevronDown className="w-4 h-4 text-slate-600" />}
+                          </Button>
+                        </div>
+                      </div>
+
                       <div className="overflow-x-auto rounded-xl border">
                         <table className="w-full text-left border-collapse">
                           <thead>
                             <tr className="bg-gray-50 border-b">
                               <th className="p-4 font-bold text-gray-700 text-sm">Název úkolu</th>
                               <th className="p-4 font-bold text-gray-700 text-sm">Učitel (Tvůrce)</th>
+                              <th className="p-4 font-bold text-gray-700 text-sm">Škola</th>
                               <th className="p-4 font-bold text-gray-700 text-sm">Určeno pro třídu</th>
                               <th className="p-4 font-bold text-gray-700 text-sm">Počet otázek</th>
                               <th className="p-4 font-bold text-gray-700 text-sm">Odevzdání</th>
@@ -2169,7 +2620,7 @@ export default function ITestApp() {
                           <tbody className="divide-y">
                             {assignments.length === 0 ? (
                               <tr>
-                                <td colSpan={6} className="p-6 text-center text-muted-foreground">V systému nebyly vytvořeny žádné úkoly.</td>
+                                <td colSpan={7} className="p-6 text-center text-muted-foreground">V systému nebyly vytvořeny žádné úkoly.</td>
                               </tr>
                             ) : (
                               assignments.map(a => {
@@ -2194,6 +2645,9 @@ export default function ITestApp() {
                                     </td>
                                     <td className="p-4 text-sm text-gray-600">
                                       {creator ? creator.name : <span className="text-xs text-muted-foreground italic">Legacy/Systém</span>}
+                                    </td>
+                                    <td className="p-4 text-sm text-gray-650 font-semibold">
+                                      {schools.find(sc => sc.id === a.schoolId)?.name || 'Bez školy'}
                                     </td>
                                     <td className="p-4">
                                       {classroom ? (
@@ -2225,6 +2679,83 @@ export default function ITestApp() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {adminTab === 'schools' && (
+                <div className="space-y-6 animate-fade-in">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <h3 className="text-2xl font-headline font-bold text-gray-800">Správa škol</h3>
+                      <p className="text-muted-foreground text-sm">Vytváření a správa školních organizací a jejich zvacích kódů.</p>
+                    </div>
+                  </div>
+
+                  {/* Formulář pro novou školu */}
+                  <Card className="border shadow-sm bg-slate-50/50 p-6 rounded-2xl">
+                    <form onSubmit={handleCreateSchool} className="grid md:grid-cols-3 gap-4 items-end">
+                      <div className="space-y-2">
+                        <Label className="font-bold">Název školy</Label>
+                        <Input placeholder="např. Gymnázium Dobříš" value={newSchoolName} onChange={e => setNewSchoolName(e.target.value)} className="bg-white" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="font-bold">Zvací kód (invite code)</Label>
+                        <Input placeholder="např. gymdobris" value={newSchoolInviteCode} onChange={e => setNewSchoolInviteCode(e.target.value)} className="bg-white font-mono text-primary font-bold animate-pulse" />
+                      </div>
+                      <Button type="submit" className="h-10 font-bold shadow-md">Vytvořit školu</Button>
+                    </form>
+                  </Card>
+
+                  {/* Seznam škol */}
+                  <div className="overflow-x-auto rounded-xl border">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="p-4 font-bold text-gray-700 text-sm">Název školy</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Zvací kód</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Třídy</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Učitelé</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Žáci</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Akce</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {isLoadingSchools ? (
+                          <tr>
+                            <td colSpan={6} className="p-6 text-center text-muted-foreground">
+                              <span className="flex items-center justify-center gap-2">
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" /> Načítám školy...
+                              </span>
+                            </td>
+                          </tr>
+                        ) : schools.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-6 text-center text-muted-foreground">Žádné školy nebyly vytvořeny.</td>
+                          </tr>
+                        ) : (
+                          schools.map(s => (
+                            <tr key={s.id} className="hover:bg-gray-50/50">
+                              <td className="p-4 font-bold text-primary">{s.name}</td>
+                              <td className="p-4 font-mono text-sm font-bold text-indigo-600">{s.inviteCode}</td>
+                              <td className="p-4 text-sm font-semibold">{s.classCount}</td>
+                              <td className="p-4 text-sm font-semibold">{s.teacherCount}</td>
+                              <td className="p-4 text-sm font-semibold">{s.studentCount}</td>
+                              <td className="p-4">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-8 w-8 p-0 rounded-full text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => handleDeleteSchool(s.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -2403,6 +2934,65 @@ export default function ITestApp() {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
     const selectedClass = store.classes.find(c => c.id === selectedClassId);
 
+    const now = new Date();
+    const isPremium = !!(currentUser.isPremium && (!currentUser.premiumExpiresAt || new Date(currentUser.premiumExpiresAt) > now));
+    
+    // Výpočet zbývajících dnů zkušební doby
+    const createdTime = currentUser.createdAt ? new Date(currentUser.createdAt).getTime() : Date.now();
+    const trialDurationMs = 90 * 24 * 60 * 60 * 1000;
+    const timeSinceCreation = Date.now() - createdTime;
+    const daysLeft = Math.max(0, Math.ceil((trialDurationMs - timeSinceCreation) / (24 * 60 * 60 * 1000)));
+    const isTrialExpired = !isPremium && (timeSinceCreation > trialDurationMs);
+    const premiumDaysLeft = currentUser.premiumExpiresAt ? Math.max(0, Math.ceil((new Date(currentUser.premiumExpiresAt).getTime() - now.getTime()) / (24 * 60 * 60 * 1000))) : 0;
+
+    if (isTrialExpired) {
+      return (
+        <div className="min-h-screen flex flex-col bg-background">
+          <Navbar user={currentUser} onLogout={() => store.logout()} />
+          <div className="flex-1 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-100 shadow-2xl space-y-6 text-center animate-scale-up animate-fade-in">
+              <div className="mx-auto w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-3xl">
+                🔒
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-headline font-black text-gray-800">Platnost zkušební verze vypršela</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Vaše 3měsíční zkušební doba pro iTest Cloud vypršela. Pro pokračování v používání platformy, vytváření tříd a správu žáků si prosím aktivujte Prémiové předplatné.
+                </p>
+              </div>
+              
+              <div className="border-t border-b py-4 space-y-3">
+                <div className="flex items-center gap-3 text-left bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100/50">
+                  <span className="text-xl">🚀</span>
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">Nulová omezení</p>
+                    <p className="text-xs text-muted-foreground">Neomezený počet tříd, žáků a zadání.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                <Button 
+                  onClick={() => store.activatePremium('monthly')}
+                  className="w-full rounded-2xl py-6 font-bold shadow-md bg-indigo-600 hover:bg-indigo-750 text-white flex justify-between px-6 border-none"
+                >
+                  <span>Měsíční tarif</span>
+                  <span>99 Kč / měsíc</span>
+                </Button>
+                <Button 
+                  onClick={() => store.activatePremium('yearly')}
+                  className="w-full rounded-2xl py-6 font-bold shadow-md bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white flex justify-between px-6 border-none"
+                >
+                  <span>Roční tarif (Ušetříte 16%)</span>
+                  <span>999 Kč / rok</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const predefinedSubjects = [
       'Matematika',
       'Český jazyk',
@@ -2427,6 +3017,49 @@ export default function ITestApp() {
       <div className="min-h-screen flex flex-col bg-background">
         <Navbar user={currentUser} onLogout={() => store.logout()} />
         
+        {/* Banner o předplatném */}
+        <div className="max-w-7xl w-full mx-auto px-4 md:px-8 mt-6">
+          {isPremium ? (
+            <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-indigo-500/10 border border-amber-200/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="bg-amber-100/80 p-2 rounded-xl text-amber-600">
+                  <Crown className="w-5 h-5 fill-amber-500 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-indigo-950 flex items-center gap-1.5">
+                    Prémiový účet aktivní <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">PREMIUM</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Všechny limity jsou zrušeny. Placená verze vyprší a přepne se do základní verze za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-gradient-to-r from-indigo-500/5 via-indigo-600/5 to-purple-500/5 border border-indigo-200/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="bg-indigo-100/80 p-2 rounded-xl text-indigo-650 animate-pulse">
+                  <Sparkles className="w-5 h-5 text-indigo-650" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-indigo-950">
+                    Používáte zkušební verzi iTest Cloud
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Zkušební doba končí za <span className="font-bold text-indigo-700">{daysLeft} dní</span>. Omezení: max. 2 třídy a 20 žáků na třídu.
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => setIsUpgradeModalOpen(true)}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white rounded-xl text-xs font-bold py-2 px-4 shadow-sm border-none"
+              >
+                Upgradovat na Premium
+              </Button>
+            </div>
+          )}
+        </div>
+
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -3691,9 +4324,30 @@ export default function ITestApp() {
               setCsvImportProgress('');
             }
           }}>
-            <DialogContent aria-describedby={undefined}>
-              <DialogHeader><DialogTitle>Zapsat žáka</DialogTitle></DialogHeader>
+            <DialogContent aria-describedby={undefined} className="rounded-3xl border-none shadow-2xl max-w-md bg-white">
+              <DialogHeader><DialogTitle className="text-2xl font-headline font-bold text-primary">Zapsat žáka</DialogTitle></DialogHeader>
               
+              {store.currentUser?.role === 'admin' && (
+                <div className="space-y-1.5 mb-4">
+                  <Label className="font-bold text-gray-700">Cílová třída</Label>
+                  <select
+                    value={targetClassId || ''}
+                    onChange={(e) => setTargetClassId(e.target.value || null)}
+                    className="flex h-11 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="">-- Vyberte cílovou třídu --</option>
+                    {store.classes.map(c => {
+                      const schoolName = schools.find(s => s.id === c.schoolId)?.name || 'Bez školy';
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({schoolName})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-1 bg-gray-100 rounded-lg mb-4 p-1">
                 <button 
                   type="button" 
@@ -3728,6 +4382,9 @@ export default function ITestApp() {
                     className="mb-2"
                   />
                   {(() => {
+                    if (store.currentUser?.role === 'admin' && !targetClassId) {
+                      return <p className="text-sm text-amber-600 font-semibold py-2">Pro výběr žáků nejprve zvolte cílovou třídu nahoře.</p>;
+                    }
                     const availableStudents = store.users.filter(u => u.role === 'student' && u.classId !== targetClassId);
                     if (availableStudents.length === 0) {
                       return <p className="text-sm text-amber-600 font-semibold py-2">Žádní další žáci nebyli v systému nalezeni.</p>;
@@ -3793,7 +4450,7 @@ export default function ITestApp() {
 
               <DialogFooter>
                 {studentActionType === 'create' ? (
-                  <Button onClick={handleAddStudent}>Vytvořit</Button>
+                  <Button onClick={handleAddStudent} disabled={store.currentUser?.role === 'admin' && !targetClassId}>Vytvořit</Button>
                 ) : studentActionType === 'select' ? (
                   <Button 
                     onClick={() => {
@@ -3803,12 +4460,12 @@ export default function ITestApp() {
                         setSelectedExistingStudentId('');
                       }
                     }} 
-                    disabled={!selectedExistingStudentId}
+                    disabled={!selectedExistingStudentId || !targetClassId}
                   >Přiřadit žáka</Button>
                 ) : (
                   <Button
                     onClick={handleImportCSVToExisting}
-                    disabled={!csvFile || !!csvImportProgress}
+                    disabled={!csvFile || !!csvImportProgress || (store.currentUser?.role === 'admin' && !targetClassId)}
                     className="w-full"
                   >
                     Importovat žáky z CSV
@@ -3936,6 +4593,156 @@ export default function ITestApp() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Dialog pro aktivaci Premium (UpgradeModal) */}
+          <Dialog open={isUpgradeModalOpen} onOpenChange={(open) => {
+            setIsUpgradeModalOpen(open);
+            if (!open) setPaymentDetails(null);
+          }}>
+            <DialogContent className="max-w-xl bg-white rounded-3xl border-none shadow-2xl p-6">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-2xl font-headline font-black text-indigo-700 flex items-center gap-2">
+                  <Crown className="w-6 h-6 text-amber-500 fill-amber-500 animate-bounce" />
+                  {paymentDetails ? 'Platební QR Kód' : 'Aktivovat iTest Cloud Premium'}
+                </DialogTitle>
+                <DialogDescription className="text-gray-500 text-sm leading-relaxed">
+                  {paymentDetails 
+                    ? 'Naskenujte QR kód ve své bankovní aplikaci nebo použijte platební údaje níže.'
+                    : 'Získejte přístup ke všem funkcím iTest Cloud bez jakýchkoliv omezení. Vytvářejte neomezeně tříd a studentů.'}
+                </DialogDescription>
+              </DialogHeader>
+              
+              {paymentDetails ? (
+                <div className="space-y-6 py-4 flex flex-col items-center">
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex flex-col items-center">
+                    <img 
+                      src={`https://api.paylibo.com/paylibo/generator/czech/image?accountNumber=1667425028&bankCode=3030&amount=${paymentDetails.amount}&currency=CZK&message=${encodeURIComponent(`${currentUser.name} - ${schools.find(s => s.id === currentUser.schoolId)?.name || 'Skola'}`)}`} 
+                      alt="Platební QR Kód" 
+                      className="w-56 h-56 object-contain rounded-xl shadow-inner bg-white border border-slate-200"
+                    />
+                    <span className="text-[10px] text-muted-foreground mt-2 uppercase font-black tracking-wider">Česká QR Platba</span>
+                  </div>
+
+                  <div className="w-full bg-slate-50 border border-slate-200/60 rounded-2xl p-4 text-xs space-y-2.5">
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="text-slate-500 font-semibold">Číslo účtu:</span>
+                      <span className="font-bold text-slate-800">1667425028 / 3030 (Air Bank)</span>
+                    </div>
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="text-slate-500 font-semibold">Částka:</span>
+                      <span className="font-black text-indigo-700">{paymentDetails.amount} Kč</span>
+                    </div>
+                    <div className="flex flex-col border-b pb-2 gap-1">
+                      <span className="text-slate-500 font-semibold">Zpráva pro příjemce (Poznámka):</span>
+                      <span className="font-bold text-slate-800 bg-white border border-slate-200 p-2 rounded-lg text-center break-all select-all font-mono">
+                        {currentUser.name} - {schools.find(s => s.id === currentUser.schoolId)?.name || 'iTest Škola'}
+                      </span>
+                    </div>
+                    <div className="bg-amber-50 text-amber-800 p-3 rounded-xl border border-amber-100/60 leading-relaxed text-[11px] font-medium flex gap-2">
+                      <span>⚠️</span>
+                      <span>Pro spárování platby prosím uveďte výše zobrazenou poznámku přesně tak, jak je uvedena.</span>
+                    </div>
+                  </div>
+
+                  <div className="w-full flex gap-3 mt-4">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 rounded-2xl py-5 font-bold border-slate-200 hover:bg-slate-50" 
+                      onClick={() => setPaymentDetails(null)}
+                    >
+                      Zpět
+                    </Button>
+                    <Button 
+                      onClick={async () => {
+                        const success = await store.activatePremium(paymentDetails.type);
+                        if (success) {
+                          setPaymentDetails(null);
+                          setIsUpgradeModalOpen(false);
+                        }
+                      }}
+                      className="flex-1 rounded-2xl py-5 font-bold shadow-md bg-indigo-600 hover:bg-indigo-700 text-white border-none"
+                    >
+                      Potvrdit zaplacení
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid md:grid-cols-2 gap-4 py-4">
+                    {/* Monthly card */}
+                    <div className="bg-slate-50 border border-slate-200/60 hover:border-indigo-400 rounded-3xl p-5 flex flex-col justify-between transition-all hover:shadow-md">
+                      <div>
+                        <h3 className="font-bold text-lg text-slate-800">Měsíční tarif</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Flexibilní předplatné na každý měsíc.</p>
+                        <div className="mt-4 flex items-baseline">
+                          <span className="text-3xl font-black text-indigo-700">99 Kč</span>
+                          <span className="text-xs text-muted-foreground ml-1">/ měsíc</span>
+                        </div>
+                        <ul className="text-xs space-y-2 mt-5 text-slate-600 font-medium">
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Neomezeně tříd
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Neomezeně žáků a testů
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Hromadné stahování výsledků
+                          </li>
+                        </ul>
+                      </div>
+                      <Button 
+                        onClick={() => setPaymentDetails({ amount: 99, type: 'monthly' })}
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-indigo-650 hover:bg-indigo-700 text-white border-none"
+                      >
+                        Aktivovat měsíčně
+                      </Button>
+                    </div>
+
+                    {/* Yearly card */}
+                    <div className="bg-gradient-to-b from-indigo-50/50 to-purple-50/50 border-2 border-indigo-500 rounded-3xl p-5 flex flex-col justify-between relative shadow-sm hover:shadow-md transition-all">
+                      <span className="absolute -top-3 right-4 bg-gradient-to-r from-amber-500 to-yellow-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
+                        UŠETŘÍTE 16%
+                      </span>
+                      <div>
+                        <h3 className="font-bold text-lg text-indigo-950 flex items-center gap-1">
+                          Roční tarif <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500" />
+                        </h3>
+                        <p className="text-xs text-indigo-900/60 mt-1">Dlouhodobě nejvýhodnější volba pro školy.</p>
+                        <div className="mt-4 flex items-baseline">
+                          <span className="text-3xl font-black text-indigo-700">999 Kč</span>
+                          <span className="text-xs text-muted-foreground ml-1">/ rok</span>
+                        </div>
+                        <ul className="text-xs space-y-2 mt-5 text-indigo-900 font-medium">
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 animate-pulse" /> Neomezeně tříd
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 animate-pulse" /> Neomezeně žáků a testů
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 animate-pulse" /> Hromadné stahování výsledků
+                          </li>
+                        </ul>
+                      </div>
+                      <Button 
+                        onClick={() => setPaymentDetails({ amount: 999, type: 'yearly' })}
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white border-none"
+                      >
+                        Aktivovat ročně
+                      </Button>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button variant="outline" className="w-full rounded-2xl font-bold py-5" onClick={() => setIsUpgradeModalOpen(false)}>
+                      Zavřít
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
+
           {renderGradebookDialog()}
         </main>
       </div>

@@ -7,6 +7,10 @@ export interface User {
   username: string;
   password?: string;
   classId?: string;
+  schoolId?: string; // přidáno pro multi-school
+  isPremium?: boolean;
+  premiumExpiresAt?: string;
+  createdAt?: string; // přidáno pro výpočet trialu
 }
 
 export interface Class {
@@ -14,6 +18,7 @@ export interface Class {
   name: string;
   teacherId: string;
   studentIds: string[];
+  schoolId?: string; // přidáno pro multi-school
 }
 
 export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'number_line' | 'true_false' | 'drawing' | 'graph';
@@ -45,6 +50,7 @@ export interface Assignment {
   sharedWithClassIds?: string[]; // Sdílení do dalších tříd
   gradeThresholds?: number[]; // [t1, t2, t3, t4] např. [85, 65, 45, 25]
   isDraft?: boolean; // Koncept — není viditelný pro žáky
+  schoolId?: string; // přidáno pro multi-school
 }
 
 export interface Submission {

@@ -8,6 +8,9 @@ export interface ITeacher extends Document {
   password?: string; // přidáno pro login (hashované heslo)
   role: string; // "teacher"
   subjects?: string[];
+  schoolId?: string; // přidáno pro multi-school
+  isPremium?: boolean;
+  premiumExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +24,9 @@ const TeacherSchema: Schema = new Schema(
     password: { type: String, select: false }, // Heslo nebude standardně zasíláno při dotazech do DB
     role: { type: String, default: "teacher" },
     subjects: { type: [String], default: [] },
+    schoolId: { type: String }, // nepovinné (admin nemá, učitel má)
+    isPremium: { type: Boolean, default: false },
+    premiumExpiresAt: { type: Date },
   },
   {
     timestamps: true,

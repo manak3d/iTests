@@ -8,7 +8,8 @@ export interface IStudent extends Document {
   password?: string;
   passwordPlain?: string;
   role: string;
-  classroomId: mongoose.Types.ObjectId;
+  classroomId: string;
+  schoolId: string; // přidáno pro multi-school
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +25,7 @@ const StudentSchema: Schema = new Schema(
     passwordPlain: { type: String },
     role: { type: String, default: "student" },
     classroomId: { type: String, required: true }, // Změněno na String pro kompatibilitu s Firebase ID
+    schoolId: { type: String, required: true }, // povinné pro rozdělení škol
   },
   {
     timestamps: true,
