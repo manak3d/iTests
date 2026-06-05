@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
 import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
+
+    console.log('[AI API] Action:', action);
+    console.log('[AI API] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY);
+    console.log('[AI API] GOOGLE_API_KEY present:', !!process.env.GOOGLE_API_KEY);
 
     if (action === 'digitize') {
       const { fileDataUri } = body;
