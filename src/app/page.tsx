@@ -2975,14 +2975,20 @@ export default function ITestApp() {
 
               <div className="grid gap-3">
                 <Button 
-                  onClick={() => store.activatePremium('monthly')}
+                  onClick={() => {
+                    setPaymentDetails({ amount: 99, type: 'monthly' });
+                    setIsUpgradeModalOpen(true);
+                  }}
                   className="w-full rounded-2xl py-6 font-bold shadow-md bg-indigo-600 hover:bg-indigo-750 text-white flex justify-between px-6 border-none"
                 >
                   <span>Měsíční tarif</span>
                   <span>99 Kč / měsíc</span>
                 </Button>
                 <Button 
-                  onClick={() => store.activatePremium('yearly')}
+                  onClick={() => {
+                    setPaymentDetails({ amount: 999, type: 'yearly' });
+                    setIsUpgradeModalOpen(true);
+                  }}
                   className="w-full rounded-2xl py-6 font-bold shadow-md bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white flex justify-between px-6 border-none"
                 >
                   <span>Roční tarif (Ušetříte 16%)</span>

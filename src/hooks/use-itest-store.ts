@@ -534,43 +534,7 @@ export function useITestStore() {
     });
   }, [toast]);
 
-  const activatePremium = useCallback((type: 'monthly' | 'yearly') => {
-    if (!currentUser) return Promise.resolve(false);
-    return fetch('/api/teachers', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'activatePremium', type })
-    })
-    .then(async res => {
-      const data = await res.json();
-      if (res.ok && data.success) {
-        toast({ title: "Premium aktivováno", description: "Děkujeme! Všechny limity byly zrušeny." });
-        
-        const updatedUser = { 
-          ...currentUser, 
-          isPremium: true, 
-          premiumExpiresAt: data.data.premiumExpiresAt 
-        };
-        
-        setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
-        
-        if (mongoUser && mongoUser.id === currentUser.id) {
-          setMongoUser(updatedUser);
-          sessionStorage.setItem('itest_mongo_user', JSON.stringify(updatedUser));
-        }
-        
-        return true;
-      } else {
-        toast({ title: "Chyba", description: data.error || "Aktivace Premium selhala.", variant: "destructive" });
-        return false;
-      }
-    })
-    .catch(err => {
-      console.error(err);
-      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
-      return false;
-    });
-  }, [currentUser, mongoUser, toast]);
+
 
   const toggleUserPremium = useCallback((userId: string, isPremium: boolean) => {
     return fetch('/api/teachers', {
@@ -665,6 +629,6 @@ export function useITestStore() {
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, activatePremium, toggleUserPremium
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium
   };
 }

@@ -104,6 +104,11 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
+
+    if ((body.action === "activatePremium" || body.action === "deactivatePremium") && session.role !== "admin") {
+      return NextResponse.json({ success: false, error: "Pouze administrátor může aktivovat nebo zrušit Premium." }, { status: 403 });
+    }
+
     const teacherId = session.role === "admin" ? body.id : session.id;
 
     if (!teacherId) {
