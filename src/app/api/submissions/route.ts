@@ -44,6 +44,31 @@ export async function POST(request: Request) {
       updateData.lastActiveAt = body.lastActiveAt;
     }
 
+    // Ochrana proti přepsání odevzdaného/oznámkovaného testu konceptem (draftem)
+    const existing = await Submission.findById(submissionId);
+    if (existing && existing.submittedAt) {
+      // Pokud je již odevzdáno, zachováme čas odevzdání
+      updateData.submittedAt = existing.submittedAt;
+      
+      // Pokud je odevzdáno a snažíme se uložit draft (submittedAt je prázdné),
+      // nepovolíme přepsání odpovědí, výkresů ani známek
+      if (!body.submittedAt || body.submittedAt === "") {
+        updateData.answers = existing.answers;
+        updateData.questionDrawings = existing.questionDrawings;
+        updateData.mainWorkDrawing = existing.mainWorkDrawing;
+        
+        if (existing.grade !== undefined && existing.grade !== null) {
+          updateData.grade = existing.grade;
+        }
+        if (existing.feedback !== undefined) {
+          updateData.feedback = existing.feedback;
+        }
+        if (existing.questionScores) {
+          updateData.questionScores = existing.questionScores;
+        }
+      }
+    }
+
     const newSubmission = await Submission.findOneAndUpdate(
       { _id: submissionId },
       { $set: updateData },

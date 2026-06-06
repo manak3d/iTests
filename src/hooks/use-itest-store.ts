@@ -489,6 +489,12 @@ export function useITestStore() {
   const saveDraft = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'> & { tabFocusLostCount?: number; lastActiveAt?: string }) => {
     const id = submission.assignmentId + "-" + submission.studentId;
     const existingSub = submissions.find(s => s.id === id);
+    
+    // Ochrana na klientské straně: pokud je test již odevzdán, nebudeme ukládat draft
+    if (existingSub && existingSub.submittedAt !== "") {
+      return Promise.resolve();
+    }
+
     const newSubmission = {
       ...submission,
       id,
