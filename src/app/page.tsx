@@ -1603,6 +1603,19 @@ export default function ITestApp() {
                     Aktivace Premium verze kompletně ruší limity a zpřístupňuje hromadný export výsledků do ZIP.
                   </p>
                 </div>
+
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-150 space-y-2">
+                  <h3 className="text-xs font-black uppercase text-violet-750 tracking-wider flex items-center gap-1">
+                    Školní licence 🏫
+                  </h3>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-sm font-black text-violet-850">od 4 999 Kč / rok</span>
+                    <span className="text-[10px] text-violet-600 font-bold uppercase tracking-wider">Individuální</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed border-t pt-2">
+                    Individuální cena přizpůsobená velikosti školy a počtu žáků (začíná na **od 4 999 Kč / rok**). Zahrnuje neomezený přístup pro celou školu a všechny její učitele.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -4727,7 +4740,7 @@ export default function ITestApp() {
             setIsUpgradeModalOpen(open);
             if (!open) setPaymentDetails(null);
           }}>
-            <DialogContent className="max-w-xl bg-white rounded-3xl border-none shadow-2xl p-6">
+            <DialogContent className="max-w-4xl bg-white rounded-3xl border-none shadow-2xl p-6">
               <DialogHeader className="space-y-3">
                 <DialogTitle className="text-2xl font-headline font-black text-indigo-700 flex items-center gap-2">
                   <Crown className="w-6 h-6 text-amber-500 fill-amber-500 animate-bounce" />
@@ -4797,7 +4810,7 @@ export default function ITestApp() {
                 </div>
               ) : (
                 <>
-                  <div className="grid md:grid-cols-2 gap-4 py-4">
+                  <div className="grid md:grid-cols-3 gap-4 py-4">
                     {/* Monthly card */}
                     <div className="bg-slate-50 border border-slate-200/60 hover:border-indigo-400 rounded-3xl p-5 flex flex-col justify-between transition-all hover:shadow-md">
                       <div>
@@ -4858,6 +4871,45 @@ export default function ITestApp() {
                         className="w-full mt-6 rounded-2xl py-5 font-bold shadow-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white border-none"
                       >
                         Aktivovat ročně
+                      </Button>
+                    </div>
+
+                    {/* School card */}
+                    <div className="bg-gradient-to-b from-violet-50/50 to-indigo-50/50 border border-violet-350 rounded-3xl p-5 flex flex-col justify-between hover:shadow-md transition-all">
+                      <div>
+                        <h3 className="font-bold text-lg text-violet-950 flex items-center gap-1">
+                          Školní licence 🏫
+                        </h3>
+                        <p className="text-xs text-violet-900/60 mt-1">Pro celé školy a neomezený počet učitelů.</p>
+                        <div className="mt-4 flex flex-col">
+                          <span className="text-2xl font-black text-violet-750">od 4 999 Kč</span>
+                          <span className="text-[10px] text-muted-foreground">/ rok (dle počtu žáků)</span>
+                        </div>
+                        <ul className="text-xs space-y-2 mt-5 text-violet-900 font-medium">
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-violet-600 shrink-0" /> Individuální nacenění
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-violet-600 shrink-0" /> Neomezeně učitelů, tříd i žáků
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-violet-600 shrink-0" /> Společná správa a fakturace
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-violet-600 shrink-0" /> Zaškolení a prioritní podpora
+                          </li>
+                        </ul>
+                      </div>
+                      <Button 
+                        onClick={() => {
+                          toast({
+                            title: "Poptávka školní licence",
+                            description: "Pro individuální nacenění nás kontaktujte na e-mailu: info@itests.cz.",
+                          });
+                        }}
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-violet-600 hover:bg-violet-750 text-white border-none"
+                      >
+                        Kontaktovat podporu
                       </Button>
                     </div>
                   </div>
