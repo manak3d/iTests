@@ -19,17 +19,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Chybí ID školy." }, { status: 400 });
     }
 
-    const newSubmission = await Submission.create({
-      _id: body.id,
+    const submissionId = body.id || (body.assignmentId + "-" + (body.studentId || session.id));
+
+    const updateData: any = {
       assignmentId: body.assignmentId,
       studentId: body.studentId || session.id,
       answers: body.answers || {},
       questionDrawings: body.questionDrawings || {},
       mainWorkDrawing: body.mainWorkDrawing,
-      submittedAt: body.submittedAt,
-      questionScores: body.questionScores || {},
+      submittedAt: body.submittedAt !== undefined ? body.submittedAt : "",
       schoolId: schoolId,
-    });
+    };
+
+    if (body.startedAt !== undefined) {
+      updateData.startedAt = body.startedAt;
+    }
+    if (body.questionScores !== undefined) {
+      updateData.questionScores = body.questionScores;
+    }
+
+    const newSubmission = await Submission.findOneAndUpdate(
+      { _id: submissionId },
+      { $set: updateData },
+      { upsert: true, new: true }
+    );
 
     return NextResponse.json({ success: true, data: newSubmission }, { status: 201 });
   } catch (error: any) {

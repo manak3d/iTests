@@ -55,6 +55,8 @@ export function AssignmentCreator({
   const [endTime, setEndTime] = useState('');
   const [assignType, setAssignType] = useState<'all' | 'specific'>('all');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isPublicTemplate, setIsPublicTemplate] = useState(false);
+  const [timeLimit, setTimeLimit] = useState<number>(0);
 
   // Grade thresholds state
   const [useCustomThresholds, setUseCustomThresholds] = useState(false);
@@ -272,12 +274,14 @@ export function AssignmentCreator({
       studentIds: assignType === 'specific' ? selectedStudentIds : [],
       gradeThresholds: useCustomThresholds ? [threshold1, threshold2, threshold3, threshold4] : undefined,
       isDraft: false,
+      isPublicTemplate,
+      timeLimit
     });
   };
 
   const handleSaveDraft = () => {
     if (!title.trim()) {
-      return toast({ title: "Chybí název", description: "Zadejte název konceptu.", variant: "destructive" });
+      return toast({ title: "Chyba", description: "Zadejte název konceptu.", variant: "destructive" });
     }
     onSave({
       title,
@@ -292,6 +296,8 @@ export function AssignmentCreator({
       studentIds: assignType === 'specific' ? selectedStudentIds : [],
       gradeThresholds: useCustomThresholds ? [threshold1, threshold2, threshold3, threshold4] : undefined,
       isDraft: true,
+      isPublicTemplate,
+      timeLimit
     });
   };
 
@@ -358,7 +364,7 @@ export function AssignmentCreator({
           {/* Časový limit a zacílení žáků */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-5 rounded-2xl border border-slate-100/80">
             <div className="space-y-4">
-              <h4 className="font-bold text-sm text-primary uppercase tracking-wider">⏱️ Časový limit testu</h4>
+              <h4 className="font-bold text-sm text-primary uppercase tracking-wider">⏱️ Časový limit a šablona</h4>
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase">Od kdy (zahájení):</label>
@@ -377,6 +383,28 @@ export function AssignmentCreator({
                     onChange={e => setEndTime(e.target.value)}
                     className="h-10 text-sm"
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Délka testu (v minutách, 0 = bez limitu):</label>
+                  <Input 
+                    type="number" 
+                    min="0"
+                    value={timeLimit} 
+                    onChange={e => setTimeLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="h-10 text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input 
+                    type="checkbox" 
+                    id="isPublicTemplate"
+                    checked={isPublicTemplate} 
+                    onChange={e => setIsPublicTemplate(e.target.checked)}
+                    className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                  />
+                  <label htmlFor="isPublicTemplate" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                    Povolit jako veřejnou šablonu pro ostatní učitele
+                  </label>
                 </div>
               </div>
             </div>

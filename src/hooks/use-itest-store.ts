@@ -202,7 +202,7 @@ export function useITestStore() {
     .catch(console.error);
   }, [db, currentUser, toast]);
 
-  const updateAssignment = useCallback((id: string, updates: { startTime?: string; endTime?: string; studentIds?: string[]; sharedWithClassIds?: string[]; isDraft?: boolean }) => {
+  const updateAssignment = useCallback((id: string, updates: { startTime?: string; endTime?: string; studentIds?: string[]; sharedWithClassIds?: string[]; isDraft?: boolean; isPublicTemplate?: boolean; timeLimit?: number }) => {
     return fetch('/api/assignments', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -337,6 +337,49 @@ export function useITestStore() {
     })
     .catch(console.error);
   }, [db, toast]);
+
+
+  const startAssignmentTimer = useCallback((assignmentId: string, studentId: string, schoolId: string) => {
+    const id = assignmentId + "-" + studentId;
+    const existing = submissions.find(s => s.assignmentId === assignmentId && s.studentId === studentId);
+    if (existing?.startedAt) {
+      return Promise.resolve(existing.startedAt);
+    }
+    
+    const startedAt = new Date().toISOString();
+    const newSubmission = {
+      id,
+      assignmentId,
+      studentId,
+      answers: {},
+      questionDrawings: {},
+      submittedAt: "",
+      startedAt,
+      schoolId
+    };
+
+    return fetch('/api/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSubmission)
+    })
+    .then(async res => {
+      if (res.ok) {
+        setSubmissions(prev => {
+          const filtered = prev.filter(s => s.id !== id);
+          return [...filtered, newSubmission as Submission];
+        });
+        if (db) {
+          setDoc(doc(db, 'submissions', id), cleanData(newSubmission)).catch(console.error);
+        }
+      }
+      return startedAt;
+    })
+    .catch(err => {
+      console.error(err);
+      return startedAt;
+    });
+  }, [db, submissions]);
 
 
   const submitWork = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'>) => {
@@ -629,6 +672,6 @@ export function useITestStore() {
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, startAssignmentTimer
   };
 }

@@ -50,7 +50,16 @@ export async function GET() {
       teachers = await Teacher.find({ schoolId }).lean();
       students = await Student.find({ schoolId }).lean();
       classes = await Classroom.find({ schoolId }).lean();
-      assignments = await Assignment.find({ schoolId }).lean();
+      if (session.role === 'teacher') {
+        assignments = await Assignment.find({
+          $or: [
+            { schoolId },
+            { isPublicTemplate: true }
+          ]
+        }).lean();
+      } else {
+        assignments = await Assignment.find({ schoolId }).lean();
+      }
 
       if (session.role === 'student') {
         // Student vidí pouze své vlastní odevzdané práce

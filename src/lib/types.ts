@@ -51,6 +51,8 @@ export interface Assignment {
   gradeThresholds?: number[]; // [t1, t2, t3, t4] např. [85, 65, 45, 25]
   isDraft?: boolean; // Koncept — není viditelný pro žáky
   schoolId?: string; // přidáno pro multi-school
+  isPublicTemplate?: boolean;
+  timeLimit?: number; // v minutách
 }
 
 export interface Submission {
@@ -61,6 +63,7 @@ export interface Submission {
   questionDrawings: Record<string, string>;
   mainWorkDrawing?: string; // Drawing on the main document
   submittedAt: string;
+  startedAt?: string;
   grade?: number; // 1-5
   feedback?: string;
   questionScores?: Record<string, number>; // Udelené body učiteľom

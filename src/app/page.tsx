@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useITestStore } from '@/hooks/use-itest-store';
 import { Navbar } from '@/components/itest/Navbar';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -112,6 +112,19 @@ export default function ITestApp() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [newPasswordVal, setNewPasswordVal] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const [editIsPublicTemplate, setEditIsPublicTemplate] = useState(false);
+  const [editTimeLimit, setEditTimeLimit] = useState(0);
+
+  const [selectedTemplateForCopy, setSelectedTemplateForCopy] = useState<Assignment | null>(null);
+  const [templateCopyClassId, setTemplateCopyClassId] = useState<string>('');
+  const [templateCopyStartTime, setTemplateCopyStartTime] = useState<string>('');
+  const [templateCopyEndTime, setTemplateCopyEndTime] = useState<string>('');
+  const [templateCopyAssignType, setTemplateCopyAssignType] = useState<'all' | 'specific'>('all');
+  const [templateCopySelectedStudentIds, setTemplateCopySelectedStudentIds] = useState<string[]>([]);
+
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const autoSubmitRef = useRef<() => void>(() => {});
   const [deleteTarget, setDeleteTarget] = useState<{
     type: 'teacher' | 'classroom' | 'student' | 'assignment';
     id: string;
@@ -148,6 +161,7 @@ export default function ITestApp() {
       fetchSchools();
     }
   }, [store.currentUser, adminTab]);
+
   const [adminViewingAssignmentId, setAdminViewingAssignmentId] = useState<string | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
@@ -163,6 +177,77 @@ export default function ITestApp() {
   const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
   const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
   const [questionDrawingOpen, setQuestionDrawingOpen] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    autoSubmitRef.current = () => {
+      if (!selectedAssignmentId || !store.currentUser) return;
+      store.submitWork({
+        assignmentId: selectedAssignmentId,
+        studentId: store.currentUser.id,
+        answers: studentAnswers,
+        questionDrawings,
+        mainWorkDrawing
+      });
+      toast({
+        title: "Časový limit vypršel",
+        description: "Test byl automaticky odevzdán.",
+        variant: "destructive"
+      });
+      selectStudentAssignment(null);
+    };
+  });
+
+  useEffect(() => {
+    const currentStudent = store.currentUser;
+    if (!selectedAssignmentId || !currentStudent || currentStudent.role !== 'student') {
+      setTimeLeft(null);
+      return;
+    }
+    const a = store.assignments.find(as => as.id === selectedAssignmentId);
+    if (!a || !a.timeLimit || a.timeLimit <= 0) {
+      setTimeLeft(null);
+      return;
+    }
+
+    const sub = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === currentStudent.id);
+    if (sub && sub.submittedAt) {
+      setTimeLeft(null);
+      return;
+    }
+
+    let timerStartedAt = sub?.startedAt;
+    let isSubscribed = true;
+    let interval: any = null;
+
+    const initializeTimer = async () => {
+      if (!timerStartedAt) {
+        timerStartedAt = await store.startAssignmentTimer(a.id, currentStudent.id, currentStudent.schoolId || '');
+      }
+
+      if (!isSubscribed) return;
+
+      interval = setInterval(() => {
+        const startMs = new Date(timerStartedAt!).getTime();
+        const limitMs = a.timeLimit! * 60 * 1000;
+        const elapsed = Date.now() - startMs;
+        const remaining = Math.max(0, limitMs - elapsed);
+        
+        setTimeLeft(Math.floor(remaining / 1000));
+
+        if (remaining <= 0) {
+          if (interval) clearInterval(interval);
+          autoSubmitRef.current?.();
+        }
+      }, 1000);
+    };
+
+    initializeTimer();
+
+    return () => {
+      isSubscribed = false;
+      if (interval) clearInterval(interval);
+    };
+  }, [selectedAssignmentId, store.currentUser, store.submissions]);
   
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [editStartTime, setEditStartTime] = useState('');
@@ -183,6 +268,8 @@ export default function ITestApp() {
     setEditEndTime(a.endTime || '');
     setEditAssignType(a.studentIds && a.studentIds.length > 0 ? 'specific' : 'all');
     setEditSelectedStudentIds(a.studentIds || []);
+    setEditIsPublicTemplate(!!a.isPublicTemplate);
+    setEditTimeLimit(a.timeLimit || 0);
     setIsEditingSettings(true);
   };
 
@@ -200,6 +287,13 @@ export default function ITestApp() {
     setStudentAnswers({});
     setQuestionDrawings({});
     setMainWorkDrawing(undefined);
+
+    if (id && currentUser && currentUser.role === 'student') {
+      const assignment = store.assignments.find(a => a.id === id);
+      if (assignment && assignment.timeLimit && assignment.timeLimit > 0) {
+        store.startAssignmentTimer(id, currentUser.id, currentUser.schoolId || '');
+      }
+    }
   };
 
   const formatDateTime = (dateStr?: string) => {
@@ -508,6 +602,83 @@ export default function ITestApp() {
       console.error(error);
       toast({ title: "Chyba", description: "Hromadný export do ZIP selhal.", variant: "destructive" });
     }
+  };
+
+  const downloadCsvResults = (assignmentId: string) => {
+    const assignment = store.assignments.find(a => a.id === assignmentId);
+    if (!assignment) return;
+
+    const classStudents = store.users.filter(u => {
+      if (u.role !== 'student') return false;
+      if (assignment.studentIds && assignment.studentIds.length > 0) {
+        return assignment.studentIds.includes(u.id);
+      }
+      return u.classId === selectedClassId;
+    });
+
+    const totalMax = assignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+
+    const headers = [
+      'Jméno žáka',
+      'Uživatelské jméno',
+      'Získané body',
+      'Maximální body',
+      'Úspěšnost (%)',
+      'Výsledná známka',
+      'Datum odevzdání'
+    ];
+
+    const rows = classStudents.map(student => {
+      const sub = store.submissions.find(s => s.assignmentId === assignment.id && s.studentId === student.id);
+      
+      let earned = 0;
+      if (sub?.questionScores) {
+        Object.values(sub.questionScores).forEach(v => { earned += v as number; });
+      }
+
+      const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+      const grade = sub && sub.grade ? String(sub.grade) : (sub ? 'Neopraveno' : 'Neodevzdáno');
+      const submittedDate = sub && sub.submittedAt ? formatDateTime(sub.submittedAt) : 'Neodevzdáno';
+
+      return [
+        student.name,
+        student.username,
+        sub ? earned : 0,
+        totalMax,
+        sub ? pct : 0,
+        grade,
+        submittedDate
+      ];
+    });
+
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(val => {
+        const strVal = String(val);
+        if (strVal.includes(';') || strVal.includes('"') || strVal.includes('\n')) {
+          return `"${strVal.replace(/"/g, '""')}"`;
+        }
+        return strVal;
+      }).join(';'))
+    ].join('\r\n');
+
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    const sanitizedTitle = assignment.title.replace(/[/\\?%*:|"<>\s]+/g, '_');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `vysledky_${sanitizedTitle}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "CSV Exportováno",
+      description: `Výsledky testu „${assignment.title}“ byly staženy ve formátu CSV.`,
+    });
   };
 
   const [evalGrade, setEvalGrade] = useState<number | undefined>();
@@ -940,6 +1111,164 @@ export default function ITestApp() {
       </div>
     );
   }
+
+  const renderTemplateCopyDialog = () => {
+    if (!selectedTemplateForCopy) return null;
+
+    const teacherClasses = store.classes.filter(c => c.teacherId === currentUser?.id);
+
+    return (
+      <Dialog open={!!selectedTemplateForCopy} onOpenChange={(open) => { if (!open) setSelectedTemplateForCopy(null); }}>
+        <DialogContent className="max-w-md rounded-2xl border-none shadow-2xl p-6 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-headline font-bold text-primary">
+              Použít šablonu testu
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Tímto zkopírujete test „{selectedTemplateForCopy.title}“ do své vybrané třídy jako nové zadání.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Výběr třídy */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-500 uppercase">Cílová třída:</label>
+              <select
+                value={templateCopyClassId}
+                onChange={(e) => {
+                  setTemplateCopyClassId(e.target.value);
+                  setTemplateCopySelectedStudentIds([]);
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-bold"
+              >
+                <option value="">— Vyberte třídu —</option>
+                {teacherClasses.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Časový limit */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase">Zahájení (od kdy):</label>
+                <Input 
+                  type="datetime-local" 
+                  value={templateCopyStartTime} 
+                  onChange={e => setTemplateCopyStartTime(e.target.value)}
+                  className="h-10 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase">Uzávěrka (do kdy):</label>
+                <Input 
+                  type="datetime-local" 
+                  value={templateCopyEndTime} 
+                  onChange={e => setTemplateCopyEndTime(e.target.value)}
+                  className="h-10 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Zacílení žáků */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-gray-500 uppercase">Zacílení žáků:</label>
+              <div className="flex gap-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setTemplateCopyAssignType('all')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${templateCopyAssignType === 'all' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                >
+                  Celá třída
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTemplateCopyAssignType('specific')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${templateCopyAssignType === 'specific' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                >
+                  Vybraní žáci
+                </button>
+              </div>
+
+              {templateCopyAssignType === 'specific' && templateCopyClassId && (
+                <div className="border rounded-xl bg-white p-3 max-h-32 overflow-y-auto space-y-1.5">
+                  {(() => {
+                    const activeStudents = store.users.filter(u => u.role === 'student' && u.classId === templateCopyClassId);
+                    if (activeStudents.length === 0) {
+                      return <p className="text-xs text-muted-foreground italic text-center py-2">Ve třídě nejsou žádní žáci.</p>;
+                    }
+                    return activeStudents.map(s => {
+                      const isChecked = templateCopySelectedStudentIds.includes(s.id);
+                      return (
+                        <label key={s.id} className="flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer hover:bg-slate-50 p-1 rounded transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setTemplateCopySelectedStudentIds(prev => prev.filter(id => id !== s.id));
+                              } else {
+                                setTemplateCopySelectedStudentIds(prev => [...prev, s.id]);
+                              }
+                            }}
+                            className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5"
+                          />
+                          <span>{s.name} <span className="text-gray-400">({s.username})</span></span>
+                        </label>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedTemplateForCopy(null)}
+              className="rounded-xl"
+            >
+              Zrušit
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!selectedTemplateForCopy || !currentUser) return;
+                
+                const copiedAssignment: Omit<Assignment, 'id'> = {
+                  title: selectedTemplateForCopy.title,
+                  description: selectedTemplateForCopy.description,
+                  classId: templateCopyClassId,
+                  subject: selectedTemplateForCopy.subject,
+                  questions: selectedTemplateForCopy.questions,
+                  fileUri: selectedTemplateForCopy.fileUri,
+                  dueDate: templateCopyEndTime || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                  startTime: templateCopyStartTime || undefined,
+                  endTime: templateCopyEndTime || undefined,
+                  studentIds: templateCopyAssignType === 'specific' ? templateCopySelectedStudentIds : [],
+                  gradeThresholds: selectedTemplateForCopy.gradeThresholds,
+                  isDraft: false,
+                  isPublicTemplate: false,
+                  timeLimit: selectedTemplateForCopy.timeLimit
+                };
+
+                store.addAssignment(copiedAssignment);
+                setSelectedTemplateForCopy(null);
+                toast({
+                  title: "Šablona použita",
+                  description: `Test byl zkopírován jako nové zadání do zvolené třídy.`,
+                });
+              }}
+              disabled={!templateCopyClassId}
+              className="bg-primary text-white rounded-xl font-bold px-6"
+            >
+              Vytvořit zadání
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3062,6 +3391,7 @@ export default function ITestApp() {
   if (currentUser.role === 'teacher') {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
     const selectedClass = store.classes.find(c => c.id === selectedClassId);
+    const publicTemplates = store.assignments.filter(a => a.isPublicTemplate === true);
 
     const now = new Date();
     const isPremium = !!(currentUser.isPremium && (!currentUser.premiumExpiresAt || new Date(currentUser.premiumExpiresAt) > now));
@@ -3416,6 +3746,7 @@ export default function ITestApp() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="bg-white/50 border shadow-sm p-1">
               <TabsTrigger value="classes" className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Třídy</TabsTrigger>
+              <TabsTrigger value="templates" className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Banka úloh (Šablony)</TabsTrigger>
               <TabsTrigger value="assignments" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Zadané práce</TabsTrigger>
               <TabsTrigger value="students" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Žáci</TabsTrigger>
               <TabsTrigger value="submissions" disabled={!selectedClassId} className="data-[state=active]:bg-primary data-[state=active]:text-white rounded-md px-6">Odevzdáno</TabsTrigger>
@@ -3447,6 +3778,83 @@ export default function ITestApp() {
                   </Card>
                 );
               })}
+            </TabsContent>
+
+            <TabsContent value="templates" className="space-y-6">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <div>
+                  <h2 className="text-2xl font-headline font-bold text-primary flex items-center gap-2">
+                    <BookOpen className="w-6 h-6 text-indigo-600" />
+                    Banka sdílených úkolů
+                  </h2>
+                  <p className="text-sm text-muted-foreground">Veřejné šablony testů sdílené ostatními učiteli.</p>
+                </div>
+              </div>
+
+              {publicTemplates.length === 0 ? (
+                <Card className="border-none shadow-md bg-white p-12 text-center text-muted-foreground rounded-3xl border border-slate-100">
+                  <span className="text-4xl block mb-3">📁</span>
+                  <p className="font-semibold text-lg text-slate-800">Žádné veřejné šablony k dispozici</p>
+                  <p className="text-sm text-slate-500 mt-1">Můžete vytvořit vlastní test a označit jej jako veřejnou šablonu.</p>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+                  {publicTemplates.map(a => {
+                    const creator = store.users.find(u => u.id === a.teacherId);
+                    const isOwnTemplate = a.teacherId === currentUser.id;
+                    return (
+                      <Card key={a.id} className="border-none shadow-lg bg-white flex flex-col justify-between hover:shadow-xl transition-all rounded-3xl overflow-hidden border border-slate-100">
+                        <CardHeader className="pb-3 bg-slate-50/50 border-b">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-50 font-semibold text-xs rounded-full px-2.5 py-0.5 border border-indigo-100">
+                              {a.subject || 'Matematika'}
+                            </Badge>
+                            {isOwnTemplate && (
+                              <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50/20 font-bold text-[10px] rounded-full">
+                                Moje šablona
+                              </Badge>
+                            )}
+                          </div>
+                          <CardTitle className="font-headline text-lg text-slate-800 line-clamp-2 mt-1">{a.title}</CardTitle>
+                          <CardDescription className="line-clamp-2 mt-1 min-h-[40px] text-xs text-slate-500">{a.description || 'Bez popisu'}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="pb-4 pt-4 text-xs text-slate-500 space-y-2 flex-grow">
+                          <div className="flex justify-between border-b pb-1.5 border-slate-100">
+                            <span>Počet úloh:</span>
+                            <span className="font-bold text-slate-700">{a.questions?.length || 0}</span>
+                          </div>
+                          <div className="flex justify-between border-b pb-1.5 border-slate-100">
+                            <span>Časový limit:</span>
+                            <span className="font-bold text-slate-700">{a.timeLimit ? `${a.timeLimit} minut` : 'Bez limitu'}</span>
+                          </div>
+                          {creator && (
+                            <div className="flex justify-between">
+                              <span>Autor:</span>
+                              <span className="font-semibold text-slate-700 truncate max-w-[150px]">{creator.name}</span>
+                            </div>
+                          )}
+                        </CardContent>
+                        <div className="p-4 bg-slate-50 border-t flex justify-end gap-2">
+                          <Button 
+                            size="sm"
+                            className="font-bold text-xs rounded-full flex items-center gap-1.5 shadow-sm px-4 h-9"
+                            onClick={() => {
+                              setSelectedTemplateForCopy(a);
+                              setTemplateCopyClassId(teacherClasses[0]?.id || '');
+                              setTemplateCopyStartTime('');
+                              setTemplateCopyEndTime('');
+                              setTemplateCopyAssignType('all');
+                              setTemplateCopySelectedStudentIds([]);
+                            }}
+                          >
+                            <Plus className="w-3.5 h-3.5" /> Použít šablonu
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </TabsContent>
 
             {/* Zbytek obsahu Tabs zůstává zachován */}
@@ -3521,6 +3929,14 @@ export default function ITestApp() {
                                 <p className="font-bold text-slate-800">
                                   {a.endTime ? `Do: ${formatDateTime(a.endTime)}` : 'Bez uzávěrky'}
                                 </p>
+                                {a.timeLimit ? (
+                                  <p className="font-bold text-slate-850">⏱️ Limit: {a.timeLimit} minut</p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">⏱️ Bez časového limitu</p>
+                                )}
+                                {a.isPublicTemplate && (
+                                  <p className="text-xs font-bold text-indigo-650">🌐 Veřejná šablona</p>
+                                )}
                               </div>
                             </div>
                           ) : (
@@ -3599,6 +4015,28 @@ export default function ITestApp() {
                                     className="h-10 text-sm"
                                   />
                                 </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-bold text-gray-500 uppercase">Délka testu (v minutách, 0 = bez limitu):</label>
+                                  <Input 
+                                    type="number"
+                                    min="0"
+                                    value={editTimeLimit} 
+                                    onChange={e => setEditTimeLimit(Math.max(0, parseInt(e.target.value) || 0))}
+                                    className="h-10 text-sm"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2 pt-2 col-span-1 md:col-span-2">
+                                  <input 
+                                    type="checkbox" 
+                                    id="editIsPublicTemplate"
+                                    checked={editIsPublicTemplate} 
+                                    onChange={e => setEditIsPublicTemplate(e.target.checked)}
+                                    className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                                  />
+                                  <label htmlFor="editIsPublicTemplate" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                                    Povolit jako veřejnou šablonu pro ostatní učitele
+                                  </label>
+                                </div>
                               </div>
 
                               <div className="flex gap-2 justify-end pt-2">
@@ -3616,7 +4054,9 @@ export default function ITestApp() {
                                     const success = await store.updateAssignment(a.id, {
                                       startTime: editStartTime || undefined,
                                       endTime: editEndTime || undefined,
-                                      studentIds: editAssignType === 'specific' ? editSelectedStudentIds : []
+                                      studentIds: editAssignType === 'specific' ? editSelectedStudentIds : [],
+                                      isPublicTemplate: editIsPublicTemplate,
+                                      timeLimit: editTimeLimit
                                     });
                                     if (success) {
                                       setIsEditingSettings(false);
@@ -4154,81 +4594,241 @@ export default function ITestApp() {
                   return u.classId === selectedClassId;
                 });
 
+                const assignmentSubmissions = store.submissions.filter(s => s.assignmentId === selAssignment.id);
+                const totalMax = selAssignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+
+                let totalEarnedOfAll = 0;
+                let totalMaxOfAll = 0;
+                let gradedSubmissionsCount = 0;
+                let sumGrades = 0;
+                const gradeCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+                assignmentSubmissions.forEach(sub => {
+                  let earned = 0;
+                  if (sub.questionScores) {
+                    Object.values(sub.questionScores).forEach(v => { earned += v as number; });
+                  }
+                  totalEarnedOfAll += earned;
+                  totalMaxOfAll += totalMax;
+                  if (sub.grade) {
+                    sumGrades += sub.grade;
+                    gradedSubmissionsCount++;
+                    const g = Math.round(sub.grade);
+                    if (g >= 1 && g <= 5) {
+                      gradeCounts[g as 1 | 2 | 3 | 4 | 5]++;
+                    }
+                  }
+                });
+
+                const avgSuccessPct = totalMaxOfAll > 0 ? Math.round((totalEarnedOfAll / totalMaxOfAll) * 100) : 0;
+                const avgGrade = gradedSubmissionsCount > 0 ? (sumGrades / gradedSubmissionsCount).toFixed(1) : '-';
+                const maxGradeCount = Math.max(...Object.values(gradeCounts), 1);
+
+                const questionStats = (selAssignment.questions || []).map(q => {
+                  const maxPoints = q.points || 1;
+                  let correctCount = 0;
+                  assignmentSubmissions.forEach(sub => {
+                    const score = sub.questionScores?.[q.id] || 0;
+                    if (score >= maxPoints) {
+                      correctCount++;
+                    }
+                  });
+                  const pct = assignmentSubmissions.length > 0 ? Math.round((correctCount / assignmentSubmissions.length) * 100) : 0;
+                  return {
+                    id: q.id,
+                    text: q.text,
+                    pct: pct,
+                    correctCount,
+                    totalCount: assignmentSubmissions.length
+                  };
+                });
+
                 return (
                   <div className="space-y-4">
-                    <Button variant="ghost" className="rounded-full" onClick={() => { setViewingAssignmentSubs(null); }}>← Zpět na testy</Button>
-                    <Card className="border-none shadow-lg rounded-2xl overflow-hidden">
-                      <CardHeader className="bg-primary/5 border-b px-6 py-4">
-                        <CardTitle className="text-xl font-headline text-primary">{selAssignment.title}</CardTitle>
-                        <CardDescription>
-                          {selAssignment.subject && `${selAssignment.subject} · `}
-                          {classStudents.length} žáků celkem
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="divide-y">
-                          {classStudents.length === 0 ? (
-                            <div className="p-8 text-center text-muted-foreground">
-                              <span className="text-3xl block mb-2">👤</span>
-                              <p className="font-medium">Žádní žáci v této třídě</p>
-                            </div>
-                          ) : (
-                            classStudents.map(student => {
-                              const sub = store.submissions.find(s => s.assignmentId === selAssignment.id && s.studentId === student.id);
-                              const totalMax = selAssignment.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                              let earned = 0;
-                              if (sub?.questionScores) {
-                                if (sub.questionScores instanceof Map) {
-                                  sub.questionScores.forEach(v => { earned += v; });
-                                } else {
-                                  Object.values(sub.questionScores).forEach(v => { earned += v as number; });
-                                }
-                              }
-                              const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                      <Button variant="ghost" className="rounded-full w-fit" onClick={() => { setViewingAssignmentSubs(null); }}>← Zpět na testy</Button>
+                      
+                      <div className="flex items-center gap-2 print-exclude">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="h-9 text-xs font-bold text-emerald-700 border-emerald-200 hover:bg-emerald-50 rounded-full flex items-center gap-1.5"
+                          onClick={() => downloadAllSubmissionsZip(selAssignment.id)}
+                        >
+                          📥 Stáhnout ZIP s PDF
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="h-9 text-xs font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50 rounded-full flex items-center gap-1.5"
+                          onClick={() => downloadCsvResults(selAssignment.id)}
+                        >
+                          <Download className="w-4 h-4" /> Exportovat výsledky (CSV)
+                        </Button>
+                      </div>
+                    </div>
 
-                              return (
-                                <div
-                                  key={student.id}
-                                  className={`p-5 flex items-center justify-between transition-all ${sub ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-60'}`}
-                                  onClick={() => {
-                                    if (!sub) return;
-                                    setEvalScores(sub.questionScores ? { ...(sub.questionScores as Record<string, number>) } : {});
-                                    setEvalGrade(sub.grade);
-                                    setEvalFeedback(sub.feedback || '');
-                                    setIsGradeManuallySet(!!sub.grade);
-                                    setViewingSubmission(sub.id);
-                                  }}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sub ? 'bg-green-500' : 'bg-gray-300'}`} />
-                                    <div>
-                                      <p className="font-bold text-gray-800">{student.name}</p>
-                                      <p className="text-xs text-muted-foreground">{student.username}</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* LEVÝ SLOUPEC: Seznam odevzdaných prací */}
+                      <div className="lg:col-span-2">
+                        <Card className="border-none shadow-lg rounded-2xl overflow-hidden">
+                          <CardHeader className="bg-primary/5 border-b px-6 py-4">
+                            <CardTitle className="text-xl font-headline text-primary">{selAssignment.title}</CardTitle>
+                            <CardDescription>
+                              {selAssignment.subject && `${selAssignment.subject} · `}
+                              {classStudents.length} žáků celkem
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="p-0">
+                            <div className="divide-y">
+                              {classStudents.length === 0 ? (
+                                <div className="p-8 text-center text-muted-foreground">
+                                  <span className="text-3xl block mb-2">👤</span>
+                                  <p className="font-medium">Žádní žáci v této třídě</p>
+                                </div>
+                              ) : (
+                                classStudents.map(student => {
+                                  const sub = store.submissions.find(s => s.assignmentId === selAssignment.id && s.studentId === student.id);
+                                  const earned = sub?.questionScores ? Object.values(sub.questionScores).reduce((acc: number, v: any) => acc + (v as number), 0) : 0;
+                                  const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
+
+                                  return (
+                                    <div
+                                      key={student.id}
+                                      className={`p-5 flex items-center justify-between transition-all ${sub ? 'hover:bg-gray-50 cursor-pointer' : 'opacity-60'}`}
+                                      onClick={() => {
+                                        if (!sub) return;
+                                        setEvalScores(sub.questionScores ? { ...(sub.questionScores as Record<string, number>) } : {});
+                                        setEvalGrade(sub.grade);
+                                        setEvalFeedback(sub.feedback || '');
+                                        setIsGradeManuallySet(!!sub.grade);
+                                        setViewingSubmission(sub.id);
+                                      }}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${sub ? (sub.submittedAt ? 'bg-green-500' : 'bg-amber-400') : 'bg-gray-300'}`} />
+                                        <div>
+                                          <p className="font-bold text-gray-800">{student.name}</p>
+                                          <p className="text-xs text-muted-foreground">{student.username}</p>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {sub ? (
+                                          <>
+                                            <Badge variant={sub.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
+                                              {sub.submittedAt === "" ? 'Rozpracováno' : (
+                                                sub.grade
+                                                  ? `Zn: ${sub.grade} (${earned}/${totalMax}b · ${pct}%)`
+                                                  : earned > 0
+                                                    ? `Body: ${earned}/${totalMax} (${pct}%)`
+                                                    : 'Neopraveno'
+                                              )}
+                                            </Badge>
+                                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                                          </>
+                                        ) : (
+                                          <Badge variant="secondary" className="text-gray-400">Neodevzdáno</Badge>
+                                        )}
+                                      </div>
                                     </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* PRAVÝ SLOUPEC: Analýza úspěšnosti */}
+                      <div className="lg:col-span-1 space-y-6">
+                        <Card className="border-none shadow-lg rounded-2xl overflow-hidden bg-white">
+                          <CardHeader className="bg-primary/5 border-b px-6 py-4">
+                            <CardTitle className="text-lg font-headline text-primary flex items-center gap-2">
+                              <Activity className="w-5 h-5 text-indigo-600" />
+                              Analýza výsledků
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="p-6 space-y-6">
+                            {assignmentSubmissions.length === 0 ? (
+                              <div className="text-center py-8 text-muted-foreground">
+                                <span className="text-2xl block mb-2">📊</span>
+                                <p className="text-sm font-medium">Zatím žádný student neodevzdal test.</p>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Rychlé statistiky */}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+                                    <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Průměrná známka</span>
+                                    <p className="text-3xl font-bold mt-1 text-slate-800">{avgGrade}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">z {gradedSubmissionsCount} ohodnocených</p>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    {sub ? (
-                                      <>
-                                        <Badge variant={sub.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
-                                          {sub.grade
-                                            ? `Zn: ${sub.grade} (${earned}/${totalMax}b · ${pct}%)`
-                                            : earned > 0
-                                              ? `Body: ${earned}/${totalMax} (${pct}%)`
-                                              : 'Neopraveno'}
-                                        </Badge>
-                                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                                      </>
-                                    ) : (
-                                      <Badge variant="secondary" className="text-gray-400">Neodevzdáno</Badge>
-                                    )}
+                                  <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+                                    <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Průměrná úspěšnost</span>
+                                    <p className="text-3xl font-bold mt-1 text-slate-800">{avgSuccessPct}%</p>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">z max. {totalMax} bodů</p>
                                   </div>
                                 </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
+
+                                {/* Rozložení známek */}
+                                <div className="space-y-3">
+                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rozložení známek</h4>
+                                  <div className="flex justify-between items-end gap-2 pt-2 h-32 px-2 border-b pb-1">
+                                    {([1, 2, 3, 4, 5] as const).map(grade => {
+                                      const count = gradeCounts[grade];
+                                      const pct = Math.max(5, (count / maxGradeCount) * 100);
+                                      const barColors = {
+                                        1: 'bg-emerald-500 hover:bg-emerald-600',
+                                        2: 'bg-teal-500 hover:bg-teal-600',
+                                        3: 'bg-amber-400 hover:bg-amber-500',
+                                        4: 'bg-orange-500 hover:bg-orange-600',
+                                        5: 'bg-rose-500 hover:bg-rose-600'
+                                      };
+                                      return (
+                                        <div key={grade} className="flex flex-col items-center gap-1 flex-1">
+                                          <span className="text-[10px] font-bold text-slate-600">{count}x</span>
+                                          <div className="w-full bg-slate-50 rounded-t-md h-20 flex items-end">
+                                            <div 
+                                              className={`w-full rounded-t-md transition-all duration-500 ${barColors[grade]}`} 
+                                              style={{ height: `${pct}%` }} 
+                                            />
+                                          </div>
+                                          <span className="text-xs font-bold mt-1 text-slate-700">{grade}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Analýza otázek */}
+                                <div className="space-y-3">
+                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Úspěšnost otázek</h4>
+                                  <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                                    {questionStats.map((stat, idx) => (
+                                      <div key={stat.id} className="space-y-1">
+                                        <div className="flex justify-between text-xs font-medium">
+                                          <span className="text-slate-700 truncate max-w-[170px]">{idx + 1}. {stat.text || `Otázka ${idx + 1}`}</span>
+                                          <span className="text-slate-600 font-bold shrink-0">{stat.pct}% ({stat.correctCount}/{stat.totalCount})</span>
+                                        </div>
+                                        <div className="w-full bg-slate-100 rounded-full h-2">
+                                          <div 
+                                            className={`h-2 rounded-full transition-all duration-500 ${
+                                              stat.pct >= 80 ? 'bg-emerald-500' :
+                                              stat.pct >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                                            }`}
+                                            style={{ width: `${stat.pct}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
                   </div>
                 );
               })() : (
@@ -4925,6 +5525,7 @@ export default function ITestApp() {
           </Dialog>
 
           {renderGradebookDialog()}
+          {renderTemplateCopyDialog()}
         </main>
       </div>
     );
@@ -4941,6 +5542,23 @@ export default function ITestApp() {
         <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 animate-fade-in">
           {selectedAssignmentId ? (
             <div className="space-y-6">
+              {timeLeft !== null && (
+                <div className="fixed top-4 right-4 z-50 bg-gradient-to-r from-red-500 to-indigo-600 text-white font-mono px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/20 animate-pulse print-exclude">
+                  <div className="bg-white/20 p-1.5 rounded-lg">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-bold block uppercase tracking-wider text-white/80">Zbývající čas</span>
+                    <span className="text-2xl font-black">{(() => {
+                      const mins = Math.floor(timeLeft / 60);
+                      const secs = timeLeft % 60;
+                      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                    })()}</span>
+                  </div>
+                </div>
+              )}
               <Button variant="ghost" className="rounded-full" onClick={() => selectStudentAssignment(null)}>← Zpět</Button>
               {(() => {
                 const a = store.assignments.find(as => as.id === selectedAssignmentId);

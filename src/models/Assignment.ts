@@ -40,6 +40,8 @@ export interface IAssignment extends Document<string> {
   gradeThresholds?: number[];
   isDraft?: boolean; // Koncept — není viditelný pro žáky
   schoolId: string; // přidáno pro multi-school
+  isPublicTemplate?: boolean;
+  timeLimit?: number; // v minutách, 0 = bez limitu
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,6 +63,8 @@ const AssignmentSchema: Schema = new Schema(
     sharedWithClassIds: { type: [String], default: [] },
     gradeThresholds: { type: [Number], default: [85, 65, 45, 25] },
     isDraft: { type: Boolean, default: false },
+    isPublicTemplate: { type: Boolean, default: false },
+    timeLimit: { type: Number, default: 0 },
     schoolId: { type: String, required: true } // povinné pro rozdělení škol
   },
   {

@@ -8,6 +8,7 @@ export interface ISubmission extends Document<string> {
   questionDrawings: Map<string, string>; // Kresby k otázkám
   mainWorkDrawing?: string; // Hlavní nákres
   submittedAt: string;
+  startedAt?: string;
   grade?: number; // 1-5
   feedback?: string;
   questionScores?: Map<string, number>; // Body za konkrétne otázky
@@ -24,7 +25,8 @@ const SubmissionSchema: Schema = new Schema(
     answers: { type: Map, of: Schema.Types.Mixed, default: {} },
     questionDrawings: { type: Map, of: String, default: {} },
     mainWorkDrawing: { type: String },
-    submittedAt: { type: String, required: true },
+    submittedAt: { type: String, default: "" },
+    startedAt: { type: String },
     grade: { type: Number, min: 1, max: 5 },
     feedback: { type: String },
     questionScores: { type: Map, of: Number, default: {} },
