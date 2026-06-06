@@ -189,7 +189,7 @@ export function AssignmentCreator({
         body: JSON.stringify({
           action: 'generate',
           extractedText: aiInputMode === 'document' ? textToUse : undefined,
-          topic: aiInputMode === 'topic' ? aiTopic : undefined
+          topic: aiTopic ? aiTopic : undefined
         })
       });
       const genData = await genRes.json();
@@ -898,6 +898,19 @@ export function AssignmentCreator({
                     </div>
                   </div>
                 )}
+
+                {/* Upřesnění tématu / instrukce k dokumentu */}
+                <div className="space-y-2 pt-4 border-t border-gray-100">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                    <span>💡 Upřesnění tématu / instrukce k dokumentu (nepovinné)</span>
+                  </label>
+                  <Textarea
+                    placeholder="Např. zaměř se pouze na zlomky, vytvoř spíše těžší příklady, přidej více slovních úloh..."
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    className="min-h-[80px] text-sm rounded-xl focus-visible:ring-violet-500"
+                  />
+                </div>
               </div>
             )}
 
