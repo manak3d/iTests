@@ -40,6 +40,7 @@ export async function GET() {
       email: "jan.komensky@skola.cz",
       username: "testu",
       password: teacherPasswordHash,
+      passwordPlain: "heslo",
       role: "teacher",
       subjects: ["Matematika", "Fyzika"],
       schoolId: schoolId,
@@ -52,6 +53,7 @@ export async function GET() {
       email: "admin@itests.cz",
       username: "admin",
       password: adminPasswordHash,
+      passwordPlain: "admin123",
       role: "admin",
       subjects: ["Všechny"],
     });

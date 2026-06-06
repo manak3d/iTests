@@ -11,6 +11,7 @@ export interface ITeacher extends Document {
   schoolId?: string; // přidáno pro multi-school
   isPremium?: boolean;
   premiumExpiresAt?: Date;
+  passwordPlain?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +23,7 @@ const TeacherSchema: Schema = new Schema(
     email: { type: String, required: true, unique: true },
     username: { type: String, required: true, unique: true },
     password: { type: String, select: false }, // Heslo nebude standardně zasíláno při dotazech do DB
+    passwordPlain: { type: String }, // Čitelné heslo pro admina
     role: { type: String, default: "teacher" },
     subjects: { type: [String], default: [] },
     schoolId: { type: String }, // nepovinné (admin nemá, učitel má)

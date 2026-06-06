@@ -137,7 +137,7 @@ export default function ITestApp() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState('classes');
-  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools'>('schools');
   const [adminSchoolFilter, setAdminSchoolFilter] = useState<string>('all');
   const [adminSearchFilter, setAdminSearchFilter] = useState<string>('');
   const [adminSortBy, setAdminSortBy] = useState<'name' | 'school' | 'default'>('default');
@@ -1609,6 +1609,17 @@ export default function ITestApp() {
           {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'schools' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('schools')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <School className="w-8 h-8 text-violet-500" />
+                <p className="text-sm font-semibold text-muted-foreground">Školy</p>
+                <p className="text-2xl font-black text-violet-500">{schools.length}</p>
+              </CardContent>
+            </Card>
+
+            <Card 
               className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'overview' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
               onClick={() => setAdminTab('overview')}
             >
@@ -1662,17 +1673,6 @@ export default function ITestApp() {
                 <p className="text-2xl font-black text-amber-500">{assignments.length}</p>
               </CardContent>
             </Card>
-
-            <Card 
-              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'schools' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
-              onClick={() => setAdminTab('schools')}
-            >
-              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-                <School className="w-8 h-8 text-violet-500" />
-                <p className="text-sm font-semibold text-muted-foreground">Školy</p>
-                <p className="text-2xl font-black text-violet-500">{schools.length}</p>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Active Tab View */}
@@ -1712,6 +1712,9 @@ export default function ITestApp() {
                   <div className="space-y-4">
                     <h4 className="font-bold text-lg text-gray-800">Rychlý rozcestník administrátora</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('schools')}>
+                        <School className="w-5 h-5 text-violet-500" /> Zobrazit školy →
+                      </Button>
                       <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('teachers')}>
                         <GraduationCap className="w-5 h-5 text-accent" /> Zobrazit učitele →
                       </Button>
@@ -1723,9 +1726,6 @@ export default function ITestApp() {
                       </Button>
                       <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('assignments')}>
                         <ClipboardList className="w-5 h-5 text-amber-500" /> Zobrazit úkoly →
-                      </Button>
-                      <Button variant="outline" className="h-16 rounded-xl font-bold justify-start px-6 gap-3 shadow-sm" onClick={() => setAdminTab('schools')}>
-                        <School className="w-5 h-5 text-violet-500" /> Zobrazit školy →
                       </Button>
                     </div>
                   </div>
@@ -1793,6 +1793,7 @@ export default function ITestApp() {
                         <tr className="bg-gray-50 border-b">
                           <th className="p-4 font-bold text-gray-700 text-sm">Jméno učitele</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Uživatelské jméno</th>
+                          <th className="p-4 font-bold text-gray-700 text-sm">Přístupové heslo</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Škola</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Spravované třídy</th>
                           <th className="p-4 font-bold text-gray-700 text-sm">Tarif / Premium</th>
@@ -1802,7 +1803,7 @@ export default function ITestApp() {
                       <tbody className="divide-y">
                         {teachers.length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="p-6 text-center text-muted-foreground">V systému zatím nejsou žádní učitelé.</td>
+                            <td colSpan={7} className="p-6 text-center text-muted-foreground">V systému zatím nejsou žádní učitelé.</td>
                           </tr>
                         ) : (
                           teachers.map(t => {
@@ -1822,6 +1823,7 @@ export default function ITestApp() {
                                   <GraduationCap className="w-4 h-4 text-accent" /> {t.name}
                                 </td>
                                 <td className="p-4 text-sm text-gray-600 font-mono">{t.username}</td>
+                                <td className="p-4 text-sm text-primary font-mono font-bold">{t.password || 'Nenastaveno'}</td>
                                 <td className="p-4 text-sm text-gray-650 font-semibold">
                                   {schools.find(s => s.id === t.schoolId)?.name || 'Bez školy / Admin'}
                                 </td>
@@ -4653,16 +4655,17 @@ export default function ITestApp() {
                       Zpět
                     </Button>
                     <Button 
-                      onClick={async () => {
-                        const success = await store.activatePremium(paymentDetails.type);
-                        if (success) {
-                          setPaymentDetails(null);
-                          setIsUpgradeModalOpen(false);
-                        }
+                      onClick={() => {
+                        toast({ 
+                          title: "Platba odeslána k ověření", 
+                          description: "Administrátor aktivuje Premium verzi vašeho účtu po připsání platby na bankovní účet." 
+                        });
+                        setPaymentDetails(null);
+                        setIsUpgradeModalOpen(false);
                       }}
                       className="flex-1 rounded-2xl py-5 font-bold shadow-md bg-indigo-600 hover:bg-indigo-700 text-white border-none"
                     >
-                      Potvrdit zaplacení
+                      Potvrdit odeslání platby
                     </Button>
                   </div>
                 </div>

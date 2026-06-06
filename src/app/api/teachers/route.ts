@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       email: body.email,
       username: body.username,
       password: hashedPassword,
+      passwordPlain: body.password,
       subjects: Array.isArray(body.subjects) ? body.subjects : (body.subjects ? body.subjects.split(',').map((s: string) => s.trim()) : []),
       schoolId: school._id.toString(),
     });
