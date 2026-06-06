@@ -28,7 +28,7 @@ export default function ITestApp() {
     setIsMounted(true);
   }, []);
   
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'register-trial'>('login');
   const [loginRole, setLoginRole] = useState<'admin' | 'teacher' | 'student'>('teacher');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -137,7 +137,7 @@ export default function ITestApp() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   
   const [activeTab, setActiveTab] = useState('classes');
-  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools'>('schools');
+  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools'>('overview');
   const [adminSchoolFilter, setAdminSchoolFilter] = useState<string>('all');
   const [adminSearchFilter, setAdminSearchFilter] = useState<string>('');
   const [adminSortBy, setAdminSortBy] = useState<'name' | 'school' | 'default'>('default');
@@ -970,7 +970,8 @@ export default function ITestApp() {
       }
     } else {
       if (name && username && password) {
-        if (!inviteCode.trim()) {
+        const isTrial = authMode === 'register-trial';
+        if (!isTrial && !inviteCode.trim()) {
           toast({ title: "Registrace selhala", description: "Zadejte kód školy (zvací kód).", variant: "destructive" });
           return;
         }
@@ -997,7 +998,8 @@ export default function ITestApp() {
               email: `${username}@skola.cz`,
               username,
               password,
-              inviteCode: inviteCode.trim(),
+              inviteCode: isTrial ? undefined : inviteCode.trim(),
+              isTrialRegistration: isTrial,
               subjects: []
             })
           });
@@ -1012,7 +1014,7 @@ export default function ITestApp() {
           // Pokud MongoDB projde, uložíme i do lokálního Firebase store pro kompatibilitu
           store.register(name, username, password);
           setAuthMode('login');
-          toast({ title: "Registrace úspěšná", description: "Účet byl vytvořen, můžete se přihlásit." });
+          toast({ title: "Registrace úspěšná", description: isTrial ? "Zkušební účet byl vytvořen, můžete se přihlásit." : "Účet byl vytvořen, můžete se přihlásit." });
 
         } catch (error) {
           console.error("Chyba při zápisu do MongoDB:", error);
@@ -1430,75 +1432,187 @@ export default function ITestApp() {
 
   if (!store.currentUser) {
     return (
-      <div className="min-h-screen bg-[#EFF3F7] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-none shadow-2xl overflow-hidden animate-fade-in">
-          <CardHeader className="text-center space-y-4 bg-primary text-white pb-8">
-            <div className="bg-white/20 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-lg transform -rotate-6">
-              <School className="text-white w-8 h-8" />
-            </div>
-            <div className="space-y-1">
-              <CardTitle className="font-headline text-4xl">iTest Cloud</CardTitle>
-              <CardDescription className="text-white/70">Moderní vzdělávání v reálném čase.</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="p-8">
-            <form onSubmit={handleAuth} className="space-y-6">
-              <div className="flex justify-center gap-4 mb-4">
-                <button 
-                  type="button" 
-                  onClick={() => setAuthMode('login')}
-                  className={`text-sm font-bold pb-1 border-b-2 transition-all ${authMode === 'login' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-                >Přihlášení</button>
-                <button 
-                  type="button" 
-                  onClick={() => setAuthMode('register')}
-                  className={`text-sm font-bold pb-1 border-b-2 transition-all ${authMode === 'register' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground'}`}
-                >Registrace učitele</button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-200/50 to-indigo-50/50 flex items-center justify-center p-4 py-8 md:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-7xl w-full mx-auto items-stretch">
+          
+          {/* Levý sloupec - Informace o platformě */}
+          <div className="bg-white/70 backdrop-blur-md border border-slate-200/40 rounded-3xl p-8 flex flex-col justify-between shadow-xl space-y-6">
+            <div className="space-y-4">
+              <div className="bg-primary/10 w-12 h-12 rounded-xl flex items-center justify-center shadow-inner">
+                <School className="text-primary w-6 h-6" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-headline font-black text-gray-800 tracking-tight">K čemu iTest slouží?</h2>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  iTest Cloud je moderní platforma pro tvorbu, zadávání a hodnocení interaktivních testů a výkresů v reálném čase.
+                </p>
               </div>
 
-              {authMode === 'login' && (
-                <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-lg">
-                  <button 
-                    type="button" 
-                    className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'teacher' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
-                    onClick={() => setLoginRole('teacher')}
-                  >Učitel</button>
-                  <button 
-                    type="button" 
-                    className={`py-2 text-xs font-bold rounded-md transition-all ${loginRole === 'student' ? 'bg-white shadow text-primary font-bold' : 'text-gray-500 hover:text-gray-900'}`}
-                    onClick={() => setLoginRole('student')}
-                  >Student</button>
+              <div className="space-y-4 pt-4 border-t border-slate-200/60">
+                <div className="flex gap-3 items-start">
+                  <span className="text-xl shrink-0">📝</span>
+                  <div>
+                    <p className="text-sm font-bold text-gray-855">Interaktivní zadání</p>
+                    <p className="text-xs text-slate-500">Vytvářejte digitální testy z matematických grafů, os a geometrie.</p>
+                  </div>
                 </div>
-              )}
+                <div className="flex gap-3 items-start">
+                  <span className="text-xl shrink-0">🎨</span>
+                  <div>
+                    <p className="text-sm font-bold text-gray-855">Kreslicí plátno</p>
+                    <p className="text-xs text-slate-500">Žáci vypracovávají a kreslí úkoly přímo na svém tabletu, počítači nebo mobilu.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <span className="text-xl shrink-0">📊</span>
+                  <div>
+                    <p className="text-sm font-bold text-gray-855">Žákovská knížka</p>
+                    <p className="text-xs text-slate-500">Okamžitý přehled výsledků, bodování a známkování s reaktivním rozhraním.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <span className="text-xl shrink-0">👥</span>
+                  <div>
+                    <p className="text-sm font-bold text-gray-855">Izolované třídy</p>
+                    <p className="text-xs text-slate-500">Každá škola má kompletně oddělená a zabezpečená data a vlastní zvací kódy.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-              <div className="space-y-4">
-                {authMode === 'register' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Vaše jméno</Label>
-                      <Input placeholder="Mgr. Jan Novák" value={name} onChange={e => setName(e.target.value)} className="h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Kód školy (zvací kód)</Label>
-                      <Input placeholder="např. testskola" value={inviteCode} onChange={e => setInviteCode(e.target.value)} className="h-12" />
-                    </div>
-                  </>
+            <div className="text-[11px] text-slate-400 font-medium pt-4 border-t border-slate-100">
+              © 2026 iTest Cloud. Všechna práva vyhrazena.
+            </div>
+          </div>
+
+          {/* Prostřední sloupec - Přihlášení / Registrace */}
+          <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white flex flex-col justify-between">
+            <CardHeader className="text-center space-y-4 bg-primary text-white pb-6 pt-8 shrink-0">
+              <div className="bg-white/20 w-14 h-14 rounded-2xl mx-auto flex items-center justify-center shadow-lg transform -rotate-6">
+                <School className="text-white w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <CardTitle className="font-headline text-3xl">iTest Cloud</CardTitle>
+                <CardDescription className="text-white/70">Zadávání a hodnocení v cloudu.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent className="p-8 flex-1 flex flex-col justify-center">
+              <form onSubmit={handleAuth} className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-4 border-b pb-4">
+                  <button 
+                    type="button" 
+                    onClick={() => setAuthMode('login')}
+                    className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'login' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
+                  >Přihlášení</button>
+                  <button 
+                    type="button" 
+                    onClick={() => setAuthMode('register')}
+                    className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'register' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
+                  >Registrace s kódem</button>
+                  <button 
+                    type="button" 
+                    onClick={() => setAuthMode('register-trial')}
+                    className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'register-trial' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
+                  >Zkouška zdarma</button>
+                </div>
+
+                {authMode === 'login' && (
+                  <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl">
+                    <button 
+                      type="button" 
+                      className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'teacher' ? 'bg-white shadow text-primary font-black' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => setLoginRole('teacher')}
+                    >Učitel</button>
+                    <button 
+                      type="button" 
+                      className={`py-2 text-xs font-bold rounded-lg transition-all ${loginRole === 'student' ? 'bg-white shadow text-primary font-black' : 'text-gray-500 hover:text-gray-900'}`}
+                      onClick={() => setLoginRole('student')}
+                    >Student</button>
+                  </div>
                 )}
-                <div className="space-y-2">
-                  <Label>Uživatelské jméno</Label>
-                  <Input placeholder="jan.novak" value={username} onChange={e => setUsername(e.target.value)} className="h-12" />
+
+                <div className="space-y-4">
+                  {(authMode === 'register' || authMode === 'register-trial') && (
+                    <div className="space-y-2">
+                      <Label className="font-bold text-gray-700">Vaše jméno</Label>
+                      <Input placeholder="Mgr. Jan Novák" value={name} onChange={e => setName(e.target.value)} className="h-12 rounded-xl" />
+                    </div>
+                  )}
+                  {authMode === 'register' && (
+                    <div className="space-y-2">
+                      <Label className="font-bold text-gray-700">Kód školy (zvací kód)</Label>
+                      <Input placeholder="např. testskola" value={inviteCode} onChange={e => setInviteCode(e.target.value)} className="h-12 rounded-xl" />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label className="font-bold text-gray-700">Uživatelské jméno</Label>
+                    <Input placeholder="jan.novak" value={username} onChange={e => setUsername(e.target.value)} className="h-12 rounded-xl" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="font-bold text-gray-700">Heslo</Label>
+                    <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="h-12 rounded-xl" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Heslo</Label>
-                  <Input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="h-12" />
+                
+                <Button type="submit" className="w-full h-12 text-base font-headline font-bold shadow-lg rounded-xl">
+                  {authMode === 'login' ? 'Vstoupit do iTestu' : authMode === 'register' ? 'Vytvořit účet' : 'Vytvořit zkušební účet'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Pravý sloupec - Tarify a ceny */}
+          <div className="bg-white/70 backdrop-blur-md border border-slate-200/40 rounded-3xl p-8 flex flex-col justify-between shadow-xl space-y-6">
+            <div className="space-y-4">
+              <div className="bg-amber-100/60 w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-inner">
+                💎
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-headline font-black text-gray-800 tracking-tight">Předplatné a verze</h2>
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Vyzkoušejte platformu na 3 měsíce zdarma a poté se rozhodněte pro verzi, která vám nejlépe vyhovuje.
+                </p>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-slate-200/60">
+                <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/50 space-y-2">
+                  <h3 className="text-xs font-black uppercase text-indigo-750 tracking-wider">Zkušební verze (Free trial)</h3>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Každý nový učitel získává po registraci **90 dní zdarma** na plné vyzkoušení platformy.
+                  </p>
+                  <div className="text-[10px] font-bold text-indigo-900 bg-white border px-2.5 py-0.5 rounded-full w-max">
+                    Max. 2 třídy · Max. 20 žáků
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/60 space-y-3">
+                  <h3 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                    Premium předplatné <Crown className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  </h3>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-sm font-black text-slate-800">99 Kč / měsíc</span>
+                      <span className="text-[10px] text-slate-400 font-semibold">Měsíční platba</span>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-sm font-black text-indigo-700">999 Kč / rok</span>
+                      <span className="text-[10px] text-slate-400 font-semibold">Roční platba (-16%)</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed border-t pt-2">
+                    Aktivace Premium verze kompletně ruší limity a zpřístupňuje hromadný export výsledků do ZIP.
+                  </p>
                 </div>
               </div>
-              <Button type="submit" className="w-full h-12 text-lg font-headline shadow-lg">
-                {authMode === 'login' ? 'Vstoupit do iTestu' : 'Vytvořit účet'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+            </div>
+
+            <div className="bg-amber-50 text-amber-800 p-3.5 rounded-2xl border border-amber-100/60 leading-relaxed text-[10px] font-medium flex gap-2">
+              <span>💡</span>
+              <span>Platba probíhá převodem na účet a Premium je ručně aktivováno administrátorem po ověření připsané částky.</span>
+            </div>
+          </div>
+
+        </div>
       </div>
     );
   }
@@ -1609,17 +1723,6 @@ export default function ITestApp() {
           {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             <Card 
-              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'schools' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
-              onClick={() => setAdminTab('schools')}
-            >
-              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-                <School className="w-8 h-8 text-violet-500" />
-                <p className="text-sm font-semibold text-muted-foreground">Školy</p>
-                <p className="text-2xl font-black text-violet-500">{schools.length}</p>
-              </CardContent>
-            </Card>
-
-            <Card 
               className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'overview' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
               onClick={() => setAdminTab('overview')}
             >
@@ -1627,6 +1730,17 @@ export default function ITestApp() {
                 <LayoutDashboard className="w-8 h-8 text-primary" />
                 <p className="text-sm font-semibold text-muted-foreground">Přehled</p>
                 <p className="text-2xl font-black text-primary">Hlavní</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'schools' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('schools')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <School className="w-8 h-8 text-violet-500" />
+                <p className="text-sm font-semibold text-muted-foreground">Školy</p>
+                <p className="text-2xl font-black text-violet-500">{schools.length}</p>
               </CardContent>
             </Card>
 
@@ -3040,6 +3154,9 @@ export default function ITestApp() {
                   <p className="text-xs text-muted-foreground">
                     Všechny limity jsou zrušeny. Placená verze vyprší a přepne se do základní verze za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).
                   </p>
+                  <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                    Škola: <span className="font-bold text-slate-700">{schools.find(s => s.id === currentUser.schoolId)?.name || 'Načítání...'}</span> · Zvací kód školy: <span className="font-mono bg-white border px-1.5 py-0.2 rounded font-bold text-indigo-700">{schools.find(s => s.id === currentUser.schoolId)?.inviteCode || '...'}</span>
+                  </p>
                 </div>
               </div>
             </div>
@@ -3055,6 +3172,9 @@ export default function ITestApp() {
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Zkušební doba končí za <span className="font-bold text-indigo-700">{daysLeft} dní</span>. Omezení: max. 2 třídy a 20 žáků na třídu.
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                    Škola: <span className="font-bold text-slate-700">{schools.find(s => s.id === currentUser.schoolId)?.name || 'Načítání...'}</span> · Zvací kód školy: <span className="font-mono bg-white border px-1.5 py-0.2 rounded font-bold text-indigo-700">{schools.find(s => s.id === currentUser.schoolId)?.inviteCode || '...'}</span>
                   </p>
                 </div>
               </div>

@@ -13,15 +13,26 @@ export async function POST(request: Request) {
   try {
     await dbConnect();
     const body = await request.json();
+    let schoolId = "";
 
-    const inviteCode = body.inviteCode;
-    if (!inviteCode) {
-      return NextResponse.json({ success: false, error: "Zadejte kód školy (zvací kód)." }, { status: 400 });
-    }
+    if (body.isTrialRegistration) {
+      const randomId = Math.floor(100 + Math.random() * 900);
+      const trialSchool = await School.create({
+        name: `Zkušební škola - ${body.firstName} ${body.lastName}`,
+        inviteCode: `zkouska-${body.username.toLowerCase().trim()}-${randomId}`,
+      });
+      schoolId = trialSchool._id.toString();
+    } else {
+      const inviteCode = body.inviteCode;
+      if (!inviteCode) {
+        return NextResponse.json({ success: false, error: "Zadejte kód školy (zvací kód)." }, { status: 400 });
+      }
 
-    const school = await School.findOne({ inviteCode: inviteCode.trim().toLowerCase() });
-    if (!school) {
-      return NextResponse.json({ success: false, error: "Zadaný kód školy není platný." }, { status: 400 });
+      const school = await School.findOne({ inviteCode: inviteCode.trim().toLowerCase() });
+      if (!school) {
+        return NextResponse.json({ success: false, error: "Zadaný kód školy není platný." }, { status: 400 });
+      }
+      schoolId = school._id.toString();
     }
 
     // Kontrola, zda uživatelské jméno již neexistuje mezi žáky (globální unikátnost loginu)
@@ -51,7 +62,7 @@ export async function POST(request: Request) {
       password: hashedPassword,
       passwordPlain: body.password,
       subjects: Array.isArray(body.subjects) ? body.subjects : (body.subjects ? body.subjects.split(',').map((s: string) => s.trim()) : []),
-      schoolId: school._id.toString(),
+      schoolId: schoolId,
     });
 
     // Nechceme vracet heslo v odpovědi
