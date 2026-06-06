@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
 import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
+import { gradeSubmissionFlow } from '@/ai/flows/grade-submission';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: result.error }, { status: 500 });
       }
       return NextResponse.json({ success: true, questions: result.questions });
+    }
+
+    if (action === 'grade') {
+      const { questions, answers, questionDrawings, mainWorkDrawing, gradeThresholds } = body;
+      if (!questions || !answers) {
+        return NextResponse.json({ error: 'Missing questions or answers' }, { status: 400 });
+      }
+
+      const result = await gradeSubmissionFlow({
+        questions,
+        answers,
+        questionDrawings: questionDrawings || {},
+        mainWorkDrawing,
+        gradeThresholds
+      });
+
+      if ('error' in result) {
+        return NextResponse.json({ error: result.error }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, evaluation: result });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

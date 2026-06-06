@@ -12,7 +12,7 @@ import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
 import { GraphQuestionStudent, GraphQuestionEvaluation, AxisQuestionStudent, AxisQuestionEvaluation, NumberLineQuestionStudent, NumberLineQuestionEvaluation } from '@/components/itest/GraphQuestion';
-import { Assignment, User } from '@/lib/types';
+import { Assignment, User, Submission } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
@@ -168,6 +168,73 @@ export default function ITestApp() {
   const [adminSearchFilter, setAdminSearchFilter] = useState<string>('');
   const [adminSortBy, setAdminSortBy] = useState<'name' | 'school' | 'default'>('default');
   const [adminSortOrder, setAdminSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const [isAiGrading, setIsAiGrading] = useState(false);
+  const handleAiGrade = async (assignment: Assignment, sub: Submission) => {
+    setIsAiGrading(true);
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'grade',
+          questions: assignment.questions,
+          answers: sub.answers || {},
+          questionDrawings: sub.questionDrawings || {},
+          mainWorkDrawing: sub.mainWorkDrawing,
+          gradeThresholds: assignment.gradeThresholds
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.evaluation) {
+        const evalData = data.evaluation;
+        
+        // Convert any Map/object schemas correctly
+        const newScores: Record<string, number> = {};
+        if (evalData.questionScores) {
+          Object.entries(evalData.questionScores).forEach(([qId, val]) => {
+            newScores[qId] = Number(val);
+          });
+        }
+        
+        setEvalScores(newScores);
+        setEvalGrade(evalData.suggestedGrade || 5);
+        
+        // Append question feedbacks if available to final feedback
+        let combinedFeedback = evalData.suggestedFeedback || '';
+        if (evalData.questionFeedback && Object.keys(evalData.questionFeedback).length > 0) {
+          combinedFeedback += "\n\nPodrobné hodnocení otázek:";
+          assignment.questions.forEach((q, idx) => {
+            const qFb = evalData.questionFeedback[q.id];
+            if (qFb) {
+              combinedFeedback += `\n- Otázka ${idx + 1}: ${qFb}`;
+            }
+          });
+        }
+        
+        setEvalFeedback(combinedFeedback);
+        setIsGradeManuallySet(true);
+        toast({
+          title: "AI Návrh úspěšný",
+          description: "Známka, body a slovní hodnocení byly předvyplněny podle Gemini."
+        });
+      } else {
+        toast({
+          title: "AI Hodnocení selhalo",
+          description: data.error || "Došlo k neznámé chybě při hodnocení.",
+          variant: "destructive"
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Chyba sítě",
+        description: err.message || "Nepodařilo se připojit k AI službě.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAiGrading(false);
+    }
+  };
 
   useEffect(() => {
     if (store.currentUser && (store.currentUser.role === 'admin' || store.currentUser.role === 'teacher')) {
@@ -2995,6 +3062,25 @@ export default function ITestApp() {
                                           </div>
 
                                           <div className="space-y-4 pt-4 print-exclude">
+                                            <Button 
+                                              type="button"
+                                              variant="outline" 
+                                              className="w-full text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center justify-center gap-2 rounded-full font-bold h-11"
+                                              onClick={() => handleAiGrade(assignment, sub)}
+                                              disabled={isAiGrading}
+                                            >
+                                              {isAiGrading ? (
+                                                <>
+                                                  <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                                                  <span>Gemini analyzuje odpovědi a výkresy...</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                                                  <span>Navrhnout hodnocení pomocí AI (Gemini)</span>
+                                                </>
+                                              )}
+                                            </Button>
                                             <Textarea 
                                               placeholder="Slovní hodnocení..." 
                                               value={evalFeedback}
@@ -4663,6 +4749,25 @@ export default function ITestApp() {
                           })()}
 
                           <div className="space-y-4 pt-4 print-exclude">
+                            <Button 
+                              type="button"
+                              variant="outline" 
+                              className="w-full text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center justify-center gap-2 rounded-full font-bold h-11"
+                              onClick={() => handleAiGrade(assignment, sub)}
+                              disabled={isAiGrading}
+                            >
+                              {isAiGrading ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+                                  <span>Gemini analyzuje odpovědi a výkresy...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                                  <span>Navrhnout hodnocení pomocí AI (Gemini)</span>
+                                </>
+                              )}
+                            </Button>
                             <Textarea 
                                 placeholder="Slovní hodnocení..." 
                                 value={evalFeedback}
