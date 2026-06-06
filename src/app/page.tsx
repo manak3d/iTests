@@ -18,11 +18,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { LiveMonitor } from '@/components/itest/LiveMonitor';
 
 export default function ITestApp() {
   const store = useITestStore();
   const { toast } = useToast();
   
+  const [monitorAssignmentId, setMonitorAssignmentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const mId = params.get('monitor');
+      if (mId) {
+        setMonitorAssignmentId(mId);
+      }
+    }
+  }, []);
+
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
@@ -249,6 +262,87 @@ export default function ITestApp() {
     };
   }, [selectedAssignmentId, store.currentUser, store.submissions]);
   
+  const tabFocusLostCountRef = useRef(0);
+
+  useEffect(() => {
+    if (!selectedAssignmentId || !store.currentUser || store.currentUser.role !== 'student') return;
+    const sub = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === store.currentUser!.id);
+    if (sub) {
+      tabFocusLostCountRef.current = sub.tabFocusLostCount || 0;
+    } else {
+      tabFocusLostCountRef.current = 0;
+    }
+  }, [selectedAssignmentId, store.currentUser, store.submissions]);
+
+  useEffect(() => {
+    if (!selectedAssignmentId || !store.currentUser || store.currentUser.role !== 'student') return;
+    const sub = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === store.currentUser!.id);
+    if (sub && sub.submittedAt) return;
+
+    const handleBlur = () => {
+      tabFocusLostCountRef.current += 1;
+      toast({
+        title: "Upozornění",
+        description: "Opustili jste okno testu! Tento incident byl zaznamenán.",
+        variant: "destructive"
+      });
+      store.saveDraft({
+        assignmentId: selectedAssignmentId,
+        studentId: store.currentUser!.id,
+        answers: studentAnswers,
+        questionDrawings,
+        mainWorkDrawing,
+        tabFocusLostCount: tabFocusLostCountRef.current,
+        lastActiveAt: new Date().toISOString()
+      });
+    };
+
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, [selectedAssignmentId, store.currentUser, studentAnswers, questionDrawings, mainWorkDrawing, store.saveDraft, toast]);
+
+  useEffect(() => {
+    if (!selectedAssignmentId || !store.currentUser || store.currentUser.role !== 'student') return;
+    const sub = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === store.currentUser!.id);
+    if (sub && sub.submittedAt) return;
+
+    const delayDebounce = setTimeout(() => {
+      store.saveDraft({
+        assignmentId: selectedAssignmentId,
+        studentId: store.currentUser!.id,
+        answers: studentAnswers,
+        questionDrawings,
+        mainWorkDrawing,
+        tabFocusLostCount: tabFocusLostCountRef.current,
+        lastActiveAt: new Date().toISOString()
+      });
+    }, 2000);
+
+    return () => clearTimeout(delayDebounce);
+  }, [studentAnswers, questionDrawings, mainWorkDrawing, selectedAssignmentId, store.currentUser, store.saveDraft]);
+
+  useEffect(() => {
+    if (!selectedAssignmentId || !store.currentUser || store.currentUser.role !== 'student') return;
+    const sub = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === store.currentUser!.id);
+    if (sub && sub.submittedAt) return;
+
+    const interval = setInterval(() => {
+      store.saveDraft({
+        assignmentId: selectedAssignmentId,
+        studentId: store.currentUser!.id,
+        answers: studentAnswers,
+        questionDrawings,
+        mainWorkDrawing,
+        tabFocusLostCount: tabFocusLostCountRef.current,
+        lastActiveAt: new Date().toISOString()
+      });
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [selectedAssignmentId, store.currentUser, studentAnswers, questionDrawings, mainWorkDrawing, store.saveDraft]);
+
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [editStartTime, setEditStartTime] = useState('');
   const [editEndTime, setEditEndTime] = useState('');
@@ -1756,6 +1850,24 @@ export default function ITestApp() {
       <div className="min-h-screen bg-[#EFF3F7] flex items-center justify-center">
         <Loader2 className="w-10 h-10 text-primary animate-spin" />
       </div>
+    );
+  }
+
+  if (monitorAssignmentId) {
+    if (!store.isLoaded) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white gap-4">
+          <Loader2 className="w-12 h-12 text-indigo-400 animate-spin" />
+          <p className="text-slate-450 animate-pulse font-medium">Načítám rozhraní pro sledování...</p>
+        </div>
+      );
+    }
+    return (
+      <LiveMonitor
+        assignmentId={monitorAssignmentId}
+        store={store}
+        onClose={() => window.close()}
+      />
     );
   }
 
@@ -4649,6 +4761,14 @@ export default function ITestApp() {
                       <Button variant="ghost" className="rounded-full w-fit" onClick={() => { setViewingAssignmentSubs(null); }}>← Zpět na testy</Button>
                       
                       <div className="flex items-center gap-2 print-exclude">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="h-9 text-xs font-bold text-red-700 border-red-200 hover:bg-red-50 rounded-full flex items-center gap-1.5"
+                          onClick={() => window.open(`/?monitor=${selAssignment.id}`, '_blank')}
+                        >
+                          <Activity className="w-4 h-4 text-red-500 animate-pulse" /> Sledovat test (Live)
+                        </Button>
                         <Button 
                           variant="outline" 
                           size="sm"

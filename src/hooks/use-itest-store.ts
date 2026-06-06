@@ -63,8 +63,8 @@ export function useITestStore() {
     return users.find(u => u.id === currentUserId) || mongoUser || null;
   }, [currentUserId, users, mongoUser]);
 
-  useEffect(() => {
-    fetch('/api/sync')
+  const refresh = useCallback(() => {
+    return fetch('/api/sync')
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -74,16 +74,19 @@ export function useITestStore() {
           setSubmissions(data.submissions);
         }
       })
-      .catch(console.error)
-      .finally(() => {
-        setLoadingStates({
-          users: false,
-          classes: false,
-          assignments: false,
-          submissions: false
-        });
+      .catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    refresh().finally(() => {
+      setLoadingStates({
+        users: false,
+        classes: false,
+        assignments: false,
+        submissions: false
       });
-  }, [currentUserId]);
+    });
+  }, [currentUserId, refresh]);
 
   const login = useCallback((role: Role, username: string, password?: string) => {
     const user = users.find(u => u.username === username && u.role === role && u.password === password);
@@ -383,7 +386,7 @@ export function useITestStore() {
 
 
   const submitWork = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'>) => {
-    const id = Math.random().toString(36).substring(2, 11);
+    const id = submission.assignmentId + "-" + submission.studentId;
 
     // Auto-hodnocení: pokud má otázka correctAnswer, porovnáme s odpovědí žáka
     const assignment = assignments.find(a => a.id === submission.assignmentId);
@@ -449,11 +452,14 @@ export function useITestStore() {
       ? { ...(submission.questionScores || {}), ...autoScores }
       : submission.questionScores;
 
+    const existingSub = submissions.find(s => s.id === id);
     const newSubmission = {
       ...submission,
       id,
       submittedAt: new Date().toISOString(),
       ...(mergedScores ? { questionScores: mergedScores } : {}),
+      tabFocusLostCount: existingSub?.tabFocusLostCount || 0,
+      lastActiveAt: new Date().toISOString()
     };
     
     // Zápis do MongoDB primárně
@@ -465,7 +471,10 @@ export function useITestStore() {
     .then(async res => {
       if (res.ok) {
         toast({ title: "Odevzdáno", description: "Práce byla úspěšně nahrána." });
-        setSubmissions(prev => [...prev, newSubmission as Submission]);
+        setSubmissions(prev => {
+          const filtered = prev.filter(s => s.id !== id);
+          return [...filtered, newSubmission as Submission];
+        });
         
         if (db) {
           setDoc(doc(db, 'submissions', id), cleanData(newSubmission)).catch(console.error);
@@ -475,7 +484,38 @@ export function useITestStore() {
       }
     })
     .catch(console.error);
-  }, [db, toast, assignments]);
+  }, [db, toast, assignments, submissions]);
+
+  const saveDraft = useCallback((submission: Omit<Submission, 'id' | 'submittedAt'> & { tabFocusLostCount?: number; lastActiveAt?: string }) => {
+    const id = submission.assignmentId + "-" + submission.studentId;
+    const existingSub = submissions.find(s => s.id === id);
+    const newSubmission = {
+      ...submission,
+      id,
+      submittedAt: "",
+      tabFocusLostCount: submission.tabFocusLostCount !== undefined ? submission.tabFocusLostCount : (existingSub?.tabFocusLostCount || 0),
+      lastActiveAt: submission.lastActiveAt || new Date().toISOString()
+    };
+    
+    return fetch('/api/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSubmission)
+    })
+    .then(async res => {
+      if (res.ok) {
+        setSubmissions(prev => {
+          const filtered = prev.filter(s => s.id !== id);
+          return [...filtered, newSubmission as Submission];
+        });
+        
+        if (db) {
+          setDoc(doc(db, 'submissions', id), cleanData(newSubmission)).catch(console.error);
+        }
+      }
+    })
+    .catch(console.error);
+  }, [db, submissions]);
 
   const gradeSubmission = useCallback((id: string, grade: number, feedback: string, questionScores?: Record<string, number>) => {
     // Aktualizace v MongoDB primárně
@@ -672,6 +712,6 @@ export function useITestStore() {
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, startAssignmentTimer
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, startAssignmentTimer, saveDraft, refresh
   };
 }

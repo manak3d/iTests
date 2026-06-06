@@ -37,6 +37,12 @@ export async function POST(request: Request) {
     if (body.questionScores !== undefined) {
       updateData.questionScores = body.questionScores;
     }
+    if (body.tabFocusLostCount !== undefined) {
+      updateData.tabFocusLostCount = body.tabFocusLostCount;
+    }
+    if (body.lastActiveAt !== undefined) {
+      updateData.lastActiveAt = body.lastActiveAt;
+    }
 
     const newSubmission = await Submission.findOneAndUpdate(
       { _id: submissionId },

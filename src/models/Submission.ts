@@ -9,6 +9,8 @@ export interface ISubmission extends Document<string> {
   mainWorkDrawing?: string; // Hlavní nákres
   submittedAt: string;
   startedAt?: string;
+  tabFocusLostCount?: number;
+  lastActiveAt?: string;
   grade?: number; // 1-5
   feedback?: string;
   questionScores?: Map<string, number>; // Body za konkrétne otázky
@@ -27,6 +29,8 @@ const SubmissionSchema: Schema = new Schema(
     mainWorkDrawing: { type: String },
     submittedAt: { type: String, default: "" },
     startedAt: { type: String },
+    tabFocusLostCount: { type: Number, default: 0 },
+    lastActiveAt: { type: String },
     grade: { type: Number, min: 1, max: 5 },
     feedback: { type: String },
     questionScores: { type: Map, of: Number, default: {} },
