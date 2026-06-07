@@ -7,18 +7,318 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
 import { GraphQuestionStudent, GraphQuestionEvaluation, AxisQuestionStudent, AxisQuestionEvaluation, NumberLineQuestionStudent, NumberLineQuestionEvaluation } from '@/components/itest/GraphQuestion';
-import { Assignment, User, Submission } from '@/lib/types';
+import { MatchingQuestionStudent, MatchingQuestionReview } from '@/components/itest/MatchingQuestion';
+import { renderRichText } from '@/lib/utils';
+import { Assignment, User, Submission, Question } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { LiveMonitor } from '@/components/itest/LiveMonitor';
+
+
+interface MistakeTrainingWidgetProps {
+  q: Question;
+  index: number;
+  practiceLoading: Record<string, boolean>;
+  practiceErrors: Record<string, string>;
+  practiceAiContent: Record<string, { theoryExplanation: string; questions: any[] }>;
+  practiceAnswers: Record<string, Record<string, any>>;
+  practiceChecked: Record<string, Record<string, boolean>>;
+  setPracticeAnswers: React.Dispatch<React.SetStateAction<Record<string, Record<string, any>>>>;
+  setPracticeChecked: React.Dispatch<React.SetStateAction<Record<string, Record<string, boolean>>>>;
+  handleLoadAiPractice: (qId: string, questionText: string, numQuestions: number) => Promise<void>;
+}
+
+function MistakeTrainingWidget({
+  q,
+  index,
+  practiceLoading,
+  practiceErrors,
+  practiceAiContent,
+  practiceAnswers,
+  practiceChecked,
+  setPracticeAnswers,
+  setPracticeChecked,
+  handleLoadAiPractice
+}: MistakeTrainingWidgetProps) {
+  const qId = q.id;
+  const numQuestions = q.numPracticeQuestions || 1;
+  const useAi = !!q.useAiForPractice;
+
+  useEffect(() => {
+    if (useAi && !practiceAiContent[qId] && !practiceLoading[qId] && !practiceErrors[qId]) {
+      handleLoadAiPractice(qId, q.text, numQuestions);
+    }
+  }, [useAi, qId, q.text, numQuestions, practiceAiContent, practiceLoading, practiceErrors, handleLoadAiPractice]);
+
+  const isLoading = practiceLoading[qId];
+  const error = practiceErrors[qId];
+  const aiData = practiceAiContent[qId];
+
+  const hasAiContent = useAi && aiData?.questions && aiData.questions.length > 0;
+  
+  const activeQuestions = hasAiContent
+    ? aiData.questions
+    : (q.practiceQuestions || []).slice(0, numQuestions);
+
+  const answers = practiceAnswers[qId] || {};
+  const checked = practiceChecked[qId] || {};
+
+  const handleAnswerChange = (pqId: string, val: any) => {
+    setPracticeAnswers(prev => ({
+      ...prev,
+      [qId]: {
+        ...(prev[qId] || {}),
+        [pqId]: val
+      }
+    }));
+  };
+
+  const handleCheck = () => {
+    setPracticeChecked(prev => ({
+      ...prev,
+      [qId]: activeQuestions.reduce((acc: Record<string, boolean>, pq: any) => {
+        acc[pq.id || pq.text] = true;
+        return acc;
+      }, {} as Record<string, boolean>)
+    }));
+  };
+
+  const handleReset = () => {
+    setPracticeAnswers(prev => {
+      const copy = { ...prev };
+      delete copy[qId];
+      return copy;
+    });
+    setPracticeChecked(prev => {
+      const copy = { ...prev };
+      delete copy[qId];
+      return copy;
+    });
+  };
+
+  if (useAi && isLoading) {
+    return (
+      <div className="mt-4 p-5 rounded-2xl border border-indigo-100 bg-indigo-50/20 text-indigo-955 space-y-3 animate-pulse">
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+          <span className="text-xs font-black uppercase tracking-wider text-indigo-650">Generuji doplňující příklady přes AI...</span>
+        </div>
+        <div className="h-4 bg-indigo-100/50 rounded w-3/4"></div>
+        <div className="h-8 bg-indigo-100/50 rounded w-full"></div>
+      </div>
+    );
+  }
+
+  if (useAi && error && activeQuestions.length === 0) {
+    return (
+      <div className="mt-4 p-4 rounded-2xl border border-amber-200 bg-amber-50/50 text-amber-900 text-xs">
+        <div className="font-bold flex items-center gap-1.5 text-amber-800">
+          ⚠️ Nelze načíst tréninkové otázky přes AI
+        </div>
+        <p className="mt-1 text-slate-500">
+          {error === 'AI_OFFLINE' 
+            ? 'AI asistent je offline (chybí API klíč Gemini).' 
+            : `Chyba: ${error}`}
+        </p>
+        <p className="mt-1 text-slate-400 font-semibold">Učitel pro tuto otázku nepřipravil žádné náhradní úlohy.</p>
+      </div>
+    );
+  }
+
+  if (activeQuestions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 p-5 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/30 to-purple-50/20 shadow-sm text-left space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-black uppercase tracking-wider text-indigo-650 flex items-center gap-1.5">
+          🏋️ Trénink chyb: Procvičování navíc ({activeQuestions.length}x)
+        </span>
+      </div>
+
+      {useAi && aiData?.theoryExplanation && (
+        <div className="p-3.5 rounded-xl bg-white border border-indigo-100/80 text-xs text-slate-700 leading-relaxed shadow-sm">
+          <div className="font-bold text-indigo-700 flex items-center gap-1 mb-1">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse" />
+            💡 Vysvětlení teorie a tipy:
+          </div>
+          <div>{renderRichText(aiData.theoryExplanation)}</div>
+        </div>
+      )}
+
+      <div className="space-y-4 pt-1">
+        {activeQuestions.map((pq: any, idx: number) => {
+          const pqId = pq.id || pq.text;
+          const studentAns = answers[pqId];
+          const isChecked = !!checked[pqId];
+          
+          let isCorrect = false;
+          if (pq.type === 'multiple_choice') {
+            isCorrect = studentAns === pq.correctAnswer;
+          } else if (pq.type === 'true_false') {
+            isCorrect = studentAns === pq.correctAnswer;
+          } else {
+            const cleanCorrect = String(pq.correctAnswer || '').trim().toLowerCase();
+            const cleanStudent = String(studentAns || '').trim().toLowerCase();
+            isCorrect = cleanCorrect === cleanStudent;
+          }
+
+          return (
+            <div key={pqId} className="p-4 bg-white/70 rounded-xl border border-slate-100 space-y-3 shadow-xs">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold h-5 mt-0.5">
+                    {idx + 1}
+                  </Badge>
+                  <p className="text-sm font-bold text-slate-800 leading-tight">{renderRichText(pq.text)}</p>
+                </div>
+
+                {isChecked && (
+                  <Badge className={`text-[9px] font-black uppercase tracking-wider ${
+                    isCorrect 
+                      ? 'bg-green-600 text-white hover:bg-green-600' 
+                      : 'bg-red-600 text-white hover:bg-red-600'
+                  }`}>
+                    {isCorrect ? '✓ Správně' : '✗ Chyba'}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="pt-1">
+                {pq.type === 'multiple_choice' && pq.options && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {pq.options.map((opt: string, oIdx: number) => {
+                      const isSelected = studentAns === oIdx;
+                      const isOptionCorrect = pq.correctAnswer === oIdx;
+                      
+                      let btnClass = 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700';
+                      if (isSelected) {
+                        btnClass = 'bg-indigo-600 border-indigo-650 text-white shadow-sm';
+                      }
+                      if (isChecked) {
+                        if (isOptionCorrect) {
+                          btnClass = 'bg-green-100 border-green-300 text-green-800 font-bold';
+                        } else if (isSelected) {
+                          btnClass = 'bg-red-100 border-red-300 text-red-800 line-through';
+                        } else {
+                          btnClass = 'opacity-50 border-slate-200 bg-white text-slate-500';
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={oIdx}
+                          type="button"
+                          disabled={isChecked}
+                          onClick={() => handleAnswerChange(pqId, oIdx)}
+                          className={`p-2.5 rounded-lg border text-left text-xs transition-all flex items-center ${btnClass}`}
+                        >
+                          <span className="font-bold mr-2">{String.fromCharCode(65 + oIdx)}.</span>
+                          <span>{opt}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {pq.type === 'true_false' && (
+                  <div className="flex gap-3 max-w-xs">
+                    {[true, false].map((tfVal) => {
+                      const isSelected = studentAns === tfVal;
+                      const isTfCorrect = pq.correctAnswer === tfVal;
+
+                      let btnClass = 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700';
+                      if (isSelected) {
+                        btnClass = 'bg-indigo-600 border-indigo-650 text-white shadow-sm';
+                      }
+                      if (isChecked) {
+                        if (isTfCorrect) {
+                          btnClass = 'bg-green-100 border-green-300 text-green-800 font-bold';
+                        } else if (isSelected) {
+                          btnClass = 'bg-red-100 border-red-300 text-red-800 line-through';
+                        } else {
+                          btnClass = 'opacity-50 border-slate-200 bg-white text-slate-500';
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={String(tfVal)}
+                          type="button"
+                          disabled={isChecked}
+                          onClick={() => handleAnswerChange(pqId, tfVal)}
+                          className={`flex-1 p-2 rounded-lg border text-center text-xs font-bold transition-all ${btnClass}`}
+                        >
+                          {tfVal ? '✓ Ano' : '✗ Ne'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {pq.type === 'short_answer' && (
+                  <div className="space-y-2 max-w-md">
+                    <Input
+                      placeholder="Napište svoji odpověď..."
+                      disabled={isChecked}
+                      value={studentAns || ''}
+                      onChange={(e) => handleAnswerChange(pqId, e.target.value)}
+                      className={`h-9 text-xs rounded-lg ${
+                        isChecked 
+                          ? (isCorrect ? 'bg-green-50 border-green-300 text-green-950 font-bold' : 'bg-red-50 border-red-300 text-red-955 line-through') 
+                          : 'focus-visible:ring-indigo-500 bg-white'
+                      }`}
+                    />
+                    {isChecked && !isCorrect && (
+                      <div className="text-[11px] font-bold text-green-700 bg-green-50/60 p-2 rounded-lg border border-green-100">
+                        Správná odpověď: {String(pq.correctAnswer)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {isChecked && pq.explanation && (
+                <div className="p-3 bg-indigo-50/40 rounded-xl border border-indigo-100/50 text-[11px] text-slate-600 leading-relaxed">
+                  <span className="font-bold text-indigo-700 uppercase tracking-wide block mb-0.5">Postup řešení:</span>
+                  {renderRichText(pq.explanation)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-2.5 pt-2">
+        {Object.keys(checked).length === 0 ? (
+          <Button
+            onClick={handleCheck}
+            className="rounded-xl font-bold px-5 bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-sm text-xs py-2 h-9 flex items-center"
+          >
+            Ověřit řešení
+          </Button>
+        ) : (
+          <Button
+            onClick={handleReset}
+            variant="outline"
+            className="rounded-xl font-bold px-5 border-slate-200 hover:bg-slate-50 text-xs text-slate-700 py-2 h-9 flex items-center"
+          >
+            Zkusit znovu
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ITestApp() {
   const store = useITestStore();
@@ -258,6 +558,38 @@ export default function ITestApp() {
   const [questionDrawings, setQuestionDrawings] = useState<Record<string, string>>({});
   const [questionDrawingOpen, setQuestionDrawingOpen] = useState<Record<string, boolean>>({});
 
+  // State pro trénink chyb (Otázky navíc) v procvičování
+  const [practiceAnswers, setPracticeAnswers] = useState<Record<string, Record<string, any>>>({});
+  const [practiceChecked, setPracticeChecked] = useState<Record<string, Record<string, boolean>>>({});
+  const [practiceAiContent, setPracticeAiContent] = useState<Record<string, { theoryExplanation: string; questions: any[] }>>({});
+  const [practiceLoading, setPracticeLoading] = useState<Record<string, boolean>>({});
+  const [practiceErrors, setPracticeErrors] = useState<Record<string, string>>({});
+
+  const handleLoadAiPractice = async (qId: string, questionText: string, numQuestions: number) => {
+    setPracticeLoading(prev => ({ ...prev, [qId]: true }));
+    setPracticeErrors(prev => ({ ...prev, [qId]: '' }));
+    try {
+      const res = await fetch('/api/ai/practice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionText, numQuestions })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === 'AI_OFFLINE') {
+          throw new Error('AI_OFFLINE');
+        }
+        throw new Error(data.message || 'Nepodařilo se vygenerovat cvičné otázky.');
+      }
+      setPracticeAiContent(prev => ({ ...prev, [qId]: data.data }));
+    } catch (err: any) {
+      console.error(err);
+      setPracticeErrors(prev => ({ ...prev, [qId]: err.message }));
+    } finally {
+      setPracticeLoading(prev => ({ ...prev, [qId]: false }));
+    }
+  };
+
   useEffect(() => {
     autoSubmitRef.current = () => {
       if (!selectedAssignmentId || !store.currentUser) return;
@@ -448,6 +780,11 @@ export default function ITestApp() {
     setStudentAnswers({});
     setQuestionDrawings({});
     setMainWorkDrawing(undefined);
+    setPracticeAnswers({});
+    setPracticeChecked({});
+    setPracticeAiContent({});
+    setPracticeLoading({});
+    setPracticeErrors({});
 
     if (id && currentUser && currentUser.role === 'student') {
       const assignment = store.assignments.find(a => a.id === id);
@@ -798,7 +1135,7 @@ export default function ITestApp() {
       }
 
       const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
-      const grade = sub && sub.grade ? String(sub.grade) : (sub ? 'Neopraveno' : 'Neodevzdáno');
+      const grade = assignment.isPractice ? (sub ? 'Procvičování' : 'Neodevzdáno') : (sub && sub.grade ? String(sub.grade) : (sub ? 'Neopraveno' : 'Neodevzdáno'));
       const submittedDate = sub && sub.submittedAt ? formatDateTime(sub.submittedAt) : 'Neodevzdáno';
 
       return [
@@ -925,7 +1262,7 @@ export default function ITestApp() {
     ];
 
     // Calculate overall average
-    const allGradedSubmissions = studentSubmissions.filter(s => s.grade !== undefined && s.grade !== null);
+    const allGradedSubmissions = studentSubmissions.filter(s => s.grade !== undefined && s.grade !== null && (() => { const a = store.assignments.find(as => as.id === s.assignmentId); return !a || !a.isPractice; })());
     const overallSum = allGradedSubmissions.reduce((sum, s) => sum + (s.grade || 0), 0);
     const overallAverage = allGradedSubmissions.length > 0 ? (overallSum / allGradedSubmissions.length) : null;
 
@@ -939,7 +1276,7 @@ export default function ITestApp() {
       const a = store.assignments.find(as => as.id === s.assignmentId);
       if (!a) return false;
       const isCorrectSubject = selectedGradebookSubject === 'Jiný' ? (!a.subject || a.subject === 'Jiný') : (a.subject === selectedGradebookSubject);
-      return isCorrectSubject && s.grade !== undefined && s.grade !== null;
+      return isCorrectSubject && s.grade !== undefined && s.grade !== null && !a.isPractice;
     });
     const subjectSum = selectedSubjectGradedSubmissions.reduce((sum, s) => sum + (s.grade || 0), 0);
     const subjectAverage = selectedSubjectGradedSubmissions.length > 0 ? (subjectSum / selectedSubjectGradedSubmissions.length) : null;
@@ -950,7 +1287,7 @@ export default function ITestApp() {
         const a = store.assignments.find(as => as.id === s.assignmentId);
         if (!a) return false;
         const isCorrectSubject = subj === 'Jiný' ? (!a.subject || a.subject === 'Jiný') : (a.subject === subj);
-        return isCorrectSubject && s.grade !== undefined && s.grade !== null;
+        return isCorrectSubject && s.grade !== undefined && s.grade !== null && !a.isPractice;
       });
       const sum = graded.reduce((sumVal, s) => sumVal + (s.grade || 0), 0);
       acc[subj] = graded.length > 0 ? (sum / graded.length) : null;
@@ -1170,7 +1507,11 @@ export default function ITestApp() {
                             {gradebookViewMode === 'child' ? (
                               <div className="flex items-center gap-3">
                                 {sub ? (
-                                  sub.grade ? (
+                                    a.isPractice ? (
+                                      <Badge className="bg-indigo-650 hover:bg-indigo-700 text-white font-black text-xs px-3 py-1 rounded-full border-none">
+                                        Dokončeno · {earned} / {totalMax} b ({pct}%)
+                                      </Badge>
+                                    ) : sub.grade ? (
                                     (() => {
                                       const emoji = sub.grade === 1 ? '🤩' : sub.grade === 2 ? '😊' : sub.grade === 3 ? '😐' : sub.grade === 4 ? '😟' : '😢';
                                       return (
@@ -1201,8 +1542,11 @@ export default function ITestApp() {
                                     <div className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border font-mono">
                                       Úspěšnost: <span className="font-bold text-slate-800">{pct} %</span>
                                     </div>
-                                    <Badge variant={sub.grade ? "default" : "secondary"} className="font-black text-xs px-2.5 py-1">
-                                      {sub.grade ? `Známka: ${sub.grade}` : 'Neohodnoceno'}
+                                    <Badge variant={!a.isPractice && sub.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold text-xs px-2.5 py-1">
+                                      {a.isPractice
+                                        ? `Procvičování (${earned}/${totalMax} b)`
+                                        : (sub.grade ? `Známka: ${sub.grade}` : 'Neohodnoceno')
+                                      }
                                     </Badge>
 
                                     {/* Action link to view/grade submission */}
@@ -2699,10 +3043,22 @@ export default function ITestApp() {
                                               </p>
                                               <p className="text-[10px] text-muted-foreground">Předmět: {a.subject || 'Obecný'}</p>
                                             </div>
-                                            {a.isDraft
-                                              ? <Badge variant="outline" className="font-bold text-amber-600 bg-amber-50 border-amber-200">Neuveřejněno</Badge>
-                                              : <Badge variant="outline" className="font-bold text-primary bg-primary/5">{subCount} odevzdání</Badge>
-                                            }
+                                            <div className="flex items-center gap-2">
+                                              {a.isDraft
+                                                ? <Badge variant="outline" className="font-bold text-amber-600 bg-amber-50 border-amber-200">Neuveřejněno</Badge>
+                                                : <Badge variant="outline" className="font-bold text-primary bg-primary/5">{subCount} odevzdání</Badge>
+                                              }
+                                              <a
+                                                href={`/print/${a.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-primary">
+                                                  <Printer className="w-4 h-4" />
+                                                </Button>
+                                              </a>
+                                            </div>
                                           </div>
                                         );
                                       })
@@ -4094,16 +4450,32 @@ export default function ITestApp() {
                         <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-100 mt-6 space-y-4">
                           <div className="flex items-center justify-between">
                             <h3 className="font-bold text-sm text-primary uppercase tracking-wider">⚙️ Nastavení úkolu</h3>
-                            {!isEditingSettings && (
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-8 text-xs font-bold text-primary flex items-center gap-1.5 rounded-full"
-                                onClick={() => handleStartEditSettings(a)}
+                            <div className="flex gap-2">
+                              <a
+                                href={`/print/${a.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
                               >
-                                ✏️ Upravit nastavení
-                              </Button>
-                            )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-xs font-bold text-gray-500 hover:text-primary flex items-center gap-1.5 rounded-full bg-white"
+                                >
+                                  <Printer className="w-3.5 h-3.5" />
+                                  Tisk do PDF
+                                </Button>
+                              </a>
+                              {!isEditingSettings && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-8 text-xs font-bold text-primary flex items-center gap-1.5 rounded-full"
+                                  onClick={() => handleStartEditSettings(a)}
+                                >
+                                  ✏️ Upravit nastavení
+                                </Button>
+                              )}
+                            </div>
                           </div>
 
                           {!isEditingSettings ? (
@@ -4452,13 +4824,21 @@ export default function ITestApp() {
                             {a.isDraft && <span className="text-xs font-bold text-amber-600">💾 Koncept — neuveřejněno</span>}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                          <a
+                            href={`/print/${a.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-primary rounded-full">
+                              <Printer className="w-5 h-5" />
+                            </Button>
+                          </a>
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full" 
                             onClick={(e) => {
-                              e.stopPropagation();
                               if (confirm(`Opravdu chcete smazat úkol "${a.title}"? Tím smažete i všechny odevzdané práce žáků.`)) {
                                 store.deleteAssignment(a.id);
                               }
@@ -4466,7 +4846,7 @@ export default function ITestApp() {
                           >
                             <Trash2 className="w-5 h-5" />
                           </Button>
-                          <ChevronRight className="w-5 h-5 text-gray-300" />
+                          <ChevronRight className="w-5 h-5 text-gray-300 cursor-pointer" onClick={() => setViewingAssignment(a.id)} />
                         </div>
                       </CardContent>
                     </Card>
@@ -4940,13 +5320,15 @@ export default function ITestApp() {
                                       <div className="flex items-center gap-2">
                                         {sub ? (
                                           <>
-                                            <Badge variant={sub.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
+                                            <Badge variant={!selAssignment.isPractice && sub.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
                                               {sub.submittedAt === "" ? 'Rozpracováno' : (
-                                                sub.grade
-                                                  ? `Zn: ${sub.grade} (${earned}/${totalMax}b · ${pct}%)`
-                                                  : earned > 0
-                                                    ? `Body: ${earned}/${totalMax} (${pct}%)`
-                                                    : 'Neopraveno'
+                                                selAssignment.isPractice
+                                                  ? `Body: ${earned}/${totalMax} (${pct}%)`
+                                                  : (sub.grade
+                                                      ? `Zn: ${sub.grade} (${earned}/${totalMax}b · ${pct}%)`
+                                                      : earned > 0
+                                                        ? `Body: ${earned}/${totalMax} (${pct}%)`
+                                                        : 'Neopraveno')
                                               )}
                                             </Badge>
                                             <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -5223,7 +5605,11 @@ export default function ITestApp() {
                                   return (
                                     <td key={a.id} className="p-4 text-center">
                                       {sub ? (
-                                        sub.grade ? (
+                                        a.isPractice ? (
+                                          <Badge variant="outline" className="font-extrabold text-xs px-2.5 py-1 bg-indigo-50 border-indigo-200 text-indigo-700 shadow-xs" title={`Procvičování (${earned}/${totalMax} bodů · ${pct}%)`}>
+                                            ${pct}%
+                                          </Badge>
+                                        ) : sub.grade ? (
                                           <Badge className="font-extrabold text-xs px-2.5 py-1 bg-primary hover:bg-primary shadow-sm">
                                             {sub.grade}
                                           </Badge>
@@ -5832,9 +6218,14 @@ export default function ITestApp() {
                               return (
                                   <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4 text-center space-y-4">
                                     <div className="text-4xl font-black text-primary">Známka: {submission.grade || 'Nehodnoceno'}</div>
+                                    {a.isPractice ? (
+                                      <div className="text-4xl font-black text-primary">Procvičování</div>
+                                    ) : (
+                                      <div className="text-4xl font-black text-primary">Známka: {submission.grade || 'Nehodnoceno'}</div>
+                                    )}
                                     <div className="text-lg font-bold text-muted-foreground">Celkové body: {earned} / {totalMax} ({pct} %)</div>
                                     
-                                    {submission.grade && (
+                                    {!a.isPractice && submission.grade && (
                                       <div className="flex flex-wrap gap-4 justify-center pt-2">
                                         {[1, 2, 3, 4, 5].map((g) => {
                                           const isActive = Number(submission.grade) === g;
@@ -5901,7 +6292,7 @@ export default function ITestApp() {
                                       ) 
                                     : 0;
                                   
-                                  const isGraded = submission.grade !== undefined && submission.grade !== null;
+                                  const isGraded = (submission.grade !== undefined && submission.grade !== null) || (a.isPractice && !!submission.submittedAt);
                                   const isCorrect = isGraded && score === maxPoints;
 
                                   return (
@@ -5926,7 +6317,7 @@ export default function ITestApp() {
                                            }`}>
                                             {index + 1}
                                           </Badge>
-                                          <p className="font-bold text-lg text-gray-800">{q.text}</p>
+                                          <p className="font-bold text-lg text-gray-800">{renderRichText(q.text)}</p>
                                         </div>
                                         
                                         <div className="flex items-center gap-2">
@@ -5948,7 +6339,7 @@ export default function ITestApp() {
                                       </div>
 
                                       {/* Odpověď */}
-                                      {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && (
+                                      {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && q.type !== 'matching' && (
                                         <div className="bg-white/80 p-3.5 rounded-xl border border-gray-100 space-y-1">
                                           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moje odpověď:</span>
                                           <div>
@@ -6012,6 +6403,31 @@ export default function ITestApp() {
                                           <img src={drawing} className="border rounded-lg max-w-full max-h-60 object-contain bg-white" alt="Kresba k otázce" />
                                         </div>
                                       )}
+
+                                      {q.type === 'matching' && (
+                                        <div className="mt-2">
+                                          <MatchingQuestionReview
+                                            question={q}
+                                            studentAnswer={answer}
+                                          />
+                                        </div>
+                                      )}
+
+                                      {/* Trénink chyb v procvičování */}
+                                      {a.isPractice && isGraded && !isCorrect && q.numPracticeQuestions !== undefined && q.numPracticeQuestions > 0 && (
+                                        <MistakeTrainingWidget
+                                          q={q}
+                                          index={index}
+                                          practiceLoading={practiceLoading}
+                                          practiceErrors={practiceErrors}
+                                          practiceAiContent={practiceAiContent}
+                                          practiceAnswers={practiceAnswers}
+                                          practiceChecked={practiceChecked}
+                                          setPracticeAnswers={setPracticeAnswers}
+                                          setPracticeChecked={setPracticeChecked}
+                                          handleLoadAiPractice={handleLoadAiPractice}
+                                        />
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -6057,7 +6473,7 @@ export default function ITestApp() {
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                       <Badge variant="outline" className="bg-primary/10 text-primary font-bold">{index + 1}</Badge>
-                                      <p className="font-semibold text-lg">{q.text}</p>
+                                      <p className="font-semibold text-lg">{renderRichText(q.text)}</p>
                                     </div>
                                     <Badge variant="secondary" className="text-[10px] uppercase">
                                       {q.type === 'short_answer' ? 'Krátká odpověď' : 
@@ -6065,6 +6481,7 @@ export default function ITestApp() {
                                        q.type === 'multiple_choice' ? 'Výběr z možností' : 
                                        q.type === 'axis' ? 'Osa X/Y' : 
                                        q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
+                                       q.type === 'matching' ? 'Přiřazování' : 
                                        q.type === 'drawing' ? 'Kresba' : q.type}
                                     </Badge>
                                   </div>
@@ -6122,6 +6539,16 @@ export default function ITestApp() {
                                    {/* Číselná osa solver */}
                                    {q.type === 'number_line' && (
                                      <NumberLineQuestionStudent
+                                       question={q}
+                                       disabled={hasEnded}
+                                       value={studentAnswers[q.id]}
+                                       onChange={(val) => setStudentAnswers(prev => ({ ...prev, [q.id]: val }))}
+                                     />
+                                   )}
+
+                                   {/* Přiřazování solver */}
+                                   {q.type === 'matching' && (
+                                     <MatchingQuestionStudent
                                        question={q}
                                        disabled={hasEnded}
                                        value={studentAnswers[q.id]}
@@ -6382,7 +6809,9 @@ export default function ITestApp() {
                           }
                         }
                         
-                        let badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
+                        let badgeText = a.isPractice
+                          ? `Procvičování (${earned}/${totalMax} b)`
+                          : (sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)');
 
                         return (
                                                     <Card 
@@ -6394,7 +6823,7 @@ export default function ITestApp() {
                               <div>
                                 <p className="font-bold text-lg text-gray-800">{a.title}</p>
                                 <div className="mt-1 flex gap-2">
-                                  <Badge variant={sub.grade ? "default" : "secondary"} className="text-xs">
+                                  <Badge variant={!a.isPractice && sub.grade ? "default" : "secondary"} className="text-xs">
                                     {badgeText}
                                   </Badge>
                                 </div>

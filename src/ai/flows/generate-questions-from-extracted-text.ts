@@ -28,9 +28,18 @@ const TrueFalseQuestionSchema = z.object({
   correctAnswer: z.boolean().describe('The correct answer for the true/false question (true or false).'),
 });
 
+const MatchingQuestionSchema = z.object({
+  type: z.literal('matching'),
+  questionText: z.string().describe('The matching question instruction in Czech.'),
+  options: z.array(z.string()).describe('An array of matching pairs formatted as "Left Part|Right Part", e.g. "1/2|0.5".'),
+});
+
 const GenerateQuestionsInputSchema = z.object({
   extractedText: z.string().optional().describe('The text extracted from a document, used to generate questions.'),
   topic: z.string().optional().describe('The topic to generate questions from directly.'),
+  numMultipleChoice: z.number().optional().describe('Number of multiple choice questions to generate.'),
+  numTrueFalse: z.number().optional().describe('Number of true/false questions to generate.'),
+  numShortAnswer: z.number().optional().describe('Number of short answer questions to generate.'),
 });
 export type GenerateQuestionsInput = z.infer<typeof GenerateQuestionsInputSchema>;
 
@@ -39,6 +48,7 @@ const GenerateQuestionsOutputSchema = z.object({
     ShortAnswerQuestionSchema,
     MultipleChoiceQuestionSchema,
     TrueFalseQuestionSchema,
+    MatchingQuestionSchema,
   ])).optional().describe('An array of generated comprehension questions of various types.'),
   error: z.string().optional().describe('Error message if the generation failed.'),
 });
@@ -49,7 +59,7 @@ const prompt = ai.definePrompt({
   input: { schema: GenerateQuestionsInputSchema },
   output: { schema: GenerateQuestionsOutputSchema },
   prompt: `You are an AI assistant specialized in creating engaging and diverse comprehension questions for educational purposes.
-Based on the provided text or topic, generate a set of questions including short answer, multiple choice, and true/false.
+Based on the provided text or topic, generate a set of questions including short answer, multiple choice, true/false, and matching.
 Ensure the questions are relevant and cover key information.
 
 The language of all generated questions, options, and answers must be Czech.
@@ -60,9 +70,14 @@ Extracted Text:
 {{{extractedText}}}
 {{/if}}
 {{#if topic}}
-Topic / Topics:
+Topic / Topics / Keywords / Instructions:
 {{{topic}}}
 {{/if}}
+
+Please generate exactly the following number of questions for each type if specified:
+- Multiple Choice: {{#if numMultipleChoice}}{{numMultipleChoice}}{{else}}at least 1{{/if}}
+- True/False: {{#if numTrueFalse}}{{numTrueFalse}}{{else}}at least 1{{/if}}
+- Short Answer: {{#if numShortAnswer}}{{numShortAnswer}}{{else}}at least 1{{/if}}
 
 Please output a JSON array of questions, adhering to the following schema for each question type:
 
@@ -87,7 +102,14 @@ True/False:
   "correctAnswer": true
 }
 
-Make sure to provide at least one question of each type if possible, and a variety of questions overall to test comprehension comprehensively.`,
+Matching (Přiřazování):
+{
+  "type": "matching",
+  "questionText": "Přiřaďte správné dvojice.",
+  "options": ["Zlomek 1/2|0.5", "Zlomek 1/4|0.25", "Zlomek 3/4|0.75"]
+}
+
+Ensure the questions cover the topic/context comprehensively.`,
 });
 
 export async function generateQuestionsFromExtractedText(input: GenerateQuestionsInput): Promise<GenerateQuestionsOutput> {

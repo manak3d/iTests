@@ -45,6 +45,9 @@ export function AssignmentCreator({
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiInputMode, setAiInputMode] = useState<'topic' | 'document'>('topic');
   const [aiTopic, setAiTopic] = useState('');
+  const [aiNumMultipleChoice, setAiNumMultipleChoice] = useState('');
+  const [aiNumTrueFalse, setAiNumTrueFalse] = useState('');
+  const [aiNumShortAnswer, setAiNumShortAnswer] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDigitizing, setIsDigitizing] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
@@ -57,6 +60,7 @@ export function AssignmentCreator({
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [isPublicTemplate, setIsPublicTemplate] = useState(false);
   const [timeLimit, setTimeLimit] = useState<number>(0);
+  const [isPractice, setIsPractice] = useState(false);
 
   // Grade thresholds state
   const [useCustomThresholds, setUseCustomThresholds] = useState(false);
@@ -105,7 +109,11 @@ export function AssignmentCreator({
       type,
       text: '',
       points: 1,
-      options: type === 'multiple_choice' ? ['', '', '', ''] : undefined,
+      options: type === 'multiple_choice' ? ['', '', '', ''] : (type === 'matching' ? ['|', '|', '|'] : undefined),
+      correctAnswer: type === 'matching' ? { "0": 0, "1": 1, "2": 2 } : undefined,
+      numPracticeQuestions: 0,
+      useAiForPractice: false,
+      practiceQuestions: [],
       ...(type === 'graph' ? {
         graphType: 'pie',
         graphData: {
@@ -133,16 +141,24 @@ export function AssignmentCreator({
       let type: QuestionType = 'short_answer';
       if (q.type === 'multiple_choice') type = 'multiple_choice';
       else if (q.type === 'true_false') type = 'true_false';
+      else if (q.type === 'matching') type = 'matching';
 
       return {
         id: Math.random().toString(36).substr(2, 9),
         type,
         text: q.questionText || '',
         points: 1,
-        options: type === 'multiple_choice' ? q.options : undefined,
-        correctAnswer: type === 'multiple_choice' 
-          ? q.correctAnswerIndex 
-          : (type === 'true_false' ? q.correctAnswer : undefined)
+        options: type === 'matching' ? q.options : (type === 'multiple_choice' ? q.options : undefined),
+        correctAnswer: type === 'matching'
+          ? (() => {
+              const map: Record<string, number> = {};
+              q.options?.forEach((_: any, idx: number) => { map[String(idx)] = idx; });
+              return map;
+            })()
+          : (type === 'multiple_choice' ? q.correctAnswerIndex : (type === 'true_false' ? q.correctAnswer : undefined)),
+        numPracticeQuestions: 0,
+        useAiForPractice: false,
+        practiceQuestions: []
       };
     });
     setQuestions([...questions, ...newQuestions]);
@@ -189,7 +205,10 @@ export function AssignmentCreator({
         body: JSON.stringify({
           action: 'generate',
           extractedText: aiInputMode === 'document' ? textToUse : undefined,
-          topic: aiTopic ? aiTopic : undefined
+          topic: aiTopic ? aiTopic : undefined,
+          numMultipleChoice: aiNumMultipleChoice ? Number(aiNumMultipleChoice) : undefined,
+          numTrueFalse: aiNumTrueFalse ? Number(aiNumTrueFalse) : undefined,
+          numShortAnswer: aiNumShortAnswer ? Number(aiNumShortAnswer) : undefined
         })
       });
       const genData = await genRes.json();
@@ -275,7 +294,8 @@ export function AssignmentCreator({
       gradeThresholds: useCustomThresholds ? [threshold1, threshold2, threshold3, threshold4] : undefined,
       isDraft: false,
       isPublicTemplate,
-      timeLimit
+      timeLimit,
+      isPractice
     });
   };
 
@@ -297,7 +317,8 @@ export function AssignmentCreator({
       gradeThresholds: useCustomThresholds ? [threshold1, threshold2, threshold3, threshold4] : undefined,
       isDraft: true,
       isPublicTemplate,
-      timeLimit
+      timeLimit,
+      isPractice
     });
   };
 
@@ -329,7 +350,7 @@ export function AssignmentCreator({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-primary uppercase">Název úkolu</label>
               <Input 
@@ -349,6 +370,17 @@ export function AssignmentCreator({
                 {SUBJECTS.map(subj => (
                   <option key={subj} value={subj}>{subj}</option>
                 ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-primary uppercase">Typ úkolu</label>
+              <select
+                value={isPractice ? 'practice' : 'test'}
+                onChange={e => setIsPractice(e.target.value === 'practice')}
+                className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="test">📝 Známkovaný test</option>
+                <option value="practice">🏋️ Neznámkované procvičování</option>
               </select>
             </div>
           </div>
@@ -481,124 +513,126 @@ export function AssignmentCreator({
           </div>
 
           {/* Klasifikace / Hodnocení */}
-          <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100/80 space-y-4">
-            <h4 className="font-bold text-sm text-primary uppercase tracking-wider flex items-center gap-2">
-              <span>📊 Klasifikace / Procentuální rozmezí známek</span>
-            </h4>
-            
-            <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 max-w-md">
-              <button
-                type="button"
-                onClick={() => setUseCustomThresholds(false)}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!useCustomThresholds ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
-              >
-                Výchozí stupnice (85% · 65% · 45% · 25%)
-              </button>
-              <button
-                type="button"
-                onClick={() => setUseCustomThresholds(true)}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${useCustomThresholds ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
-              >
-                Vlastní stupnice
-              </button>
-            </div>
-
-            {useCustomThresholds && (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
-                {/* Známka 1 */}
-                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-primary block">Známka 1 (Výborně)</span>
-                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od 100% do</span>
-                  </div>
-                  <div className="relative mt-3 flex items-center">
-                    <Input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={threshold1}
-                      onChange={(e) => setThreshold1(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
-                    />
-                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
-                  </div>
-                </div>
-
-                {/* Známka 2 */}
-                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-primary block">Známka 2 (Chvalitebně)</span>
-                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold1}% do</span>
-                  </div>
-                  <div className="relative mt-3 flex items-center">
-                    <Input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={threshold2}
-                      onChange={(e) => setThreshold2(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
-                    />
-                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
-                  </div>
-                </div>
-
-                {/* Známka 3 */}
-                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-primary block">Známka 3 (Dobře)</span>
-                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold2}% do</span>
-                  </div>
-                  <div className="relative mt-3 flex items-center">
-                    <Input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={threshold3}
-                      onChange={(e) => setThreshold3(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
-                    />
-                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
-                  </div>
-                </div>
-
-                {/* Známka 4 */}
-                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-primary block">Známka 4 (Dostatečně)</span>
-                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold3}% do</span>
-                  </div>
-                  <div className="relative mt-3 flex items-center">
-                    <Input
-                      type="number"
-                      min="1"
-                      max="100"
-                      value={threshold4}
-                      onChange={(e) => setThreshold4(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
-                      className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
-                    />
-                    <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
-                  </div>
-                </div>
-
-                {/* Známka 5 */}
-                <div className="bg-slate-100/50 p-3 rounded-xl border border-slate-200/60 flex flex-col justify-between select-none">
-                  <div>
-                    <span className="text-xs font-bold text-muted-foreground block">Známka 5 (Nedostatečně)</span>
-                    <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold4}% do</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-center bg-slate-200/50 rounded-md border h-10 border-slate-200">
-                    <span className="text-sm font-black text-muted-foreground">0 %</span>
-                  </div>
-                </div>
-
-                <div className="col-span-2 sm:col-span-5 text-[10px] text-muted-foreground mt-1 px-1">
-                  💡 Mezní hodnoty musí sestupovat: Výborně &gt; Chvalitebně &gt; Dobře &gt; Dostatečně. 
-                  Změnou předchozích hodnot se automaticky přepočítají a přizpůsobí začátky dalších rozsahů.
-                </div>
+          {!isPractice && (
+            <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100/80 space-y-4">
+              <h4 className="font-bold text-sm text-primary uppercase tracking-wider flex items-center gap-2">
+                <span>📊 Klasifikace / Procentuální rozmezí známek</span>
+              </h4>
+              
+              <div className="flex gap-2 bg-white p-1 rounded-lg border border-slate-200 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setUseCustomThresholds(false)}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${!useCustomThresholds ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                >
+                  Výchozí stupnice (85% · 65% · 45% · 25%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseCustomThresholds(true)}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${useCustomThresholds ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-slate-50'}`}
+                >
+                  Vlastní stupnice
+                </button>
               </div>
-            )}
-          </div>
+
+              {useCustomThresholds && (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
+                  {/* Známka 1 */}
+                  <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-primary block">Známka 1 (Výborně)</span>
+                      <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od 100% do</span>
+                    </div>
+                    <div className="relative mt-3 flex items-center">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={threshold1}
+                        onChange={(e) => setThreshold1(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                        className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                      />
+                      <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                    </div>
+                  </div>
+
+                  {/* Známka 2 */}
+                  <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-primary block">Známka 2 (Chvalitebně)</span>
+                      <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold1}% do</span>
+                    </div>
+                    <div className="relative mt-3 flex items-center">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={threshold2}
+                        onChange={(e) => setThreshold2(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                        className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                      />
+                      <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                    </div>
+                  </div>
+
+                  {/* Známka 3 */}
+                  <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-primary block">Známka 3 (Dobře)</span>
+                      <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold2}% do</span>
+                    </div>
+                    <div className="relative mt-3 flex items-center">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={threshold3}
+                        onChange={(e) => setThreshold3(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                        className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                      />
+                      <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                    </div>
+                  </div>
+
+                  {/* Známka 4 */}
+                  <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-primary block">Známka 4 (Dostatečně)</span>
+                      <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold3}% do</span>
+                    </div>
+                    <div className="relative mt-3 flex items-center">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={threshold4}
+                        onChange={(e) => setThreshold4(Math.min(100, Math.max(1, parseInt(e.target.value) || 0)))}
+                        className="h-10 text-sm font-bold text-center border-slate-300 focus:border-primary pr-6"
+                      />
+                      <span className="absolute right-2 text-xs font-bold text-gray-400">%</span>
+                    </div>
+                  </div>
+
+                  {/* Známka 5 */}
+                  <div className="bg-slate-100/50 p-3 rounded-xl border border-slate-200/60 flex flex-col justify-between select-none">
+                    <div>
+                      <span className="text-xs font-bold text-muted-foreground block">Známka 5 (Nedostatečně)</span>
+                      <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5">Rozmezí: od {threshold4}% do</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-center bg-slate-200/50 rounded-md border h-10 border-slate-200">
+                      <span className="text-sm font-black text-muted-foreground">0 %</span>
+                    </div>
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-5 text-[10px] text-muted-foreground mt-1 px-1">
+                    💡 Mezní hodnoty musí sestupovat: Výborně &gt; Chvalitebně &gt; Dobře &gt; Dostatečně. 
+                    Změnou předchozích hodnot se automaticky přepočítají a přizpůsobí začátky dalších rozsahů.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {fileUri && (
             <div className="p-4 bg-muted rounded-xl border border-dashed flex items-center justify-between">
@@ -616,9 +650,14 @@ export function AssignmentCreator({
       </Card>
 
       <div className="space-y-4">
-        <h3 className="font-headline text-xl text-primary flex items-center gap-2 px-1">
-          <Wand2 className="w-5 h-5 text-accent" /> Otázky a úkoly
-        </h3>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center px-1 gap-2 border-b pb-2">
+          <h3 className="font-headline text-xl text-primary flex items-center gap-2">
+            <Wand2 className="w-5 h-5 text-accent" /> Otázky a úkoly
+          </h3>
+          <div className="bg-indigo-50 border border-indigo-150 rounded-xl px-3 py-1.5 text-xs text-indigo-700 font-semibold flex items-center gap-1.5 shadow-sm">
+            <span>💡 Tip: Svislý zlomek zapíšete jako <strong>[čitatel/jmenovatel]</strong> (např. <code>[3/4]</code>).</span>
+          </div>
+        </div>
         
         <div className="grid gap-4">
           {questions.map((q, index) => (
@@ -630,6 +669,7 @@ export function AssignmentCreator({
                        {q.type === 'short_answer' ? 'Krátká odp.' : 
                         q.type === 'long_answer' ? 'Dlouhá odp.' : 
                         q.type === 'multiple_choice' ? 'Výběr (A-D)' : 
+                        q.type === 'matching' ? 'Přiřazování' : 
                         q.type === 'axis' ? 'Osa X/Y' : 
                         q.type === 'number_line' ? 'Číselná osa' : 
                         q.type === 'true_false' ? 'Ano / Ne' : 
@@ -754,6 +794,278 @@ export function AssignmentCreator({
                     onChange={(updates) => updateQuestion(q.id, updates)}
                   />
                 )}
+
+                {q.type === 'matching' && (
+                  <div className="space-y-3 mt-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Páry pro přiřazení (Levá strana | Pravá strana):</p>
+                    <div className="space-y-2">
+                      {(q.options || []).map((opt, i) => {
+                        const [left, right] = opt.split('|');
+                        return (
+                          <div key={i} className="flex items-center gap-3 animate-fade-in">
+                            <span className="text-xs font-bold text-slate-400 w-5">{i + 1}.</span>
+                            <Input
+                              placeholder="Levá část (např. 1/2)"
+                              value={left || ''}
+                              onChange={e => {
+                                const newOpts = [...(q.options || [])];
+                                const currentRight = (newOpts[i] || '').split('|')[1] || '';
+                                newOpts[i] = `${e.target.value}|${currentRight}`;
+                                const correctMap: Record<string, number> = {};
+                                newOpts.forEach((_, idx) => { correctMap[String(idx)] = idx; });
+                                updateQuestion(q.id, { options: newOpts, correctAnswer: correctMap });
+                              }}
+                              className="flex-1"
+                            />
+                            <span className="text-slate-400 font-bold">↔</span>
+                            <Input
+                              placeholder="Pravá část (např. 0,5)"
+                              value={right || ''}
+                              onChange={e => {
+                                const newOpts = [...(q.options || [])];
+                                const currentLeft = (newOpts[i] || '').split('|')[0] || '';
+                                newOpts[i] = `${currentLeft}|${e.target.value}`;
+                                const correctMap: Record<string, number> = {};
+                                newOpts.forEach((_, idx) => { correctMap[String(idx)] = idx; });
+                                updateQuestion(q.id, { options: newOpts, correctAnswer: correctMap });
+                              }}
+                              className="flex-1"
+                            />
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => {
+                                const newOpts = (q.options || []).filter((_, idx) => idx !== i);
+                                const correctMap: Record<string, number> = {};
+                                newOpts.forEach((_, idx) => { correctMap[String(idx)] = idx; });
+                                updateQuestion(q.id, { options: newOpts, correctAnswer: correctMap });
+                              }}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 rounded-full"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full text-xs font-bold"
+                        onClick={() => {
+                          const newOpts = [...(q.options || []), '|'];
+                          const correctMap: Record<string, number> = {};
+                          newOpts.forEach((_, idx) => { correctMap[String(idx)] = idx; });
+                          updateQuestion(q.id, { options: newOpts, correctAnswer: correctMap });
+                        }}
+                      >
+                        + Přidat pár
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {isPractice && (
+                  <div className="mt-4 pt-4 border-t border-dashed border-slate-200 space-y-3">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                      <div>
+                        <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wide">🏋️ Procvičování: Otázky navíc při chybě</h5>
+                        <p className="text-[10px] text-muted-foreground">Pokud žák odpoví na tuto otázku špatně, dostane procvičovací úlohy navíc.</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-600">Počet úloh navíc:</span>
+                        <select
+                          value={q.numPracticeQuestions || 0}
+                          onChange={e => updateQuestion(q.id, { numPracticeQuestions: Number(e.target.value) })}
+                          className="flex h-8 w-24 rounded-lg border border-input bg-white px-2 py-0.5 text-xs font-bold focus:outline-none"
+                        >
+                          <option value={0}>0 (vypnuto)</option>
+                          <option value={1}>1 úloha</option>
+                          <option value={2}>2 úlohy</option>
+                          <option value={3}>3 úlohy</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {(q.numPracticeQuestions || 0) > 0 && (
+                      <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-150 space-y-3 animate-fade-in text-left">
+                        <div className="flex items-center gap-4 text-xs font-bold text-slate-700">
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`practice-source-${q.id}`}
+                              checked={!q.useAiForPractice}
+                              onChange={() => updateQuestion(q.id, { useAiForPractice: false })}
+                              className="rounded-full border-gray-300 text-primary h-3.5 w-3.5"
+                            />
+                            <span>Učitelem předpřipravené úlohy</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`practice-source-${q.id}`}
+                              checked={!!q.useAiForPractice}
+                              onChange={() => updateQuestion(q.id, { useAiForPractice: true })}
+                              className="rounded-full border-gray-300 text-primary h-3.5 w-3.5"
+                            />
+                            <span>Generovat automaticky pomocí AI</span>
+                          </label>
+                        </div>
+
+                        {!q.useAiForPractice && (
+                          <div className="space-y-3 pt-2">
+                            <div className="space-y-2">
+                              {(q.practiceQuestions || []).map((pq, pIdx) => (
+                                <div key={pq.id} className="p-3 bg-white border border-slate-200 rounded-lg space-y-2">
+                                  <div className="flex justify-between items-center text-xs">
+                                    <span className="font-bold text-indigo-650">Úloha navíc #{pIdx + 1}</span>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      onClick={() => {
+                                        const newPqs = (q.practiceQuestions || []).filter(item => item.id !== pq.id);
+                                        updateQuestion(q.id, { practiceQuestions: newPqs });
+                                      }}
+                                      className="text-red-500 hover:text-red-700 h-6 w-6 rounded-full"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <select
+                                      value={pq.type}
+                                      onChange={e => {
+                                        const newPqs = [...(q.practiceQuestions || [])];
+                                        const newType = e.target.value as QuestionType;
+                                        newPqs[pIdx] = {
+                                          ...pq,
+                                          type: newType,
+                                          options: newType === 'multiple_choice' ? ['', '', '', ''] : undefined,
+                                          correctAnswer: undefined
+                                        };
+                                        updateQuestion(q.id, { practiceQuestions: newPqs });
+                                      }}
+                                      className="flex h-9 rounded-lg border border-input bg-white px-2 py-1 text-xs font-semibold"
+                                    >
+                                      <option value="short_answer">Krátká odpověď</option>
+                                      <option value="multiple_choice">Výběr z možností</option>
+                                      <option value="true_false">Ano / Ne</option>
+                                    </select>
+                                    <Input
+                                      placeholder="Zadání otázky navíc..."
+                                      value={pq.text}
+                                      onChange={e => {
+                                        const newPqs = [...(q.practiceQuestions || [])];
+                                        newPqs[pIdx] = { ...pq, text: e.target.value };
+                                        updateQuestion(q.id, { practiceQuestions: newPqs });
+                                      }}
+                                      className="h-9 text-xs"
+                                    />
+                                    {pq.type === 'short_answer' && (
+                                      <div className="flex items-center gap-2 mt-1 pl-1">
+                                        <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">Správná odpověď:</span>
+                                        <Input
+                                          placeholder="Zadejte správnou odpověď..."
+                                          value={pq.correctAnswer || ''}
+                                          onChange={e => {
+                                            const newPqs = [...(q.practiceQuestions || [])];
+                                            newPqs[pIdx] = { ...pq, correctAnswer: e.target.value };
+                                            updateQuestion(q.id, { practiceQuestions: newPqs });
+                                          }}
+                                          className="h-8 text-[11px] flex-1"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {pq.type === 'multiple_choice' && (
+                                    <div className="grid grid-cols-2 gap-2 mt-2 pl-2">
+                                      {(pq.options || []).map((pOpt, pOptIdx) => {
+                                        const isCorrect = pq.correctAnswer === pOptIdx;
+                                        return (
+                                          <div key={pOptIdx} className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newPqs = [...(q.practiceQuestions || [])];
+                                                newPqs[pIdx] = { ...pq, correctAnswer: isCorrect ? undefined : pOptIdx };
+                                                updateQuestion(q.id, { practiceQuestions: newPqs });
+                                              }}
+                                              className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-500'}`}
+                                            >
+                                              {String.fromCharCode(65 + pOptIdx)}
+                                            </button>
+                                            <Input
+                                              placeholder={`Možnost ${pOptIdx + 1}`}
+                                              value={pOpt}
+                                              onChange={e => {
+                                                const newPqs = [...(q.practiceQuestions || [])];
+                                                const newOpts = [...(pq.options || [])];
+                                                newOpts[pOptIdx] = e.target.value;
+                                                newPqs[pIdx] = { ...pq, options: newOpts };
+                                                updateQuestion(q.id, { practiceQuestions: newPqs });
+                                              }}
+                                              className="h-8 text-[11px]"
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {pq.type === 'true_false' && (
+                                    <div className="flex gap-2 mt-2 pl-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newPqs = [...(q.practiceQuestions || [])];
+                                          newPqs[pIdx] = { ...pq, correctAnswer: pq.correctAnswer === true ? undefined : true };
+                                          updateQuestion(q.id, { practiceQuestions: newPqs });
+                                        }}
+                                        className={`flex-1 py-1 rounded-lg text-xs font-semibold border ${pq.correctAnswer === true ? 'bg-green-500 text-white border-green-500' : 'bg-white text-gray-650'}`}
+                                      >✓ Ano</button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newPqs = [...(q.practiceQuestions || [])];
+                                          newPqs[pIdx] = { ...pq, correctAnswer: pq.correctAnswer === false ? undefined : false };
+                                          updateQuestion(q.id, { practiceQuestions: newPqs });
+                                        }}
+                                        className={`flex-1 py-1 rounded-lg text-xs font-semibold border ${pq.correctAnswer === false ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-650'}`}
+                                      >✗ Ne</button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {(q.practiceQuestions || []).length < (q.numPracticeQuestions || 0) && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full text-xs"
+                                onClick={() => {
+                                  const newPqs = [...(q.practiceQuestions || []), {
+                                    id: Math.random().toString(36).substr(2, 9),
+                                    type: 'short_answer' as QuestionType,
+                                    text: '',
+                                    points: 0
+                                  }];
+                                  updateQuestion(q.id, { practiceQuestions: newPqs });
+                                }}
+                              >
+                                + Přidat otázku navíc
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -768,6 +1080,9 @@ export function AssignmentCreator({
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('multiple_choice')}>
             <Plus className="w-4 h-4 mr-2" /> Výběr (A-D)
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('matching')}>
+            <Plus className="w-4 h-4 mr-2" /> Přiřazování
           </Button>
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('axis')}>
             <BarChart4 className="w-4 h-4 mr-2" /> Osa X/Y
@@ -784,8 +1099,6 @@ export function AssignmentCreator({
           <Button variant="secondary" size="sm" className="rounded-full bg-primary/10 text-primary hover:bg-primary/20" onClick={() => addQuestion('graph')}>
             <BarChart4 className="w-4 h-4 mr-2" /> Grafická otázka
           </Button>
-          {/* AI Generátor je dočasně skryt, dokud nebude nakonfigurován platný Gemini API klíč */}
-          {/*
           <Button 
             variant="default" 
             size="sm" 
@@ -793,12 +1106,16 @@ export function AssignmentCreator({
             onClick={() => {
               setGeneratedQuestions([]);
               setSelectedGeneratedIds([]);
+              setAiTopic('');
+              setAiNumMultipleChoice('');
+              setAiNumTrueFalse('');
+              setAiNumShortAnswer('');
+              setAiError(null);
               setIsAiModalOpen(true);
             }}
           >
             <Wand2 className="w-4 h-4 mr-2" /> Generovat pomocí AI
           </Button>
-          */}
         </div>
       </div>
 
@@ -839,16 +1156,62 @@ export function AssignmentCreator({
 
             {/* TAB 1: TOPIC */}
             {aiInputMode === 'topic' && (
-              <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                  Téma, oblast učiva nebo klíčová slova
-                </label>
-                <Textarea
-                  placeholder="Např. Pythagorova věta, bitva u Stalingradu, fotosyntéza, vyjmenovaná slova..."
-                  value={aiTopic}
-                  onChange={(e) => setAiTopic(e.target.value)}
-                  className="min-h-[100px] text-base rounded-xl focus-visible:ring-violet-500"
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Téma, oblast učiva nebo klíčová slova
+                  </label>
+                  <Textarea
+                    placeholder="Např. Pythagorova věta, bitva u Stalingradu, fotosyntéza, vyjmenovaná slova..."
+                    value={aiTopic}
+                    onChange={(e) => setAiTopic(e.target.value)}
+                    className="min-h-[100px] text-base rounded-xl focus-visible:ring-violet-500"
+                  />
+                  <div className="text-[10px] text-slate-500 flex items-center gap-1 bg-slate-50 p-2 rounded-xl border border-slate-200 mt-1">
+                    <span>💡 Tip: Můžete zadávat i témata obsahující zlomky, např. <code>vytvoř příklady se zlomky jako [3/4] nebo [1/2]</code>.</span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 block mb-2">
+                    Počet otázek jednotlivých typů (nepovinné)
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Výběr z možností</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="např. 3"
+                        value={aiNumMultipleChoice}
+                        onChange={(e) => setAiNumMultipleChoice(e.target.value)}
+                        className="rounded-xl text-sm text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Pravda / Nepravda</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="např. 2"
+                        value={aiNumTrueFalse}
+                        onChange={(e) => setAiNumTrueFalse(e.target.value)}
+                        className="rounded-xl text-sm text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Krátká odpověď</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="např. 1"
+                        value={aiNumShortAnswer}
+                        onChange={(e) => setAiNumShortAnswer(e.target.value)}
+                        className="rounded-xl text-sm text-slate-800"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

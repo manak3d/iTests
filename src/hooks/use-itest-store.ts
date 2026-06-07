@@ -399,6 +399,20 @@ export function useITestStore() {
         let isCorrect = false;
         if (q.type === 'multiple_choice') {
           isCorrect = studentAnswer === q.correctAnswer;
+        } else if (q.type === 'matching') {
+          const totalPairs = q.options?.length || 0;
+          if (totalPairs > 0) {
+            let correctCount = 0;
+            const given = studentAnswer && typeof studentAnswer === 'object' ? studentAnswer : {};
+            for (let i = 0; i < totalPairs; i++) {
+              if (given[i] !== undefined && Number(given[i]) === i) {
+                correctCount++;
+              }
+            }
+            const earned = (correctCount / totalPairs) * points;
+            autoScores[q.id] = Math.round(earned * 100) / 100;
+            continue;
+          }
         } else if (q.type === 'axis') {
           const correct = Array.isArray(q.correctAnswer) ? q.correctAnswer : [];
           const given = Array.isArray(studentAnswer) ? studentAnswer : [];
@@ -625,14 +639,14 @@ export function useITestStore() {
 
 
 
-  const toggleUserPremium = useCallback((userId: string, isPremium: boolean) => {
+  const toggleUserPremium = useCallback((userId: string, isPremium: boolean, type: 'monthly' | 'yearly' = 'yearly') => {
     return fetch('/api/teachers', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         id: userId, 
         action: isPremium ? 'deactivatePremium' : 'activatePremium', 
-        type: 'yearly'
+        type
       })
     })
     .then(async res => {

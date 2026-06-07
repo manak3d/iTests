@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       isDraft: body.isDraft === true, // false = publikováno, true = koncept
       isPublicTemplate: body.isPublicTemplate === true,
       timeLimit: typeof body.timeLimit === 'number' ? body.timeLimit : 0,
+      isPractice: body.isPractice === true,
       schoolId: schoolId,
     });
 
@@ -61,7 +62,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { id, startTime, endTime, studentIds, sharedWithClassIds, gradeThresholds, isDraft, isPublicTemplate, timeLimit } = body;
+    const { id, startTime, endTime, studentIds, sharedWithClassIds, gradeThresholds, isDraft, isPublicTemplate, timeLimit, isPractice } = body;
     
     if (!id) {
       return NextResponse.json({ success: false, error: "Missing assignment ID" }, { status: 400 });
@@ -80,7 +81,8 @@ export async function PUT(request: Request) {
           gradeThresholds: gradeThresholds || undefined,
           ...(isDraft !== undefined ? { isDraft } : {}),
           ...(isPublicTemplate !== undefined ? { isPublicTemplate } : {}),
-          ...(timeLimit !== undefined ? { timeLimit: typeof timeLimit === 'number' ? timeLimit : 0 } : {})
+          ...(timeLimit !== undefined ? { timeLimit: typeof timeLimit === 'number' ? timeLimit : 0 } : {}),
+          ...(isPractice !== undefined ? { isPractice } : {})
         }
       },
       { new: true }

@@ -28,12 +28,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'generate') {
-      const { extractedText, topic } = body;
+      const { extractedText, topic, numMultipleChoice, numTrueFalse, numShortAnswer } = body;
       if (!extractedText && !topic) {
         return NextResponse.json({ error: 'Missing both extractedText and topic' }, { status: 400 });
       }
 
-      const result = await generateQuestionsFromExtractedText({ extractedText, topic });
+      const result = await generateQuestionsFromExtractedText({
+        extractedText,
+        topic,
+        numMultipleChoice: numMultipleChoice ? Number(numMultipleChoice) : undefined,
+        numTrueFalse: numTrueFalse ? Number(numTrueFalse) : undefined,
+        numShortAnswer: numShortAnswer ? Number(numShortAnswer) : undefined
+      });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 500 });
       }

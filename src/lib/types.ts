@@ -21,7 +21,7 @@ export interface Class {
   schoolId?: string; // přidáno pro multi-school
 }
 
-export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'number_line' | 'true_false' | 'drawing' | 'graph';
+export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'number_line' | 'true_false' | 'drawing' | 'graph' | 'matching';
 
 export interface Question {
   id: string;
@@ -32,6 +32,9 @@ export interface Question {
   points?: number; // Body za otázku
   graphType?: 'pie' | 'bar' | 'linear';
   graphData?: any;
+  numPracticeQuestions?: number;
+  useAiForPractice?: boolean;
+  practiceQuestions?: Question[];
 }
 
 export interface Assignment {
@@ -53,6 +56,7 @@ export interface Assignment {
   schoolId?: string; // přidáno pro multi-school
   isPublicTemplate?: boolean;
   timeLimit?: number; // v minutách
+  isPractice?: boolean; // Typ úkolu: Procvičování (neznámkované)
 }
 
 export interface Submission {

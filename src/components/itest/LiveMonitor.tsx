@@ -86,7 +86,7 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
     if (remaining <= 0) return "Čas vypršel";
     
     const mins = Math.floor(remaining / 60000);
-    const secs = Math.floor((remaining % 65000) / 1000) % 60;
+    const secs = Math.floor((remaining % 60000) / 1000) % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -303,7 +303,7 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
                       <span>Vypracováno:</span>
                       <span className="font-bold text-white">{answeredCount} / {questionsCount} ({progressPct}%)</span>
                     </div>
-                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-850">
+                    <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
                       <div 
                         className={`h-full transition-all duration-500 ${
                           status === 'completed' 
@@ -350,7 +350,7 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
 
               {/* Real-time answers preview toggle */}
               {status !== 'not_started' && sub && (
-                <div className="border-t border-slate-850 p-3 bg-slate-950/20">
+                <div className="border-t border-slate-800 p-3 bg-slate-950/20">
                   <button 
                     onClick={() => setExpandedStudentId(expandedStudentId === student.id ? null : student.id)}
                     className="w-full flex items-center justify-between text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium"

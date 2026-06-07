@@ -81,7 +81,7 @@ ${hasDrawing ? `- K otázce je přiložena kresba (viz připojený obrázek).\n`
     }
 
     const { output } = await ai.generate({
-      model: 'googleai/gemini-2.0-flash',
+      model: 'googleai/gemini-2.5-flash',
       prompt: promptParts,
       output: { schema: GradeSubmissionOutputSchema }
     });
