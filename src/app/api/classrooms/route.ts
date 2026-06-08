@@ -48,6 +48,11 @@ export async function POST(request: Request) {
           if (classCount >= 2) {
             return NextResponse.json({ success: false, error: "Zkušební verze má limit maximálně 2 třídy. Pro vytvoření další aktivujte Premium." }, { status: 403 });
           }
+        } else if (teacher.premiumType === 'monthly') {
+          const classCount = await Classroom.countDocuments({ teacherId: body.teacherId || session.id });
+          if (classCount >= 8) {
+            return NextResponse.json({ success: false, error: "Měsíční Premium verze má limit maximálně 8 tříd. Pro vytvoření dalších aktivujte roční Premium nebo Školní licenci." }, { status: 403 });
+          }
         }
       }
     }

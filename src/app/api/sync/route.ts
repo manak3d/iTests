@@ -36,7 +36,7 @@ export async function GET() {
           currentTeacher.aiCreditsResetDate = nextReset;
           await currentTeacher.save();
         } else if (now >= new Date(currentTeacher.aiCreditsResetDate)) {
-          const maxCredits = currentTeacher.premiumType === 'yearly' ? 400 : 300;
+          const maxCredits = currentTeacher.premiumType === 'yearly' ? 400 : currentTeacher.premiumType === 'school' ? 1000 : 200;
           const extraCredits = currentTeacher.aiExtraCredits || 0;
           
           let nextReset = new Date(currentTeacher.aiCreditsResetDate);

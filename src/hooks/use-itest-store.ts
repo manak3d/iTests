@@ -641,7 +641,7 @@ export function useITestStore() {
 
 
 
-  const toggleUserPremium = useCallback((userId: string, isPremium: boolean, type: 'monthly' | 'yearly' = 'yearly') => {
+  const toggleUserPremium = useCallback((userId: string, isPremium: boolean, type: 'monthly' | 'yearly' | 'school' = 'yearly') => {
     return fetch('/api/teachers', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

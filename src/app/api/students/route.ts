@@ -48,6 +48,13 @@ export async function POST(request: Request) {
           if (studentCount >= 20) {
             return NextResponse.json({ success: false, error: "Zkušební verze má limit maximálně 20 žáků ve třídě. Pro přidání dalšího aktivujte Premium." }, { status: 403 });
           }
+        } else if (teacher.premiumType === 'monthly') {
+          const teacherClassrooms = await Classroom.find({ teacherId: classroom.teacherId });
+          const classIds = teacherClassrooms.map(c => c._id);
+          const totalStudentsCount = await Student.countDocuments({ classroomId: { $in: classIds } });
+          if (totalStudentsCount >= 100) {
+            return NextResponse.json({ success: false, error: "Měsíční Premium verze má limit maximálně 100 žáků celkem. Pro přidání dalších aktivujte roční Premium nebo Školní licenci." }, { status: 403 });
+          }
         }
       }
     }

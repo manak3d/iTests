@@ -145,11 +145,16 @@ export async function PUT(request: Request) {
         updateData.premiumType = "yearly";
         updateData.aiCreditsMax = 400;
         updateData.aiCredits = 400 + (teacher.aiExtraCredits || 0);
+      } else if (body.type === "school") {
+        updateData.premiumExpiresAt = new Date(now.getFullYear() + 10, now.getMonth(), now.getDate());
+        updateData.premiumType = "school";
+        updateData.aiCreditsMax = 1000;
+        updateData.aiCredits = 1000 + (teacher.aiExtraCredits || 0);
       } else {
         updateData.premiumExpiresAt = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
         updateData.premiumType = "monthly";
-        updateData.aiCreditsMax = 300;
-        updateData.aiCredits = 300 + (teacher.aiExtraCredits || 0);
+        updateData.aiCreditsMax = 200;
+        updateData.aiCredits = 200 + (teacher.aiExtraCredits || 0);
       }
       updateData.aiCreditsResetDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
     } else if (body.action === "deactivatePremium") {

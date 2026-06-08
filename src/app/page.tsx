@@ -2769,7 +2769,7 @@ export default function ITestApp() {
                     </div>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed border-t pt-2">
-                    Aktivace Premium verze kompletně ruší limity a zpřístupňuje hromadný export výsledků do ZIP.
+                    Měsíční předplatné (99 Kč) nabízí 200 AI kreditů a limit 8 tříd / 100 žáků celkem. Roční předplatné (999 Kč) kompletně ruší limity a nabízí 400 AI kreditů.
                   </p>
                 </div>
 
@@ -3211,6 +3211,7 @@ export default function ITestApp() {
                                             >
                                               Aktivovat Roční
                                             </Button>
+                                             <Button variant="outline" size="sm" className="h-6 text-[9px] px-2 rounded-xl font-bold bg-violet-600 hover:bg-violet-700 text-white border-none" onClick={() => store.toggleUserPremium(t.id, false, "school")}>Aktivovat Školní</Button>
                                           </>
                                         )}
                                         <Button
@@ -4636,7 +4637,15 @@ export default function ITestApp() {
                     Prémiový účet aktivní <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">PREMIUM ({currentUser.premiumType === 'yearly' ? 'Roční' : currentUser.premiumType === 'school' ? 'Školní' : currentUser.premiumType === 'trial' ? 'Zkušební' : 'Měsíční'})</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Všechny limity jsou zrušeny. Placená verze vyprší za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).
+                    {currentUser.premiumType === 'monthly' ? (
+                      <>
+                        Limity aktivní: max. 8 tříd, max. 100 žáků celkem. Placená verze vyprší za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).
+                      </>
+                    ) : (
+                      <>
+                        Všechny limity jsou zrušeny. Placená verze vyprší za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).
+                      </>
+                    )}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1 font-medium flex flex-wrap gap-x-3 gap-y-1">
                     <span>Škola: <span className="font-bold text-slate-700">{schools.find(s => s.id === currentUser.schoolId)?.name || 'Načítání...'}</span></span>
@@ -6641,13 +6650,13 @@ export default function ITestApp() {
                         </div>
                         <ul className="text-xs space-y-2 mt-5 text-slate-600 font-medium">
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> <strong>300 AI kreditů</strong> / měsíc
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> <strong>200 AI kreditů</strong> / měsíc
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Neomezeně tříd
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Maximálně <strong>8 tříd</strong>
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Neomezeně žáků a testů
+                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Maximálně <strong>100 žáků</strong> celkem
                           </li>
                           <li className="flex items-center gap-1.5">
                             <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Hromadné stahování výsledků
