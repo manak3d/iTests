@@ -665,6 +665,7 @@ export default function ITestApp() {
   }, [selectedAssignmentId, store.currentUser, store.submissions]);
   
   const tabFocusLostCountRef = useRef(0);
+  const lastLoadedDraftAssignmentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!selectedAssignmentId || !store.currentUser || store.currentUser.role !== 'student') return;
@@ -673,6 +674,25 @@ export default function ITestApp() {
       tabFocusLostCountRef.current = sub.tabFocusLostCount || 0;
     } else {
       tabFocusLostCountRef.current = 0;
+    }
+  }, [selectedAssignmentId, store.currentUser, store.submissions]);
+
+  useEffect(() => {
+    if (!selectedAssignmentId || !store.currentUser || store.currentUser.role !== 'student') {
+      lastLoadedDraftAssignmentIdRef.current = null;
+      return;
+    }
+    
+    if (lastLoadedDraftAssignmentIdRef.current === selectedAssignmentId) return;
+
+    const sub = store.submissions.find(s => s.assignmentId === selectedAssignmentId && s.studentId === store.currentUser!.id);
+    if (sub) {
+      lastLoadedDraftAssignmentIdRef.current = selectedAssignmentId;
+      if (!sub.submittedAt) {
+        setStudentAnswers(sub.answers || {});
+        setQuestionDrawings(sub.questionDrawings || {});
+        setMainWorkDrawing(sub.mainWorkDrawing);
+      }
     }
   }, [selectedAssignmentId, store.currentUser, store.submissions]);
 
@@ -6362,7 +6382,7 @@ export default function ITestApp() {
                       <CardTitle className="text-3xl">{a.title}</CardTitle>
                     </CardHeader>
                     <CardContent className="p-8 space-y-8 bg-white">
-                      {submission ? (
+                      {submission && submission.submittedAt ? (
                         <div className="space-y-8">
                           {/* Výsledková karta žáka */}
                           <div className="text-center py-6 space-y-4">
@@ -6848,7 +6868,7 @@ export default function ITestApp() {
                 {(() => {
                   const pending = studentAssignments.filter(a =>
                     (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
-                    !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
+                    !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
                   );
 
                   if (pending.length === 0) {
@@ -6947,7 +6967,7 @@ export default function ITestApp() {
                 {(() => {
                   const completed = studentAssignments.filter(a =>
                     (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
-                    store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id)
+                    store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
                   );
 
                   if (completed.length === 0) {
