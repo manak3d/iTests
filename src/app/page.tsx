@@ -6550,34 +6550,61 @@ export default function ITestApp() {
                                       {/* Grafické vyhodnocení pro typ graph */}
                                       {q.type === 'graph' && (
                                         <div className="mt-2">
-                                          <GraphQuestionEvaluation
-                                            question={q}
-                                            studentAnswer={answer}
-                                            score={score}
-                                            maxPoints={maxPoints}
-                                          />
+                                          {isGraded ? (
+                                            <GraphQuestionEvaluation
+                                              question={q}
+                                              studentAnswer={answer}
+                                              score={score}
+                                              maxPoints={maxPoints}
+                                            />
+                                          ) : (
+                                            <GraphQuestionStudent
+                                              question={q}
+                                              disabled={true}
+                                              value={answer}
+                                              onChange={() => {}}
+                                            />
+                                          )}
                                         </div>
                                       )}
 
                                        {/* Osa X/Y vyhodnocení */}
                                        {q.type === 'axis' && (
                                          <div className="mt-2">
-                                           <AxisQuestionEvaluation
-                                             question={q}
-                                             studentAnswer={answer}
-                                             score={score}
-                                             maxPoints={maxPoints}
-                                           />
+                                           {isGraded ? (
+                                             <AxisQuestionEvaluation
+                                               question={q}
+                                               studentAnswer={answer}
+                                               score={score}
+                                               maxPoints={maxPoints}
+                                             />
+                                           ) : (
+                                             <AxisQuestionStudent
+                                               question={q}
+                                               disabled={true}
+                                               value={answer}
+                                               onChange={() => {}}
+                                             />
+                                           )}
                                          </div>
                                        )}
                                        {q.type === 'number_line' && (
                                          <div className="mt-2">
-                                           <NumberLineQuestionEvaluation
-                                             question={q}
-                                             studentAnswer={answer}
-                                             score={score}
-                                             maxPoints={maxPoints}
-                                           />
+                                           {isGraded ? (
+                                             <NumberLineQuestionEvaluation
+                                               question={q}
+                                               studentAnswer={answer}
+                                               score={score}
+                                               maxPoints={maxPoints}
+                                             />
+                                           ) : (
+                                             <NumberLineQuestionStudent
+                                               question={q}
+                                               disabled={true}
+                                               value={answer}
+                                               onChange={() => {}}
+                                             />
+                                           )}
                                          </div>
                                        )}
 
@@ -6591,10 +6618,19 @@ export default function ITestApp() {
 
                                       {q.type === 'matching' && (
                                         <div className="mt-2">
-                                          <MatchingQuestionReview
-                                            question={q}
-                                            studentAnswer={answer}
-                                          />
+                                          {isGraded ? (
+                                            <MatchingQuestionReview
+                                              question={q}
+                                              studentAnswer={answer}
+                                            />
+                                          ) : (
+                                            <MatchingQuestionStudent
+                                              question={q}
+                                              disabled={true}
+                                              value={answer}
+                                              onChange={() => {}}
+                                            />
+                                          )}
                                         </div>
                                       )}
 
