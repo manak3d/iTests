@@ -431,6 +431,7 @@ export default function ITestApp() {
 
   const [editIsPublicTemplate, setEditIsPublicTemplate] = useState(false);
   const [editTimeLimit, setEditTimeLimit] = useState(0);
+  const [customCredits, setCustomCredits] = useState<Record<string, string>>({});
 
   const [selectedTemplateForCopy, setSelectedTemplateForCopy] = useState<Assignment | null>(null);
   const [templateCopyClassId, setTemplateCopyClassId] = useState<string>('');
@@ -2911,6 +2912,35 @@ export default function ITestApp() {
                                         >
                                           +50 kr.
                                         </Button>
+                                        <div className="flex items-center gap-1 ml-1">
+                                          <Input
+                                            type="number"
+                                            placeholder="vlastní"
+                                            value={customCredits[t.id] ?? ''}
+                                            onChange={e => setCustomCredits(prev => ({ ...prev, [t.id]: e.target.value }))}
+                                            className="h-6 w-14 text-[9px] px-1 bg-white rounded-lg border border-slate-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 focus-visible:ring-offset-0"
+                                          />
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-6 text-[9px] px-1.5 rounded-xl font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                            onClick={() => {
+                                              const amount = parseInt(customCredits[t.id] || '0');
+                                              if (amount > 0) {
+                                                store.addTeacherCredits(t.id, amount);
+                                                setCustomCredits(prev => ({ ...prev, [t.id]: '' }));
+                                              } else {
+                                                toast({
+                                                  title: "Chyba",
+                                                  description: "Zadejte platné kladné číslo.",
+                                                  variant: "destructive"
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            Přidat
+                                          </Button>
+                                        </div>
                                       </div>
                                     </div>
                                 </td>
