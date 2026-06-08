@@ -2591,7 +2591,7 @@ export default function ITestApp() {
 
     return (
       <div className="min-h-screen flex flex-col bg-[#EFF3F7]">
-        <Navbar user={currentUser} onLogout={() => store.logout()} />
+        <Navbar user={currentUser} onLogout={() => store.logout()} onUpgradeClick={() => setIsUpgradeModalOpen(true)} />
 
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
           {/* Header */}
@@ -4047,7 +4047,7 @@ export default function ITestApp() {
     if (isTrialExpired) {
       return (
         <div className="min-h-screen flex flex-col bg-background">
-          <Navbar user={currentUser} onLogout={() => store.logout()} />
+          <Navbar user={currentUser} onLogout={() => store.logout()} onUpgradeClick={() => setIsUpgradeModalOpen(true)} />
           <div className="flex-1 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-100 shadow-2xl space-y-6 text-center animate-scale-up animate-fade-in">
               <div className="mx-auto w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-3xl">
@@ -4120,7 +4120,7 @@ export default function ITestApp() {
 
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar user={currentUser} onLogout={() => store.logout()} />
+        <Navbar user={currentUser} onLogout={() => store.logout()} onUpgradeClick={() => setIsUpgradeModalOpen(true)} />
         
         {/* Banner o předplatném */}
         <div className="max-w-7xl w-full mx-auto px-4 md:px-8 mt-6">

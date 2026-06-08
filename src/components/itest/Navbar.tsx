@@ -4,7 +4,7 @@ import { LogOut, BookOpen, GraduationCap, ClipboardList, Zap } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { User } from '@/lib/types';
 
-export function Navbar({ user, onLogout }: { user: User; onLogout: () => void }) {
+export function Navbar({ user, onLogout, onUpgradeClick }: { user: User; onLogout: () => void; onUpgradeClick?: () => void }) {
   return (
     <nav className="border-b bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center gap-2">
@@ -16,7 +16,11 @@ export function Navbar({ user, onLogout }: { user: User; onLogout: () => void })
 
       <div className="flex items-center gap-6">
         {user.role === 'teacher' && (
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 shadow-sm animate-fade-in">
+          <button
+            type="button"
+            onClick={onUpgradeClick}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100 shadow-sm animate-fade-in cursor-pointer hover:bg-indigo-100 active:scale-95 transition-all text-left outline-none"
+          >
             <Zap className="w-3.5 h-3.5 fill-indigo-500 text-indigo-500" />
             <span className="text-xs font-bold">AI Kredity:</span>
             <span className="text-sm font-black">{user.aiCredits !== undefined ? user.aiCredits : 30} / {user.aiCreditsMax || 30}</span>
@@ -25,7 +29,7 @@ export function Navbar({ user, onLogout }: { user: User; onLogout: () => void })
                 +{user.aiExtraCredits} extra
               </span>
             ) : null}
-          </div>
+          </button>
         )}
         
         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-accent/10 rounded-full border border-accent/20">
