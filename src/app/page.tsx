@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap, Settings, MessageSquare } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -465,16 +465,95 @@ export default function ITestApp() {
   const [csvImportProgress, setCsvImportProgress] = useState<string>('');
   const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [aiInstructions, setAiInstructions] = useState('');
   
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileFirstName, setProfileFirstName] = useState('');
+  const [profileLastName, setProfileLastName] = useState('');
+  const [profileEducation, setProfileEducation] = useState('');
+  const [profileYearsOfExperience, setProfileYearsOfExperience] = useState('');
+  const [profileSchoolName, setProfileSchoolName] = useState('');
+  const [feedbackContent, setFeedbackContent] = useState('');
+  const [activeProfileTab, setActiveProfileTab] = useState<'profile' | 'feedback'>('profile');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+  const [replyingFeedbackId, setReplyingFeedbackId] = useState<string | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState('');
+
+  useEffect(() => {
+    if (isProfileModalOpen && store.currentUser) {
+      setProfileFirstName((store.currentUser as any).firstName || '');
+      setProfileLastName((store.currentUser as any).lastName || '');
+      setProfileEducation(store.currentUser.education || '');
+      setProfileYearsOfExperience(store.currentUser.yearsOfExperience !== undefined ? String(store.currentUser.yearsOfExperience) : '');
+      const userSchool = schools.find(s => s.id === store.currentUser?.schoolId);
+      setProfileSchoolName(userSchool?.name || '');
+      setActiveProfileTab('profile');
+    }
+  }, [isProfileModalOpen, store.currentUser, schools]);
+
+  const handleSaveProfile = async () => {
+    if (!profileFirstName.trim() || !profileLastName.trim()) {
+      toast({
+        title: "Chyba",
+        description: "Jméno a příjmení jsou povinná pole.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      const success = await store.updateProfile({
+        firstName: profileFirstName.trim(),
+        lastName: profileLastName.trim(),
+        education: profileEducation.trim(),
+        yearsOfExperience: parseInt(profileYearsOfExperience) || 0,
+        schoolName: profileSchoolName.trim()
+      });
+      if (success) {
+        setIsProfileModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Chyba sítě", variant: "destructive" });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleSendFeedback = async () => {
+    if (!feedbackContent.trim()) {
+      toast({
+        title: "Chyba",
+        description: "Zpětná vazba nemůže být prázdná.",
+        variant: "destructive"
+      });
+      return;
+    }
+    setIsSendingFeedback(true);
+    try {
+      const success = await store.sendFeedback(feedbackContent.trim());
+      if (success) {
+        setFeedbackContent('');
+        setIsProfileModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Chyba sítě", variant: "destructive" });
+    } finally {
+      setIsSendingFeedback(false);
+    }
+  };
+
   const [activeTab, setActiveTab] = useState('classes');
-  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools' | 'feedback'>('overview');
   const [adminSchoolFilter, setAdminSchoolFilter] = useState<string>('all');
   const [adminSearchFilter, setAdminSearchFilter] = useState<string>('');
   const [adminSortBy, setAdminSortBy] = useState<'name' | 'school' | 'default'>('default');
   const [adminSortOrder, setAdminSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const [isAiGrading, setIsAiGrading] = useState(false);
-  const handleAiGrade = async (assignment: Assignment, sub: Submission) => {
+  const handleAiGrade = async (assignment: Assignment, sub: Submission, customInstructions?: string) => {
     setIsAiGrading(true);
     try {
       const res = await fetch('/api/ai', {
@@ -486,7 +565,8 @@ export default function ITestApp() {
           answers: sub.answers || {},
           questionDrawings: sub.questionDrawings || {},
           mainWorkDrawing: sub.mainWorkDrawing,
-          gradeThresholds: assignment.gradeThresholds
+          gradeThresholds: assignment.gradeThresholds,
+          customInstructions: customInstructions || ''
         })
       });
       const data = await res.json();
@@ -827,7 +907,8 @@ export default function ITestApp() {
       hour: '2-digit', 
       minute: '2-digit' 
     });
-  };  const downloadAllSubmissionsZip = async (assignmentId: string) => {
+  };
+  const downloadAllSubmissionsZip = async (assignmentId: string) => {
     try {
       const assignment = store.assignments.find(a => a.id === assignmentId);
       if (!assignment) return;
@@ -1182,7 +1263,7 @@ export default function ITestApp() {
         }
         return strVal;
       }).join(';'))
-    ].join('\r\n');
+    ].join('\n');
 
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1793,6 +1874,210 @@ export default function ITestApp() {
             >
               Vytvořit zadání
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const renderProfileModal = () => {
+    if (!currentUser) return null;
+
+    return (
+      <Dialog open={isProfileModalOpen} onOpenChange={setIsProfileModalOpen}>
+        <DialogContent className="max-w-xl bg-white rounded-3xl border-none shadow-2xl p-6 text-slate-800">
+          <DialogHeader className="space-y-3">
+            <DialogTitle className="text-2xl font-headline font-black text-indigo-700 flex items-center gap-2">
+              <Settings className="w-6 h-6 text-indigo-600" />
+              Můj Profil a Nastavení
+            </DialogTitle>
+            <DialogDescription className="text-gray-500 text-sm leading-relaxed">
+              Upravte své osobní údaje, informace o výuce nebo nám pošlete zpětnou vazbu.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex border-b border-slate-100 mb-6 mt-4">
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('profile')}
+              className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-2 ${
+                activeProfileTab === 'profile'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <GraduationCap className="w-4 h-4" />
+              Osobní údaje
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveProfileTab('feedback')}
+              className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all flex items-center justify-center gap-2 ${
+                activeProfileTab === 'feedback'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Zpětná vazba
+            </button>
+          </div>
+
+          {activeProfileTab === 'profile' ? (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="prof-first" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Jméno</Label>
+                  <Input
+                    id="prof-first"
+                    value={profileFirstName}
+                    onChange={(e) => setProfileFirstName(e.target.value)}
+                    className="rounded-xl h-11 border-slate-200 focus-visible:ring-indigo-500 font-medium"
+                    placeholder="Např. Jan"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prof-last" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Příjmení</Label>
+                  <Input
+                    id="prof-last"
+                    value={profileLastName}
+                    onChange={(e) => setProfileLastName(e.target.value)}
+                    className="rounded-xl h-11 border-slate-200 focus-visible:ring-indigo-500 font-medium"
+                    placeholder="Např. Novák"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="prof-school" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Škola, kde učíte</Label>
+                <Input
+                  id="prof-school"
+                  value={profileSchoolName}
+                  onChange={(e) => setProfileSchoolName(e.target.value)}
+                  className="rounded-xl h-11 border-slate-200 focus-visible:ring-indigo-500 font-medium"
+                  placeholder="Zadejte název školy"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="prof-edu" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dosažené vzdělání</Label>
+                  <Input
+                    id="prof-edu"
+                    value={profileEducation}
+                    onChange={(e) => setProfileEducation(e.target.value)}
+                    className="rounded-xl h-11 border-slate-200 focus-visible:ring-indigo-500 font-medium"
+                    placeholder="Např. Mgr., Ing."
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="prof-exp" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Roky praxe</Label>
+                  <Input
+                    id="prof-exp"
+                    type="number"
+                    min="0"
+                    value={profileYearsOfExperience}
+                    onChange={(e) => setProfileYearsOfExperience(e.target.value)}
+                    className="rounded-xl h-11 border-slate-200 focus-visible:ring-indigo-500 font-medium"
+                    placeholder="Např. 5"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 py-2">
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-xs text-indigo-950 leading-relaxed shadow-sm">
+                <div className="flex gap-2.5 items-start">
+                  <span className="text-base shrink-0">💡</span>
+                  <div className="space-y-1">
+                    <strong className="font-bold">Jak s námi nejlépe komunikovat?</strong>
+                    <p className="text-indigo-900/90">
+                      Zanechte nám zde své postřehy, nápady na nové funkce, hlášení chyb nebo cokoli, co by vám v iTestu usnadnilo práci. Zpětnou vazbu si osobně čteme a neustále podle ní systém vylepšujeme.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="feedback-text" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vaše zpráva</Label>
+                <Textarea
+                  id="feedback-text"
+                  placeholder="Napište nám své připomínky, návrhy nebo dotazy..."
+                  value={feedbackContent}
+                  onChange={(e) => setFeedbackContent(e.target.value)}
+                  className="rounded-xl min-h-[140px] border-slate-200 focus-visible:ring-indigo-500 resize-none font-medium"
+                />
+              </div>
+
+              {store.feedbacks && store.feedbacks.length > 0 && (
+                <div className="space-y-3 pt-4 border-t border-slate-100 mt-6 max-h-[220px] overflow-y-auto pr-1">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Předchozí zprávy</h4>
+                  <div className="space-y-2.5">
+                    {store.feedbacks.map((f: any) => (
+                      <div key={f.id} className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 space-y-2 text-left">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-[10px] text-slate-500 font-medium font-mono">
+                            {new Date(f.createdAt).toLocaleDateString('cs-CZ')} {new Date(f.createdAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            f.status === 'resolved' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {f.status === 'resolved' ? 'Vyřešeno' : 'Čeká na vyřízení'}
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800 leading-relaxed break-words whitespace-pre-wrap">{f.content}</p>
+                        {f.adminReply && (
+                          <div className="bg-indigo-50/70 border border-indigo-100/50 rounded-lg p-2.5 mt-2 space-y-1 text-left">
+                            <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                              💬 Odpověď administrátora:
+                            </span>
+                            <p className="text-xs font-medium text-slate-850 whitespace-pre-wrap break-words">{f.adminReply}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0 mt-6 pt-4 border-t border-slate-100">
+            <Button
+              variant="outline"
+              className="rounded-xl font-bold border-slate-200 hover:bg-slate-50 text-slate-700"
+              onClick={() => setIsProfileModalOpen(false)}
+              disabled={isSavingProfile || isSendingFeedback}
+            >
+              Zrušit
+            </Button>
+            {activeProfileTab === 'profile' ? (
+              <Button
+                onClick={handleSaveProfile}
+                disabled={isSavingProfile || !profileFirstName.trim() || !profileLastName.trim()}
+                className="bg-primary hover:bg-primary/95 text-white rounded-xl font-bold px-6"
+              >
+                {isSavingProfile ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Ukládám...
+                  </>
+                ) : 'Uložit změny'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSendFeedback}
+                disabled={isSendingFeedback || !feedbackContent.trim()}
+                className="bg-primary hover:bg-primary/95 text-white rounded-xl font-bold px-6"
+              >
+                {isSendingFeedback ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Odesílám...
+                  </>
+                ) : 'Odeslat názor'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2591,7 +2876,12 @@ export default function ITestApp() {
 
     return (
       <div className="min-h-screen flex flex-col bg-[#EFF3F7]">
-        <Navbar user={currentUser} onLogout={() => store.logout()} onUpgradeClick={() => setIsUpgradeModalOpen(true)} />
+        <Navbar 
+          user={currentUser} 
+          onLogout={() => store.logout()} 
+          onUpgradeClick={() => setIsUpgradeModalOpen(true)} 
+          onProfileClick={() => setIsProfileModalOpen(true)}
+        />
 
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
           {/* Header */}
@@ -2610,7 +2900,7 @@ export default function ITestApp() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
             <Card 
               className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'overview' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
               onClick={() => setAdminTab('overview')}
@@ -2674,6 +2964,17 @@ export default function ITestApp() {
                 <ClipboardList className="w-8 h-8 text-amber-500" />
                 <p className="text-sm font-semibold text-muted-foreground">Úkoly</p>
                 <p className="text-2xl font-black text-amber-500">{assignments.length}</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className={`border-none shadow-md cursor-pointer transition-all hover:scale-105 hover:shadow-lg ${adminTab === 'feedback' ? 'ring-2 ring-primary bg-white' : 'bg-white'}`}
+              onClick={() => setAdminTab('feedback')}
+            >
+              <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+                <MessageSquare className="w-8 h-8 text-rose-500" />
+                <p className="text-sm font-semibold text-muted-foreground">Feedback</p>
+                <p className="text-2xl font-black text-rose-500">{store.feedbacks ? store.feedbacks.length : 0}</p>
               </CardContent>
             </Card>
           </div>
@@ -3303,7 +3604,6 @@ export default function ITestApp() {
                     const creator = store.users.find(u => u.id === a.teacherId) || store.users.find(u => (u as any).teacherId === a.teacherId);
                     const classroom = store.classes.find(c => c.id === a.classId);
                     const assignmentSubmissions = store.submissions.filter(s => s.assignmentId === a.id);
-
                     return (
                       <div className="space-y-6">
                         {/* Záhlaví detail testu */}
@@ -3336,13 +3636,23 @@ export default function ITestApp() {
                               const student = store.users.find(u => u.id === sub?.studentId);
                               if (!sub || !assignment || !student) return null;
                               return (
-                                <Card className="border-none shadow-2xl rounded-3xl overflow-hidden print-container">
-                                  <style>{`@media print{body{visibility:hidden!important;background:white!important}.print-container,.print-container *{visibility:visible!important}.print-container{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-width:100%!important;padding:0!important;margin:0!important;box-shadow:none!important;border:none!important}.print-exclude,button,textarea,input,.dialog,[role="dialog"],header,nav{display:none!important;visibility:hidden!important}.print-show{display:block!important;visibility:visible!important}}`}</style>
+                                <Card className="border-none shadow-2xl rounded-3xl overflow-hidden">
                                   <CardHeader className="bg-white border-b p-8 flex flex-row items-center justify-between gap-4">
                                     <div>
                                       <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
                                       <CardDescription>Odevzdal: {student.name}</CardDescription>
                                     </div>
+                                    <a
+                                      href={`/print/submission/${sub.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <Button 
+                                        className="rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                                      >
+                                        🖨️ Tisk / Uložit PDF
+                                      </Button>
+                                    </a>
                                   </CardHeader>
                                   <CardContent className="p-8 space-y-8">
                                     {assignment.questions && assignment.questions.length > 0 && (
@@ -3504,11 +3814,23 @@ export default function ITestApp() {
                                           </div>
 
                                           <div className="space-y-4 pt-4 print-exclude">
+                                            <div className="space-y-1.5 text-left bg-slate-50 border border-slate-200/60 p-3.5 rounded-2xl">
+                                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                                💡 Specifické pokyny pro AI slovní hodnocení (nepovinné)
+                                              </label>
+                                              <Textarea 
+                                                placeholder="Např.: Napiš to přátelsky a povzbudivě, zdůrazni co šlo skvěle a v čem má přidat, napiš to ve 3 odrážkách..."
+                                                value={aiInstructions}
+                                                onChange={(e) => setAiInstructions(e.target.value)}
+                                                className="bg-white rounded-xl min-h-[60px] text-sm font-medium border-slate-200 resize-none"
+                                                rows={2}
+                                              />
+                                            </div>
                                             <Button 
                                               type="button"
                                               variant="outline" 
                                               className="w-full text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center justify-center gap-2 rounded-full font-bold h-11"
-                                              onClick={() => handleAiGrade(assignment, sub)}
+                                              onClick={() => handleAiGrade(assignment, sub, aiInstructions)}
                                               disabled={isAiGrading}
                                             >
                                               {isAiGrading ? (
@@ -3856,6 +4178,116 @@ export default function ITestApp() {
                   </div>
                 </div>
               )}
+
+              {adminTab === 'feedback' && (
+                <div className="space-y-6 animate-fade-in text-slate-800">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                      <h3 className="text-2xl font-headline font-bold text-gray-800">Zpětná vazba od učitelů</h3>
+                      <p className="text-muted-foreground text-sm">Přehled, vyřizování a odpovědi na podněty od učitelů.</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    {(!store.feedbacks || store.feedbacks.length === 0) ? (
+                      <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <span className="text-3xl">📭</span>
+                        <p className="text-slate-500 font-bold mt-2">Zatím nebyly doručeny žádné zprávy.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {store.feedbacks.map((f: any) => {
+                          const school = schools.find(s => s.id === f.schoolId)?.name || 'Neznámá škola';
+                          return (
+                            <Card key={f.id} className="border border-slate-150 shadow-sm rounded-2xl overflow-hidden bg-white">
+                              <CardContent className="p-6 space-y-4">
+                                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-gray-900">{f.teacherName}</span>
+                                      <span className="text-xs text-slate-500 font-medium">({f.teacherEmail})</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
+                                      <span>🏫 {school}</span>
+                                      <span>•</span>
+                                      <span>🕒 {new Date(f.createdAt).toLocaleDateString('cs-CZ')} {new Date(f.createdAt).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                                      f.status === 'resolved' 
+                                        ? 'bg-green-100 text-green-800' 
+                                        : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                      {f.status === 'resolved' ? 'Vyřešeno' : 'Čeká na vyřízení'}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="bg-slate-50/70 border border-slate-100 p-4 rounded-xl text-left">
+                                  <p className="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap break-words">{f.content}</p>
+                                </div>
+
+                                {f.adminReply && (
+                                  <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 space-y-1 text-left">
+                                    <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                                      💬 Vaše odpověď:
+                                    </span>
+                                    <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap break-words">{f.adminReply}</p>
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                                  <a 
+                                    href={`mailto:${f.teacherEmail}?subject=${encodeURIComponent('Reakce na Vaši zpětnou vazbu v iTestu')}&body=${encodeURIComponent(
+                                      `Dobrý den,\n\nreaguji na Vaši zpětnou vazbu: "${f.content}"\n\n`
+                                    )}`}
+                                  >
+                                    <Button variant="outline" size="sm" className="rounded-xl font-bold h-9">
+                                      ✉️ Napsat e-mail
+                                    </Button>
+                                  </a>
+                                  
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="rounded-xl font-bold h-9 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200"
+                                    onClick={() => {
+                                      setReplyingFeedbackId(f.id);
+                                      setAdminReplyText(f.adminReply || '');
+                                    }}
+                                  >
+                                    ✍️ {f.adminReply ? 'Upravit odpověď' : 'Odpovědět'}
+                                  </Button>
+
+                                  {f.status === 'pending' && (
+                                    <Button 
+                                      size="sm" 
+                                      className="rounded-xl font-bold h-9 bg-green-600 hover:bg-green-700 text-white"
+                                      onClick={() => store.updateFeedbackStatus(f.id, 'resolved', f.adminReply)}
+                                    >
+                                      ✓ Označit jako vyřešené
+                                    </Button>
+                                  )}
+
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="rounded-xl font-bold h-9 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => store.deleteFeedback(f.id)}
+                                  >
+                                    🗑️ Smazat
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -4022,6 +4454,56 @@ export default function ITestApp() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          {renderProfileModal()}
+
+          {/* Dialog pro odpověď na zpětnou vazbu */}
+          <Dialog open={replyingFeedbackId !== null} onOpenChange={(open) => { if (!open) setReplyingFeedbackId(null); }}>
+            <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl p-6 text-slate-800">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-xl font-headline font-bold text-indigo-700 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-indigo-600" />
+                  Odpovědět učiteli
+                </DialogTitle>
+                <DialogDescription className="text-gray-500 text-sm leading-relaxed">
+                  Zde napište odpověď, která se zobrazí učiteli v jeho profilu u této zprávy.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4 space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="replyInputAdmin" className="text-xs font-bold text-slate-500 uppercase tracking-wider">Text odpovědi</Label>
+                  <Textarea 
+                    id="replyInputAdmin"
+                    placeholder="Např. Děkujeme za podnět, funkci pro CSV import jsme vylepšili..."
+                    value={adminReplyText}
+                    onChange={(e) => setAdminReplyText(e.target.value)}
+                    className="rounded-xl min-h-[120px] resize-none font-medium border-slate-200 focus-visible:ring-indigo-500"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <DialogFooter className="flex justify-end gap-3 pt-2">
+                <Button variant="outline" className="rounded-xl font-bold px-4 border-slate-200 hover:bg-slate-50 text-slate-700" onClick={() => setReplyingFeedbackId(null)}>
+                  Zrušit
+                </Button>
+                <Button 
+                  disabled={!adminReplyText.trim()}
+                  className="bg-primary hover:bg-primary/95 text-white rounded-xl font-bold px-5" 
+                  onClick={async () => {
+                    if (replyingFeedbackId) {
+                      const success = await store.updateFeedbackStatus(replyingFeedbackId, 'resolved', adminReplyText.trim());
+                      if (success) {
+                        setReplyingFeedbackId(null);
+                        setAdminReplyText('');
+                      }
+                    }
+                  }}
+                >
+                  Uložit a odeslat
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {renderGradebookDialog()}
         </main>
       </div>
@@ -4047,7 +4529,12 @@ export default function ITestApp() {
     if (isTrialExpired) {
       return (
         <div className="min-h-screen flex flex-col bg-background">
-          <Navbar user={currentUser} onLogout={() => store.logout()} onUpgradeClick={() => setIsUpgradeModalOpen(true)} />
+          <Navbar 
+            user={currentUser} 
+            onLogout={() => store.logout()} 
+            onUpgradeClick={() => setIsUpgradeModalOpen(true)} 
+            onProfileClick={() => setIsProfileModalOpen(true)}
+          />
           <div className="flex-1 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-100 shadow-2xl space-y-6 text-center animate-scale-up animate-fade-in">
               <div className="mx-auto w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center text-3xl">
@@ -4069,7 +4556,7 @@ export default function ITestApp() {
                   </div>
                 </div>
               </div>
-
+ 
               <div className="grid gap-3">
                 <Button 
                   onClick={() => {
@@ -4094,6 +4581,7 @@ export default function ITestApp() {
               </div>
             </div>
           </div>
+          {renderProfileModal()}
         </div>
       );
     }
@@ -4120,7 +4608,12 @@ export default function ITestApp() {
 
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Navbar user={currentUser} onLogout={() => store.logout()} onUpgradeClick={() => setIsUpgradeModalOpen(true)} />
+        <Navbar 
+          user={currentUser} 
+          onLogout={() => store.logout()} 
+          onUpgradeClick={() => setIsUpgradeModalOpen(true)} 
+          onProfileClick={() => setIsProfileModalOpen(true)}
+        />
         
         {/* Banner o předplatném */}
         <div className="max-w-7xl w-full mx-auto px-4 md:px-8 mt-6">
@@ -5030,48 +5523,23 @@ export default function ITestApp() {
                     const student = store.users.find(u => u.id === sub?.studentId);
                     if (!sub || !assignment || !student) return null;
                     return (
-                      <Card className="border-none shadow-2xl rounded-3xl overflow-hidden print-container">
-                        <style>{`
-                          @media print {
-                            body {
-                              visibility: hidden !important;
-                              background: white !important;
-                            }
-                            .print-container, .print-container * {
-                              visibility: visible !important;
-                            }
-                            .print-container {
-                              position: absolute !important;
-                              left: 0 !important;
-                              top: 0 !important;
-                              width: 100% !important;
-                              max-width: 100% !important;
-                              padding: 0 !important;
-                              margin: 0 !important;
-                              box-shadow: none !important;
-                              border: none !important;
-                            }
-                            .print-exclude, button, textarea, input, .dialog, [role="dialog"], header, nav {
-                              display: none !important;
-                              visibility: hidden !important;
-                            }
-                            .print-show {
-                              display: block !important;
-                              visibility: visible !important;
-                            }
-                          }
-                        `}</style>
+                      <Card className="border-none shadow-2xl rounded-3xl overflow-hidden">
                         <CardHeader className="bg-white border-b p-8 flex flex-row items-center justify-between gap-4">
                           <div>
                             <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
                             <CardDescription>Odevzdal: {student.name}</CardDescription>
                           </div>
-                          <Button 
-                            onClick={() => window.print()} 
-                            className="print-exclude rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                          <a
+                            href={`/print/submission/${sub.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
-                            🖨️ Tisk / Uložit PDF
-                          </Button>
+                            <Button 
+                              className="rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                            >
+                              🖨️ Tisk / Uložit PDF
+                            </Button>
+                          </a>
                         </CardHeader>
                         <CardContent className="p-8 space-y-8">
                           {assignment.questions && assignment.questions.length > 0 && (
@@ -5241,11 +5709,23 @@ export default function ITestApp() {
                           })()}
 
                           <div className="space-y-4 pt-4 print-exclude">
+                            <div className="space-y-1.5 text-left bg-slate-50 border border-slate-200/60 p-3.5 rounded-2xl">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                💡 Specifické pokyny pro AI slovní hodnocení (nepovinné)
+                              </label>
+                              <Textarea 
+                                placeholder="Např.: Napiš to přátelsky a povzbudivě, zdůrazni co šlo skvěle a v čem má přidat, napiš to ve 3 odrážkách..."
+                                value={aiInstructions}
+                                onChange={(e) => setAiInstructions(e.target.value)}
+                                className="bg-white rounded-xl min-h-[60px] text-sm font-medium border-slate-200 resize-none"
+                                rows={2}
+                              />
+                            </div>
                             <Button 
                               type="button"
                               variant="outline" 
                               className="w-full text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center justify-center gap-2 rounded-full font-bold h-11"
-                              onClick={() => handleAiGrade(assignment, sub)}
+                              onClick={() => handleAiGrade(assignment, sub, aiInstructions)}
                               disabled={isAiGrading}
                             >
                               {isAiGrading ? (
@@ -6350,6 +6830,7 @@ export default function ITestApp() {
             </DialogContent>
           </Dialog>
 
+          {renderProfileModal()}
           {renderGradebookDialog()}
           {renderTemplateCopyDialog()}
         </main>

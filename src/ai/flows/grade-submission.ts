@@ -17,6 +17,7 @@ const GradeSubmissionInputSchema = z.object({
   questionDrawings: z.record(z.string(), z.string()),
   mainWorkDrawing: z.string().optional(),
   gradeThresholds: z.array(z.number()).optional(), // [85, 65, 45, 25]
+  customInstructions: z.string().optional(), // Specifické pokyny pro slovní hodnocení
 });
 export type GradeSubmissionInput = z.infer<typeof GradeSubmissionInputSchema>;
 
@@ -30,7 +31,7 @@ export type GradeSubmissionOutput = z.infer<typeof GradeSubmissionOutputSchema>;
 
 export async function gradeSubmissionFlow(input: GradeSubmissionInput): Promise<GradeSubmissionOutput | { error: string }> {
   try {
-    const { questions, answers, questionDrawings, mainWorkDrawing, gradeThresholds } = input;
+    const { questions, answers, questionDrawings, mainWorkDrawing, gradeThresholds, customInstructions } = input;
 
     let promptText = `Jste přísný, ale spravedlivý učitelský asistent, který opravuje a boduje studentské testy v češtině.
 Zhodnoťte odpovědi studenta na základě zadání otázky a případné správné odpovědi.
@@ -42,6 +43,10 @@ U každé otázky navrhněte:
 Na konci navrhněte celkovou známku (1-5) na základě celkové úspěšnosti a následujících bodových hranic (pokud jsou k dispozici):
 Prahové hodnoty úspěšnosti v % pro známky 1, 2, 3, 4: ${gradeThresholds ? JSON.stringify(gradeThresholds) : '[85, 65, 45, 25]'} (pokud student získá např. >=85%, navrhněte 1; >=65% navrhněte 2 atd.)
 Přidejte celkové shrnutí a slovní hodnocení testu.
+
+${customInstructions ? `DŮLEŽITÉ POKYNY OD UČITELE PRO SLOVNÍ HODNOCENÍ:
+"${customInstructions}"
+Při tvorbě celkového slovního hodnocení a tónu zpětné vazby se striktně řiďte těmito pokyny učitele.` : ''}
 
 Zadání otázek a odpovědi studenta:
 `;

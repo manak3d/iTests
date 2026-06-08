@@ -5,6 +5,7 @@ import { Student } from "@/models/Student";
 import { Classroom } from "@/models/Classroom";
 import { Assignment } from "@/models/Assignment";
 import { Submission } from "@/models/Submission";
+import { Feedback } from "@/models/Feedback";
 
 import { getUserSession } from "@/lib/auth";
 
@@ -19,7 +20,8 @@ export async function GET() {
         users: [], 
         classes: [], 
         assignments: [], 
-        submissions: [] 
+        submissions: [],
+        feedbacks: []
       });
     }
 
@@ -63,6 +65,7 @@ export async function GET() {
     let classes: any[] = [];
     let assignments: any[] = [];
     let submissions: any[] = [];
+    let feedbacks: any[] = [];
 
     if (session.role === 'admin') {
       // Admin vidí všechno ze všech škol
@@ -71,6 +74,7 @@ export async function GET() {
       classes = await Classroom.find({}).lean();
       assignments = await Assignment.find({}).lean();
       submissions = await Submission.find({}).lean();
+      feedbacks = await Feedback.find({}).sort({ createdAt: -1 }).lean();
     } else {
       // Běžný učitel / student vidí jen data své školy
       const schoolId = session.schoolId || "";
@@ -84,6 +88,7 @@ export async function GET() {
             { isPublicTemplate: true }
           ]
         }).lean();
+        feedbacks = await Feedback.find({ teacherId: session.id }).sort({ createdAt: -1 }).lean();
       } else {
         assignments = await Assignment.find({ schoolId }).lean();
       }
@@ -121,6 +126,7 @@ export async function GET() {
     // Přemapování _id na id pro frontend
     const mappedClasses = classes.map(c => ({ ...c, id: c._id }));
     const mappedAssignments = assignments.map(a => ({ ...a, id: a._id }));
+    const mappedFeedbacks = feedbacks.map(f => ({ ...f, id: f._id }));
     // Helper: Mongoose Map → plain object
     const mapToObj = (m: any): Record<string, any> => {
       if (!m) return {};
@@ -142,7 +148,8 @@ export async function GET() {
       users, 
       classes: mappedClasses, 
       assignments: mappedAssignments, 
-      submissions: mappedSubmissions 
+      submissions: mappedSubmissions,
+      feedbacks: mappedFeedbacks
     });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

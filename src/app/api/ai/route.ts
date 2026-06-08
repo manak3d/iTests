@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'grade') {
-      const { questions, answers, questionDrawings, mainWorkDrawing, gradeThresholds } = body;
+      const { questions, answers, questionDrawings, mainWorkDrawing, gradeThresholds, customInstructions } = body;
       if (!questions || !answers) {
         return NextResponse.json({ error: 'Missing questions or answers' }, { status: 400 });
       }
@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
         answers,
         questionDrawings: questionDrawings || {},
         mainWorkDrawing,
-        gradeThresholds
+        gradeThresholds,
+        customInstructions
       });
 
       if ('error' in result) {

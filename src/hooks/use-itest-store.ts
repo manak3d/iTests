@@ -46,6 +46,7 @@ export function useITestStore() {
   const [users, setUsers] = useState<User[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
   
   const [loadingStates, setLoadingStates] = useState({
     users: true,
@@ -72,6 +73,7 @@ export function useITestStore() {
           setClasses(data.classes);
           setAssignments(data.assignments);
           setSubmissions(data.submissions);
+          setFeedbacks(data.feedbacks || []);
         }
       })
       .catch(console.error);
@@ -760,6 +762,125 @@ export function useITestStore() {
     });
   }, [users, currentUser, mongoUser, toast]);
 
+  const updateProfile = useCallback((updates: { firstName?: string; lastName?: string; education?: string; yearsOfExperience?: number; schoolName?: string }) => {
+    return fetch('/api/teachers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Profil aktualizován", description: "Změny byly úspěšně uloženy." });
+        
+        if (currentUser) {
+          const updatedUser = {
+            ...currentUser,
+            firstName: updates.firstName !== undefined ? updates.firstName : (currentUser as any).firstName,
+            lastName: updates.lastName !== undefined ? updates.lastName : (currentUser as any).lastName,
+            name: (updates.firstName && updates.lastName) ? `${updates.firstName} ${updates.lastName}` : currentUser.name,
+            education: updates.education !== undefined ? updates.education : currentUser.education,
+            yearsOfExperience: updates.yearsOfExperience !== undefined ? updates.yearsOfExperience : currentUser.yearsOfExperience,
+          };
+
+          setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, ...updatedUser } : u));
+          
+          if (mongoUser && mongoUser.id === currentUser.id) {
+            setMongoUser(updatedUser);
+            sessionStorage.setItem('itest_mongo_user', JSON.stringify(updatedUser));
+          }
+        }
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se uložit profil.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [currentUser, mongoUser, toast]);
+
+  const sendFeedback = useCallback((content: string) => {
+    return fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Děkujeme za názor!", description: "Zpětná vazba byla úspěšně odeslána administrátorovi." });
+        const newFeedback = {
+          ...data.data,
+          id: data.data._id
+        };
+        setFeedbacks(prev => [newFeedback, ...prev]);
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se odeslat zpětnou vazbu.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [toast]);
+
+  const updateFeedbackStatus = useCallback((id: string, status: 'pending' | 'resolved', adminReply?: string) => {
+    return fetch('/api/feedback', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status, adminReply })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Zpětná vazba aktualizována", description: "Změny byly úspěšně uloženy." });
+        const updatedFeedback = {
+          ...data.data,
+          id: data.data._id
+        };
+        setFeedbacks(prev => prev.map(f => f.id === id ? updatedFeedback : f));
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se aktualizovat zpětnou vazbu.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [toast]);
+
+  const deleteFeedback = useCallback((id: string) => {
+    return fetch(`/api/feedback?id=${id}`, {
+      method: 'DELETE'
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Zpráva smazána", description: "Zpětná vazba byla odstraněna." });
+        setFeedbacks(prev => prev.filter(f => f.id !== id));
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se smazat zprávu.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [toast]);
+
   const renameClassroom = useCallback((classId: string, newName: string) => {
     return fetch('/api/classrooms', {
       method: 'PUT',
@@ -793,8 +914,8 @@ export function useITestStore() {
   }, [db, toast, classes]);
 
   return {
-    isLoaded, currentUser, classes, users, assignments, submissions,
+    isLoaded, currentUser, classes, users, assignments, submissions, feedbacks,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh, updateProfile, sendFeedback, updateFeedbackStatus, deleteFeedback
   };
 }

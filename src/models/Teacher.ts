@@ -17,6 +17,8 @@ export interface ITeacher extends Document {
   aiExtraCredits?: number;
   premiumType?: string; // 'monthly' | 'yearly' | 'trial'
   aiCreditsResetDate?: Date | null;
+  education?: string;
+  yearsOfExperience?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +41,8 @@ const TeacherSchema: Schema = new Schema(
     aiExtraCredits: { type: Number, default: 0 },
     premiumType: { type: String, enum: ['monthly', 'yearly', 'trial'], default: 'trial' },
     aiCreditsResetDate: { type: Date, default: null },
+    education: { type: String },
+    yearsOfExperience: { type: Number },
   },
   {
     timestamps: true,

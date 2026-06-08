@@ -16,6 +16,8 @@ export interface User {
   aiExtraCredits?: number;
   premiumType?: 'monthly' | 'yearly' | 'trial';
   aiCreditsResetDate?: string;
+  education?: string;
+  yearsOfExperience?: number;
 }
 
 export interface Class {

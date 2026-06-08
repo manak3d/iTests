@@ -167,6 +167,12 @@ export async function PUT(request: Request) {
       if (body.firstName !== undefined) updateData.firstName = body.firstName;
       if (body.lastName !== undefined) updateData.lastName = body.lastName;
       if (body.subjects !== undefined) updateData.subjects = body.subjects;
+      if (body.education !== undefined) updateData.education = body.education;
+      if (body.yearsOfExperience !== undefined) updateData.yearsOfExperience = body.yearsOfExperience;
+      
+      if (body.schoolName !== undefined && teacher.schoolId) {
+        await School.updateOne({ _id: teacher.schoolId }, { $set: { name: body.schoolName } });
+      }
     }
 
     const updatedTeacher = await Teacher.findOneAndUpdate(

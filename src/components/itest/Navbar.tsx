@@ -1,10 +1,20 @@
 "use client";
 
-import { LogOut, BookOpen, GraduationCap, ClipboardList, Zap } from 'lucide-react';
+import { LogOut, BookOpen, GraduationCap, ClipboardList, Zap, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { User } from '@/lib/types';
 
-export function Navbar({ user, onLogout, onUpgradeClick }: { user: User; onLogout: () => void; onUpgradeClick?: () => void }) {
+export function Navbar({ 
+  user, 
+  onLogout, 
+  onUpgradeClick,
+  onProfileClick 
+}: { 
+  user: User; 
+  onLogout: () => void; 
+  onUpgradeClick?: () => void;
+  onProfileClick?: () => void;
+}) {
   return (
     <nav className="border-b bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center gap-2">
@@ -32,10 +42,26 @@ export function Navbar({ user, onLogout, onUpgradeClick }: { user: User; onLogou
           </button>
         )}
         
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-accent/10 rounded-full border border-accent/20">
-          <GraduationCap className="w-4 h-4 text-accent" />
-          <span className="text-sm font-medium text-accent-foreground">{user.name} ({user.role})</span>
-        </div>
+        {onProfileClick ? (
+          <button
+            type="button"
+            onClick={onProfileClick}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 active:scale-95 transition-all rounded-full border border-accent/20 cursor-pointer text-left outline-none"
+          >
+            <GraduationCap className="w-4 h-4 text-accent" />
+            <span className="text-sm font-medium text-accent-foreground">
+              {user.name} ({user.role === 'teacher' ? 'Učitel' : user.role === 'admin' ? 'Admin' : 'Žák'})
+            </span>
+            <Settings className="w-3.5 h-3.5 text-accent/70 hover:text-accent" />
+          </button>
+        ) : (
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-accent/10 rounded-full border border-accent/20">
+            <GraduationCap className="w-4 h-4 text-accent" />
+            <span className="text-sm font-medium text-accent-foreground">
+              {user.name} ({user.role === 'teacher' ? 'Učitel' : user.role === 'admin' ? 'Admin' : 'Žák'})
+            </span>
+          </div>
+        )}
         <Button variant="ghost" size="sm" onClick={onLogout} className="text-muted-foreground hover:text-destructive">
           <LogOut className="w-4 h-4 mr-2" />
           Odhlásit se

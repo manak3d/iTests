@@ -65,6 +65,28 @@ export default async function PrintPage({ params }: PrintPageProps) {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased print:bg-white print:text-black">
+      <style>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          body {
+            background-color: white !important;
+            color: black !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .avoid-break {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      `}</style>
+      <script dangerouslySetInnerHTML={{ __html: `
+        setTimeout(() => {
+          window.print();
+        }, 800);
+      `}} />
       {/* Control panel for screen only */}
       <div className="no-print sticky top-0 z-50 bg-slate-900 text-white p-4 shadow-md flex justify-between items-center px-6 print:hidden">
         <div className="flex items-center gap-4">
