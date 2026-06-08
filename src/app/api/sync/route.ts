@@ -22,6 +22,33 @@ export async function GET() {
         submissions: [] 
       });
     }
+
+    // Check and refill credits if reset date has passed
+    if (session.role === 'teacher') {
+      const currentTeacher = await Teacher.findOne({ _id: session.id });
+      if (currentTeacher && currentTeacher.isPremium && currentTeacher.premiumExpiresAt && new Date(currentTeacher.premiumExpiresAt) > new Date()) {
+        const now = new Date();
+        if (!currentTeacher.aiCreditsResetDate) {
+          const nextReset = new Date();
+          nextReset.setMonth(nextReset.getMonth() + 1);
+          currentTeacher.aiCreditsResetDate = nextReset;
+          await currentTeacher.save();
+        } else if (now >= new Date(currentTeacher.aiCreditsResetDate)) {
+          const maxCredits = currentTeacher.premiumType === 'yearly' ? 400 : 300;
+          const extraCredits = currentTeacher.aiExtraCredits || 0;
+          
+          let nextReset = new Date(currentTeacher.aiCreditsResetDate);
+          while (nextReset <= now) {
+            nextReset.setMonth(nextReset.getMonth() + 1);
+          }
+          
+          currentTeacher.aiCredits = maxCredits + extraCredits;
+          currentTeacher.aiCreditsMax = maxCredits;
+          currentTeacher.aiCreditsResetDate = nextReset;
+          await currentTeacher.save();
+        }
+      }
+    }
     
     // Automatické čistenie databázy - vymazanie dát starších ako 30 dní
     const limitDate = new Date();
@@ -72,7 +99,22 @@ export async function GET() {
 
     // Sjednotíme učitele a žáky do jednoho pole "users", aby to sedělo s původním frontendem
     const users = [
-      ...teachers.map(t => ({ id: t._id, name: `${t.firstName} ${t.lastName}`, username: t.username, role: t.role, schoolId: t.schoolId, isPremium: t.isPremium, premiumExpiresAt: t.premiumExpiresAt, createdAt: t.createdAt, password: t.passwordPlain })),
+      ...teachers.map(t => ({
+        id: t._id,
+        name: `${t.firstName} ${t.lastName}`,
+        username: t.username,
+        role: t.role,
+        schoolId: t.schoolId,
+        isPremium: t.isPremium,
+        premiumExpiresAt: t.premiumExpiresAt,
+        createdAt: t.createdAt,
+        password: t.passwordPlain,
+        aiCredits: t.aiCredits,
+        aiCreditsMax: t.aiCreditsMax,
+        aiExtraCredits: t.aiExtraCredits,
+        premiumType: t.premiumType,
+        aiCreditsResetDate: t.aiCreditsResetDate
+      })),
       ...students.map(s => ({ id: s._id, name: `${s.firstName} ${s.lastName}`, username: s.username, role: s.role, classId: s.classroomId, password: s.passwordPlain, schoolId: s.schoolId }))
     ];
 

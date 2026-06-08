@@ -45,7 +45,24 @@ export async function POST(request: Request) {
         path: "/",
       });
 
-      return NextResponse.json({ success: true, user: { id: teacher._id, username: teacher.username, role: teacher.role, name: `${teacher.firstName} ${teacher.lastName}`, schoolId: teacher.schoolId, isPremium: teacher.isPremium, premiumExpiresAt: teacher.premiumExpiresAt, createdAt: teacher.createdAt } });
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: teacher._id,
+          username: teacher.username,
+          role: teacher.role,
+          name: `${teacher.firstName} ${teacher.lastName}`,
+          schoolId: teacher.schoolId,
+          isPremium: teacher.isPremium,
+          premiumExpiresAt: teacher.premiumExpiresAt,
+          createdAt: teacher.createdAt,
+          aiCredits: teacher.aiCredits,
+          aiCreditsMax: teacher.aiCreditsMax,
+          aiExtraCredits: teacher.aiExtraCredits,
+          premiumType: teacher.premiumType,
+          aiCreditsResetDate: teacher.aiCreditsResetDate,
+        }
+      });
     } else if (role === 'student') {
       const student = await Student.findOne({ username }).select('+password');
       if (!student || !student.password) {

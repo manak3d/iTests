@@ -12,6 +12,11 @@ export interface ITeacher extends Document {
   isPremium?: boolean;
   premiumExpiresAt?: Date;
   passwordPlain?: string;
+  aiCredits?: number;
+  aiCreditsMax?: number;
+  aiExtraCredits?: number;
+  premiumType?: string; // 'monthly' | 'yearly' | 'trial'
+  aiCreditsResetDate?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +34,11 @@ const TeacherSchema: Schema = new Schema(
     schoolId: { type: String }, // nepovinné (admin nemá, učitel má)
     isPremium: { type: Boolean, default: false },
     premiumExpiresAt: { type: Date },
+    aiCredits: { type: Number, default: 30 },
+    aiCreditsMax: { type: Number, default: 30 },
+    aiExtraCredits: { type: Number, default: 0 },
+    premiumType: { type: String, enum: ['monthly', 'yearly', 'trial'], default: 'trial' },
+    aiCreditsResetDate: { type: Date, default: null },
   },
   {
     timestamps: true,

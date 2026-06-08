@@ -11,6 +11,11 @@ export interface User {
   isPremium?: boolean;
   premiumExpiresAt?: string;
   createdAt?: string; // přidáno pro výpočet trialu
+  aiCredits?: number;
+  aiCreditsMax?: number;
+  aiExtraCredits?: number;
+  premiumType?: 'monthly' | 'yearly' | 'trial';
+  aiCreditsResetDate?: string;
 }
 
 export interface Class {

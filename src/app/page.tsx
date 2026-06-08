@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -33,7 +33,8 @@ interface MistakeTrainingWidgetProps {
   practiceChecked: Record<string, Record<string, boolean>>;
   setPracticeAnswers: React.Dispatch<React.SetStateAction<Record<string, Record<string, any>>>>;
   setPracticeChecked: React.Dispatch<React.SetStateAction<Record<string, Record<string, boolean>>>>;
-  handleLoadAiPractice: (qId: string, questionText: string, numQuestions: number) => Promise<void>;
+  handleLoadAiPractice: (qId: string, questionText: string, numQuestions: number, assignmentId?: string) => Promise<void>;
+  assignmentId?: string;
 }
 
 function MistakeTrainingWidget({
@@ -46,7 +47,8 @@ function MistakeTrainingWidget({
   practiceChecked,
   setPracticeAnswers,
   setPracticeChecked,
-  handleLoadAiPractice
+  handleLoadAiPractice,
+  assignmentId
 }: MistakeTrainingWidgetProps) {
   const qId = q.id;
   const numQuestions = q.numPracticeQuestions || 1;
@@ -54,9 +56,9 @@ function MistakeTrainingWidget({
 
   useEffect(() => {
     if (useAi && !practiceAiContent[qId] && !practiceLoading[qId] && !practiceErrors[qId]) {
-      handleLoadAiPractice(qId, q.text, numQuestions);
+      handleLoadAiPractice(qId, q.text, numQuestions, assignmentId);
     }
-  }, [useAi, qId, q.text, numQuestions, practiceAiContent, practiceLoading, practiceErrors, handleLoadAiPractice]);
+  }, [useAi, qId, q.text, numQuestions, practiceAiContent, practiceLoading, practiceErrors, handleLoadAiPractice, assignmentId]);
 
   const isLoading = practiceLoading[qId];
   const error = practiceErrors[qId];
@@ -414,7 +416,8 @@ export default function ITestApp() {
   
   const [isAddingClass, setIsAddingClass] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [paymentDetails, setPaymentDetails] = useState<{ amount: number, type: 'monthly' | 'yearly' } | null>(null);
+  const [isCustomSchoolModalOpen, setIsCustomSchoolModalOpen] = useState(false);
+  const [paymentDetails, setPaymentDetails] = useState<{ amount: number, type: 'monthly' | 'yearly' | 'credits', credits?: number } | null>(null);
   const [newClassName, setNewClassName] = useState('');
 
   const [isAddingStudent, setIsAddingStudent] = useState(false);
@@ -565,14 +568,14 @@ export default function ITestApp() {
   const [practiceLoading, setPracticeLoading] = useState<Record<string, boolean>>({});
   const [practiceErrors, setPracticeErrors] = useState<Record<string, string>>({});
 
-  const handleLoadAiPractice = async (qId: string, questionText: string, numQuestions: number) => {
+  const handleLoadAiPractice = async (qId: string, questionText: string, numQuestions: number, assignmentId?: string) => {
     setPracticeLoading(prev => ({ ...prev, [qId]: true }));
     setPracticeErrors(prev => ({ ...prev, [qId]: '' }));
     try {
       const res = await fetch('/api/ai/practice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionText, numQuestions })
+        body: JSON.stringify({ questionText, numQuestions, assignmentId })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -2818,45 +2821,78 @@ export default function ITestApp() {
                                   </div>
                                 </td>
                                 <td className="p-4">
-                                  {t.role === 'admin' ? (
-                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full uppercase tracking-wider">Admin</span>
-                                  ) : (
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex flex-col">
-                                        {isPremium ? (
-                                          <>
-                                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200/50 px-2 py-0.5 rounded-full w-max flex items-center gap-1">
-                                              <Crown className="w-3 h-3 fill-amber-500 text-amber-500" /> Premium
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground mt-1 font-medium">zbývá {premiumDaysLeft} dní</span>
-                                          </>
-                                        ) : isTrialExpired ? (
-                                          <>
-                                            <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200/50 px-2 py-0.5 rounded-full w-max">
-                                              Zkušební verze vypršela
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground mt-1 font-medium">0 dní</span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full w-max">
-                                              Zkušební verze
-                                            </span>
-                                            <span className="text-[10px] text-muted-foreground mt-1 font-medium">zbývá {trialDaysLeft} dní</span>
-                                          </>
-                                        )}
+                                    <div className="flex flex-col gap-1.5">
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex flex-col">
+                                          {isPremium ? (
+                                            <>
+                                              <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200/50 px-2 py-0.5 rounded-full w-max flex items-center gap-1">
+                                                <Crown className="w-3 h-3 fill-amber-500 text-amber-500" /> Premium ({t.premiumType === 'yearly' ? 'Roční' : 'Měsíční'})
+                                              </span>
+                                              <span className="text-[10px] text-muted-foreground mt-1 font-medium">zbývá {premiumDaysLeft} dní</span>
+                                            </>
+                                          ) : isTrialExpired ? (
+                                            <>
+                                              <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200/50 px-2 py-0.5 rounded-full w-max">
+                                                Zkušební verze vypršela
+                                              </span>
+                                              <span className="text-[10px] text-muted-foreground mt-1 font-medium">0 dní</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full w-max">
+                                                Zkušební verze
+                                              </span>
+                                              <span className="text-[10px] text-muted-foreground mt-1 font-medium">zbývá {trialDaysLeft} dní</span>
+                                            </>
+                                          )}
+                                        </div>
+                                        <div className="text-[10px] font-semibold text-indigo-950 font-mono bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded-lg flex flex-col shrink-0">
+                                          <span>AI: {t.aiCredits !== undefined ? t.aiCredits : 30} / {t.aiCreditsMax || 30}</span>
+                                          {t.aiExtraCredits ? <span className="text-[9px] text-indigo-650 font-bold font-sans">+{t.aiExtraCredits} extra</span> : null}
+                                        </div>
                                       </div>
 
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className={`h-7 text-[10px] px-2.5 rounded-xl font-bold ${isPremium ? 'border-red-200 text-red-650 hover:bg-red-50 hover:text-red-700' : 'bg-amber-500 hover:bg-amber-600 text-white border-none'}`}
-                                        onClick={() => store.toggleUserPremium(t.id, isPremium)}
-                                      >
-                                        {isPremium ? 'Zrušit Premium' : 'Aktivovat Premium'}
-                                      </Button>
+                                      <div className="flex flex-wrap gap-1">
+                                        {isPremium ? (
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-6 text-[9px] px-2 rounded-xl font-bold border-red-200 text-red-650 hover:bg-red-50 hover:text-red-700"
+                                            onClick={() => store.toggleUserPremium(t.id, true)}
+                                          >
+                                            Zrušit Premium
+                                          </Button>
+                                        ) : (
+                                          <>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-6 text-[9px] px-2 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-750 text-white border-none"
+                                              onClick={() => store.toggleUserPremium(t.id, false, 'monthly')}
+                                            >
+                                              Aktivovat Měsíční
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-6 text-[9px] px-2 rounded-xl font-bold bg-amber-500 hover:bg-amber-600 text-white border-none"
+                                              onClick={() => store.toggleUserPremium(t.id, false, 'yearly')}
+                                            >
+                                              Aktivovat Roční
+                                            </Button>
+                                          </>
+                                        )}
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-6 text-[9px] px-2 rounded-xl font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                          onClick={() => store.addTeacherCredits(t.id, 50)}
+                                        >
+                                          +50 kr.
+                                        </Button>
+                                      </div>
                                     </div>
-                                  )}
                                 </td>
                                 <td className="p-4">
                                   {t.id === currentUser.id ? (
@@ -3992,7 +4028,7 @@ export default function ITestApp() {
                   }}
                   className="w-full rounded-2xl py-6 font-bold shadow-md bg-indigo-600 hover:bg-indigo-750 text-white flex justify-between px-6 border-none"
                 >
-                  <span>Měsíční tarif</span>
+                  <span>Měsíční tarif (300 kr./měsíc)</span>
                   <span>99 Kč / měsíc</span>
                 </Button>
                 <Button 
@@ -4002,7 +4038,7 @@ export default function ITestApp() {
                   }}
                   className="w-full rounded-2xl py-6 font-bold shadow-md bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white flex justify-between px-6 border-none"
                 >
-                  <span>Roční tarif (Ušetříte 16%)</span>
+                  <span>Roční tarif (400 kr./měsíc, Ušetříte 16%)</span>
                   <span>999 Kč / rok</span>
                 </Button>
               </div>
@@ -4039,48 +4075,74 @@ export default function ITestApp() {
         {/* Banner o předplatném */}
         <div className="max-w-7xl w-full mx-auto px-4 md:px-8 mt-6">
           {isPremium ? (
-            <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-indigo-500/10 border border-amber-200/50 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+            <div className="bg-gradient-to-r from-amber-500/10 via-yellow-500/10 to-indigo-500/10 border border-amber-200/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
               <div className="flex items-center gap-3">
-                <div className="bg-amber-100/80 p-2 rounded-xl text-amber-600">
+                <div className="bg-amber-100/80 p-2 rounded-xl text-amber-600 shrink-0">
                   <Crown className="w-5 h-5 fill-amber-500 text-amber-500" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-indigo-950 flex items-center gap-1.5">
-                    Prémiový účet aktivní <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">PREMIUM</span>
+                    Prémiový účet aktivní <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">PREMIUM ({currentUser.premiumType === 'yearly' ? 'Roční' : 'Měsíční'})</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Všechny limity jsou zrušeny. Placená verze vyprší a přepne se do základní verze za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).
+                    Všechny limity jsou zrušeny. Placená verze vyprší za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                    Škola: <span className="font-bold text-slate-700">{schools.find(s => s.id === currentUser.schoolId)?.name || 'Načítání...'}</span> · Zvací kód školy: <span className="font-mono bg-white border px-1.5 py-0.2 rounded font-bold text-indigo-700">{schools.find(s => s.id === currentUser.schoolId)?.inviteCode || '...'}</span>
+                  <p className="text-[11px] text-slate-500 mt-1 font-medium flex flex-wrap gap-x-3 gap-y-1">
+                    <span>Škola: <span className="font-bold text-slate-700">{schools.find(s => s.id === currentUser.schoolId)?.name || 'Načítání...'}</span></span>
+                    <span>Zvací kód: <span className="font-mono bg-white border px-1.5 py-0.2 rounded font-bold text-indigo-700">{schools.find(s => s.id === currentUser.schoolId)?.inviteCode || '...'}</span></span>
+                    <span>AI Kredity: <span className="font-bold text-indigo-700">{currentUser.aiCredits !== undefined ? currentUser.aiCredits : 30} / {currentUser.aiCreditsMax || 30} {currentUser.aiExtraCredits ? `(+${currentUser.aiExtraCredits} extra)` : ''}</span></span>
+                    {currentUser.aiCreditsResetDate && (
+                      <span>Obnovení: <span className="font-bold text-indigo-700">{new Date(currentUser.aiCreditsResetDate).toLocaleDateString('cs-CZ')}</span></span>
+                    )}
                   </p>
                 </div>
               </div>
+              <Button 
+                onClick={() => {
+                  setPaymentDetails({ amount: 25, type: 'credits', credits: 50 });
+                  setIsUpgradeModalOpen(true);
+                }}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold py-2 px-4 shadow-sm border-none shrink-0 flex items-center gap-1"
+              >
+                <Zap className="w-3.5 h-3.5 fill-white text-white" /> Dokoupit 50 kr. (25 Kč)
+              </Button>
             </div>
           ) : (
-            <div className="bg-gradient-to-r from-indigo-500/5 via-indigo-600/5 to-purple-500/5 border border-indigo-200/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+            <div className="bg-gradient-to-r from-indigo-50/50 via-indigo-600/5 to-purple-50/5 border border-indigo-200/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
               <div className="flex items-center gap-3">
-                <div className="bg-indigo-100/80 p-2 rounded-xl text-indigo-650 animate-pulse">
-                  <Sparkles className="w-5 h-5 text-indigo-650" />
+                <div className="bg-indigo-100/80 p-2 rounded-xl text-indigo-650 shrink-0">
+                  <Sparkles className="w-5 h-5 text-indigo-650 animate-pulse" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-indigo-950">
                     Používáte zkušební verzi iTest Cloud
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Zkušební doba končí za <span className="font-bold text-indigo-700">{daysLeft} dní</span>. Omezení: max. 2 třídy a 20 žáků na třídu.
+                    Zkušební doba končí za <span className="font-bold text-indigo-700">{daysLeft} dní</span>. Omezení: max. 2 třídy a 20 žáků na třídu. AI Kredity: <span className="font-bold text-indigo-700">{currentUser.aiCredits !== undefined ? currentUser.aiCredits : 30} / {currentUser.aiCreditsMax || 30} {currentUser.aiExtraCredits ? `(+${currentUser.aiExtraCredits} extra)` : ''}</span>.
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1 font-medium">
                     Škola: <span className="font-bold text-slate-700">{schools.find(s => s.id === currentUser.schoolId)?.name || 'Načítání...'}</span> · Zvací kód školy: <span className="font-mono bg-white border px-1.5 py-0.2 rounded font-bold text-indigo-700">{schools.find(s => s.id === currentUser.schoolId)?.inviteCode || '...'}</span>
                   </p>
                 </div>
               </div>
-              <Button 
-                onClick={() => setIsUpgradeModalOpen(true)}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white rounded-xl text-xs font-bold py-2 px-4 shadow-sm border-none"
-              >
-                Upgradovat na Premium
-              </Button>
+              <div className="flex gap-2 self-end sm:self-auto shrink-0">
+                <Button 
+                  onClick={() => {
+                    setPaymentDetails({ amount: 25, type: 'credits', credits: 50 });
+                    setIsUpgradeModalOpen(true);
+                  }}
+                  variant="outline"
+                  className="bg-white hover:bg-slate-50 border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold py-2 px-4 shadow-sm flex items-center gap-1"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-indigo-600 text-indigo-600" /> Dokoupit 50 kr. (25 Kč)
+                </Button>
+                <Button 
+                  onClick={() => setIsUpgradeModalOpen(true)}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white rounded-xl text-xs font-bold py-2 px-4 shadow-sm border-none"
+                >
+                  Upgradovat na Premium
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -5968,7 +6030,11 @@ export default function ITestApp() {
                 <div className="space-y-6 py-4 flex flex-col items-center">
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl flex flex-col items-center">
                     <img 
-                      src={`https://api.paylibo.com/paylibo/generator/czech/image?accountNumber=1667425028&bankCode=3030&amount=${paymentDetails.amount}&currency=CZK&message=${encodeURIComponent(`${currentUser.name} - ${schools.find(s => s.id === currentUser.schoolId)?.name || 'Skola'}`)}`} 
+                      src={`https://api.paylibo.com/paylibo/generator/czech/image?accountNumber=1667425028&bankCode=3030&amount=${paymentDetails.amount}&currency=CZK&message=${encodeURIComponent(
+                        paymentDetails.type === 'credits'
+                          ? `Kredity: ${currentUser.name} (${currentUser.username})`
+                          : `${currentUser.name} - ${schools.find(s => s.id === currentUser.schoolId)?.name || 'Skola'}`
+                      )}`} 
                       alt="Platební QR Kód" 
                       className="w-56 h-56 object-contain rounded-xl shadow-inner bg-white border border-slate-200"
                     />
@@ -5987,7 +6053,9 @@ export default function ITestApp() {
                     <div className="flex flex-col border-b pb-2 gap-1">
                       <span className="text-slate-500 font-semibold">Zpráva pro příjemce (Poznámka):</span>
                       <span className="font-bold text-slate-800 bg-white border border-slate-200 p-2 rounded-lg text-center break-all select-all font-mono">
-                        {currentUser.name} - {schools.find(s => s.id === currentUser.schoolId)?.name || 'iTest Škola'}
+                        {paymentDetails.type === 'credits'
+                          ? `Kredity: ${currentUser.name} (${currentUser.username})`
+                          : `${currentUser.name} - ${schools.find(s => s.id === currentUser.schoolId)?.name || 'iTest Škola'}`}
                       </span>
                     </div>
                     <div className="bg-amber-50 text-amber-800 p-3 rounded-xl border border-amber-100/60 leading-relaxed text-[11px] font-medium flex gap-2">
@@ -6007,8 +6075,10 @@ export default function ITestApp() {
                     <Button 
                       onClick={() => {
                         toast({ 
-                          title: "Platba odeslána k ověření", 
-                          description: "Administrátor aktivuje Premium verzi vašeho účtu po připsání platby na bankovní účet." 
+                          title: paymentDetails.type === 'credits' ? "Platba za kredity odeslána" : "Platba odeslána k ověření", 
+                          description: paymentDetails.type === 'credits'
+                            ? "Administrátor připíše 50 AI kreditů na váš účet po připsání platby 25 Kč na bankovní účet."
+                            : "Administrátor aktivuje Premium verzi vašeho účtu po připsání platby na bankovní účet." 
                         });
                         setPaymentDetails(null);
                         setIsUpgradeModalOpen(false);
@@ -6021,7 +6091,7 @@ export default function ITestApp() {
                 </div>
               ) : (
                 <>
-                  <div className="grid md:grid-cols-3 gap-4 py-4">
+                  <div className="grid md:grid-cols-4 gap-4 py-4">
                     {/* Monthly card */}
                     <div className="bg-slate-50 border border-slate-200/60 hover:border-indigo-400 rounded-3xl p-5 flex flex-col justify-between transition-all hover:shadow-md">
                       <div>
@@ -6032,6 +6102,9 @@ export default function ITestApp() {
                           <span className="text-xs text-muted-foreground ml-1">/ měsíc</span>
                         </div>
                         <ul className="text-xs space-y-2 mt-5 text-slate-600 font-medium">
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> <strong>300 AI kreditů</strong> / měsíc
+                          </li>
                           <li className="flex items-center gap-1.5">
                             <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Neomezeně tříd
                           </li>
@@ -6052,7 +6125,7 @@ export default function ITestApp() {
                     </div>
 
                     {/* Yearly card */}
-                    <div className="bg-gradient-to-b from-indigo-50/50 to-purple-50/50 border-2 border-indigo-500 rounded-3xl p-5 flex flex-col justify-between relative shadow-sm hover:shadow-md transition-all">
+                    <div className="bg-gradient-to-b from-indigo-50/50 to-purple-50/5 border-2 border-indigo-500 rounded-3xl p-5 flex flex-col justify-between relative shadow-sm hover:shadow-md transition-all">
                       <span className="absolute -top-3 right-4 bg-gradient-to-r from-amber-500 to-yellow-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-sm">
                         UŠETŘÍTE 16%
                       </span>
@@ -6060,12 +6133,15 @@ export default function ITestApp() {
                         <h3 className="font-bold text-lg text-indigo-950 flex items-center gap-1">
                           Roční tarif <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500" />
                         </h3>
-                        <p className="text-xs text-indigo-900/60 mt-1">Dlouhodobě nejvýhodnější volba pro školy.</p>
+                        <p className="text-xs text-indigo-900/60 mt-1">Nejvýhodnější volba pro učitele.</p>
                         <div className="mt-4 flex items-baseline">
                           <span className="text-3xl font-black text-indigo-700">999 Kč</span>
                           <span className="text-xs text-muted-foreground ml-1">/ rok</span>
                         </div>
                         <ul className="text-xs space-y-2 mt-5 text-indigo-900 font-medium">
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 animate-pulse" /> <strong>400 AI kreditů</strong> / měsíc
+                          </li>
                           <li className="flex items-center gap-1.5">
                             <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 animate-pulse" /> Neomezeně tříd
                           </li>
@@ -6073,7 +6149,7 @@ export default function ITestApp() {
                             <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 animate-pulse" /> Neomezeně žáků a testů
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 animate-pulse" /> Hromadné stahování výsledků
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Hromadné stahování výsledků
                           </li>
                         </ul>
                       </div>
@@ -6082,6 +6158,37 @@ export default function ITestApp() {
                         className="w-full mt-6 rounded-2xl py-5 font-bold shadow-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white border-none"
                       >
                         Aktivovat ročně
+                      </Button>
+                    </div>
+
+                    {/* Buy Credits card */}
+                    <div className="bg-slate-50 border border-indigo-200 rounded-3xl p-5 flex flex-col justify-between transition-all hover:border-indigo-400 hover:shadow-md">
+                      <div>
+                        <h3 className="font-bold text-lg text-slate-800 flex items-center gap-1">
+                          Dokoupit kredity <Zap className="w-4 h-4 text-indigo-650 fill-indigo-600" />
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">Jednorázové navýšení limitu bez expirace.</p>
+                        <div className="mt-4 flex items-baseline">
+                          <span className="text-3xl font-black text-indigo-750">25 Kč</span>
+                          <span className="text-xs text-muted-foreground ml-1">/ 50 ks</span>
+                        </div>
+                        <ul className="text-xs space-y-2 mt-5 text-slate-600 font-medium">
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> <strong>50 AI kreditů</strong> jednorázově
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Kredity nikdy neexpirují
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Lze koupit opakovaně
+                          </li>
+                        </ul>
+                      </div>
+                      <Button 
+                        onClick={() => setPaymentDetails({ amount: 25, type: 'credits', credits: 50 })}
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-indigo-600 hover:bg-indigo-750 text-white border-none flex items-center justify-center gap-1"
+                      >
+                        <Zap className="w-3.5 h-3.5 fill-white" /> Dokoupit 50 ks
                       </Button>
                     </div>
 
@@ -6132,6 +6239,64 @@ export default function ITestApp() {
                   </DialogFooter>
                 </>
               )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Dialog pro poptávku balíčku na míru pro školy */}
+          <Dialog open={isCustomSchoolModalOpen} onOpenChange={setIsCustomSchoolModalOpen}>
+            <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl p-6 text-slate-800">
+              <DialogHeader className="space-y-3">
+                <DialogTitle className="text-2xl font-headline font-black text-indigo-700 flex items-center gap-2">
+                  <School className="w-6 h-6 text-violet-650" />
+                  Balíček na míru pro školy
+                </DialogTitle>
+                <DialogDescription className="text-gray-500 text-sm leading-relaxed">
+                  Máte zájem o licencování celé školy, více učitelů nebo o individuální navýšení kreditů? Kontaktujte nás a my Vám připravíme nabídku na míru.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="bg-violet-50/50 border border-violet-100 rounded-2xl p-4 space-y-3.5 text-xs text-violet-900 my-4">
+                <div className="flex justify-between border-b border-violet-200/50 pb-2">
+                  <span className="font-semibold text-violet-700">Kontaktní e-mail:</span>
+                  <a href="mailto:info@itests.cz" className="font-bold text-violet-900 hover:underline">info@itests.cz</a>
+                </div>
+                <div className="flex flex-col gap-1 leading-relaxed">
+                  <span className="font-semibold text-violet-700">Co uvést do poptávky:</span>
+                  <ul className="list-disc list-inside space-y-1 text-[11px] mt-1 font-medium pl-1">
+                    <li>Název a adresa školy</li>
+                    <li>Orientační počet učitelů (licencí)</li>
+                    <li>Orientační počet žáků</li>
+                    <li>Požadované funkce / objem AI kreditů</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1 rounded-2xl py-5 font-bold border-slate-200 hover:bg-slate-50" 
+                  onClick={() => setIsCustomSchoolModalOpen(false)}
+                >
+                  Zavřít
+                </Button>
+                <a 
+                  href={`mailto:info@itests.cz?subject=${encodeURIComponent('Poptávka balíčku na míru pro školu - iTest Cloud')}&body=${encodeURIComponent(
+                    `Dobrý den,\n\nmám zájem o přípravu individuální nabídky (balíčku na míru) pro naši školu.\n\n` +
+                    `Název školy: \n` +
+                    `Orientační počet učitelů: \n` +
+                    `Orientační počet žáků: \n` +
+                    `Požadavky / poznámky: \n\n` +
+                    `S pozdravem\n${currentUser.name}`
+                  )}`}
+                  className="flex-1"
+                >
+                  <Button 
+                    className="w-full rounded-2xl py-5 font-bold shadow-md bg-indigo-600 hover:bg-indigo-700 text-white border-none flex items-center justify-center gap-1.5"
+                  >
+                    Otevřít e-mail
+                  </Button>
+                </a>
+              </div>
             </DialogContent>
           </Dialog>
 
@@ -6426,6 +6591,7 @@ export default function ITestApp() {
                                           setPracticeAnswers={setPracticeAnswers}
                                           setPracticeChecked={setPracticeChecked}
                                           handleLoadAiPractice={handleLoadAiPractice}
+                                          assignmentId={a.id}
                                         />
                                       )}
                                     </div>

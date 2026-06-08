@@ -2,11 +2,53 @@ import { NextRequest, NextResponse } from 'next/server';
 import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
 import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
 import { gradeSubmissionFlow } from '@/ai/flows/grade-submission';
+import { getUserSession } from '@/lib/auth';
+import { Teacher } from '@/models/Teacher';
+import dbConnect from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
 
+const deductTeacherCredit = async (teacherId: string) => {
+  const t = await Teacher.findOne({ _id: teacherId });
+  if (!t || t.role === 'admin') return;
+  
+  const maxCredits = t.aiCreditsMax || 30;
+  const currentCredits = t.aiCredits || 0;
+  
+  const updateData: any = {};
+  if (currentCredits > maxCredits) {
+    updateData.aiExtraCredits = Math.max(0, (t.aiExtraCredits || 0) - 1);
+    updateData.aiCredits = Math.max(0, currentCredits - 1);
+  } else {
+    updateData.aiCredits = Math.max(0, currentCredits - 1);
+  }
+  await Teacher.updateOne({ _id: teacherId }, { $set: updateData });
+};
+
 export async function POST(request: NextRequest) {
   try {
+    const session = await getUserSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Pro přístup se musíte přihlásit.' }, { status: 401 });
+    }
+
+    await dbConnect();
+    let teacher = null;
+
+    if (session.role === 'teacher') {
+      teacher = await Teacher.findOne({ _id: session.id });
+      if (!teacher) {
+        return NextResponse.json({ error: 'Učitel nebyl nalezen.' }, { status: 404 });
+      }
+      if ((teacher.aiCredits || 0) <= 0) {
+        return NextResponse.json({ 
+          error: 'Nemáte dostatek AI kreditů. Pro pokračování si prosím dokupte kredity (50 ks za 25 Kč) nebo upgradujte svůj tarif.' 
+        }, { status: 403 });
+      }
+    } else if (session.role !== 'admin') {
+      return NextResponse.json({ error: 'Nedostatečná oprávnění pro využití AI funkcí.' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { action } = body;
 
@@ -23,6 +65,10 @@ export async function POST(request: NextRequest) {
       const result = await digitizePdfContentForAssignment({ fileDataUri });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 500 });
+      }
+
+      if (teacher) {
+        await deductTeacherCredit(teacher._id.toString());
       }
       return NextResponse.json({ success: true, extractedText: result.extractedText });
     }
@@ -43,6 +89,10 @@ export async function POST(request: NextRequest) {
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 500 });
       }
+
+      if (teacher) {
+        await deductTeacherCredit(teacher._id.toString());
+      }
       return NextResponse.json({ success: true, questions: result.questions });
     }
 
@@ -62,6 +112,10 @@ export async function POST(request: NextRequest) {
 
       if ('error' in result) {
         return NextResponse.json({ error: result.error }, { status: 500 });
+      }
+
+      if (teacher) {
+        await deductTeacherCredit(teacher._id.toString());
       }
       return NextResponse.json({ success: true, evaluation: result });
     }

@@ -63,6 +63,11 @@ export async function POST(request: Request) {
       passwordPlain: body.password,
       subjects: Array.isArray(body.subjects) ? body.subjects : (body.subjects ? body.subjects.split(',').map((s: string) => s.trim()) : []),
       schoolId: schoolId,
+      aiCredits: 30,
+      aiCreditsMax: 30,
+      aiExtraCredits: 0,
+      premiumType: "trial",
+      aiCreditsResetDate: null
     });
 
     // Nechceme vracet heslo v odpovědi
@@ -116,8 +121,8 @@ export async function PUT(request: Request) {
 
     const body = await request.json();
 
-    if ((body.action === "activatePremium" || body.action === "deactivatePremium") && session.role !== "admin") {
-      return NextResponse.json({ success: false, error: "Pouze administrátor může aktivovat nebo zrušit Premium." }, { status: 403 });
+    if ((body.action === "activatePremium" || body.action === "deactivatePremium" || body.action === "addCredits") && session.role !== "admin") {
+      return NextResponse.json({ success: false, error: "Pouze administrátor může spravovat předplatné a kredity." }, { status: 403 });
     }
 
     const teacherId = session.role === "admin" ? body.id : session.id;
@@ -137,12 +142,27 @@ export async function PUT(request: Request) {
       const now = new Date();
       if (body.type === "yearly") {
         updateData.premiumExpiresAt = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+        updateData.premiumType = "yearly";
+        updateData.aiCreditsMax = 400;
+        updateData.aiCredits = 400 + (teacher.aiExtraCredits || 0);
       } else {
         updateData.premiumExpiresAt = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+        updateData.premiumType = "monthly";
+        updateData.aiCreditsMax = 300;
+        updateData.aiCredits = 300 + (teacher.aiExtraCredits || 0);
       }
+      updateData.aiCreditsResetDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
     } else if (body.action === "deactivatePremium") {
       updateData.isPremium = false;
       updateData.premiumExpiresAt = null;
+      updateData.premiumType = "trial";
+      updateData.aiCreditsMax = 30;
+      updateData.aiCredits = 30;
+      updateData.aiCreditsResetDate = null;
+    } else if (body.action === "addCredits") {
+      const creditsToAdd = body.amount || 50;
+      updateData.aiExtraCredits = (teacher.aiExtraCredits || 0) + creditsToAdd;
+      updateData.aiCredits = (teacher.aiCredits || 0) + creditsToAdd;
     } else {
       if (body.firstName !== undefined) updateData.firstName = body.firstName;
       if (body.lastName !== undefined) updateData.lastName = body.lastName;

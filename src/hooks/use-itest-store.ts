@@ -659,6 +659,7 @@ export function useITestStore() {
         
         const targetUser = users.find(u => u.id === userId);
         const updatedUser = { 
+          ...targetUser,
           id: userId,
           name: targetUser?.name || '',
           username: targetUser?.username || '',
@@ -666,8 +667,13 @@ export function useITestStore() {
           schoolId: targetUser?.schoolId,
           createdAt: targetUser?.createdAt,
           classId: targetUser?.classId,
-          isPremium: !isPremium, 
-          premiumExpiresAt: data.data.premiumExpiresAt 
+          isPremium: data.data.isPremium, 
+          premiumExpiresAt: data.data.premiumExpiresAt,
+          aiCredits: data.data.aiCredits,
+          aiCreditsMax: data.data.aiCreditsMax,
+          aiExtraCredits: data.data.aiExtraCredits,
+          premiumType: data.data.premiumType,
+          aiCreditsResetDate: data.data.aiCreditsResetDate
         };
         
         setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
@@ -675,8 +681,13 @@ export function useITestStore() {
         if (currentUser && currentUser.id === userId) {
           const updatedCurrentUser = {
             ...currentUser,
-            isPremium: !isPremium,
-            premiumExpiresAt: data.data.premiumExpiresAt
+            isPremium: data.data.isPremium,
+            premiumExpiresAt: data.data.premiumExpiresAt,
+            aiCredits: data.data.aiCredits,
+            aiCreditsMax: data.data.aiCreditsMax,
+            aiExtraCredits: data.data.aiExtraCredits,
+            premiumType: data.data.premiumType,
+            aiCreditsResetDate: data.data.aiCreditsResetDate
           };
           if (mongoUser && mongoUser.id === userId) {
             setMongoUser(updatedCurrentUser);
@@ -687,6 +698,58 @@ export function useITestStore() {
         return true;
       } else {
         toast({ title: "Chyba", description: data.error || "Změna Premium stavu selhala.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    });
+  }, [users, currentUser, mongoUser, toast]);
+
+  const addTeacherCredits = useCallback((userId: string, amount: number) => {
+    return fetch('/api/teachers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        id: userId, 
+        action: 'addCredits', 
+        amount
+      })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ 
+          title: "Kredity přidány", 
+          description: `Bylo přidáno ${amount} kreditů učiteli.` 
+        });
+        
+        const targetUser = users.find(u => u.id === userId);
+        const updatedUser = {
+          ...targetUser,
+          id: userId,
+          aiCredits: data.data.aiCredits,
+          aiExtraCredits: data.data.aiExtraCredits
+        } as any;
+        
+        setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+        
+        if (currentUser && currentUser.id === userId) {
+          const updatedCurrentUser = {
+            ...currentUser,
+            aiCredits: data.data.aiCredits,
+            aiExtraCredits: data.data.aiExtraCredits
+          };
+          if (mongoUser && mongoUser.id === userId) {
+            setMongoUser(updatedCurrentUser);
+            sessionStorage.setItem('itest_mongo_user', JSON.stringify(updatedCurrentUser));
+          }
+        }
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se přidat kredity.", variant: "destructive" });
         return false;
       }
     })
@@ -732,6 +795,6 @@ export function useITestStore() {
   return {
     isLoaded, currentUser, classes, users, assignments, submissions,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, startAssignmentTimer, saveDraft, refresh
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh
   };
 }

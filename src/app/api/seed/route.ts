@@ -44,6 +44,11 @@ export async function GET() {
       role: "teacher",
       subjects: ["Matematika", "Fyzika"],
       schoolId: schoolId,
+      aiCredits: 30,
+      aiCreditsMax: 30,
+      aiExtraCredits: 0,
+      premiumType: "trial",
+      aiCreditsResetDate: null,
     });
 
     // 4.1. Vytvoření administrátora (v modelu Teacher s role: "admin", bez schoolId)
