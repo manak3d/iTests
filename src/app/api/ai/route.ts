@@ -52,6 +52,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action } = body;
 
+    if (action === 'grade' && session.role === 'teacher' && teacher) {
+      if (teacher.premiumType !== 'yearly' && teacher.premiumType !== 'school') {
+        return NextResponse.json({ 
+          error: 'AI hodnocení odevzdaných prací je dostupné pouze pro uživatele s ročním Premium předplatným nebo školní licencí.' 
+        }, { status: 403 });
+      }
+    }
+
     console.log('[AI API] Action:', action);
     console.log('[AI API] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY);
     console.log('[AI API] GOOGLE_API_KEY present:', !!process.env.GOOGLE_API_KEY);

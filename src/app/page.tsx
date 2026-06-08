@@ -554,6 +554,14 @@ export default function ITestApp() {
 
   const [isAiGrading, setIsAiGrading] = useState(false);
   const handleAiGrade = async (assignment: Assignment, sub: Submission, customInstructions?: string) => {
+    if (currentUser?.role !== 'admin' && currentUser?.premiumType !== 'yearly' && currentUser?.premiumType !== 'school') {
+      toast({
+        title: "Nedostupná funkce",
+        description: "AI hodnocení odevzdaných prací je dostupné pouze pro uživatele s ročním Premium předplatným nebo školní licencí.",
+        variant: "destructive"
+      });
+      return;
+    }
     setIsAiGrading(true);
     try {
       const res = await fetch('/api/ai', {
@@ -3149,7 +3157,7 @@ export default function ITestApp() {
                                           {isPremium ? (
                                             <>
                                               <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-200/50 px-2 py-0.5 rounded-full w-max flex items-center gap-1">
-                                                <Crown className="w-3 h-3 fill-amber-500 text-amber-500" /> Premium ({t.premiumType === 'yearly' ? 'Roční' : 'Měsíční'})
+                                                <Crown className="w-3 h-3 fill-amber-500 text-amber-500" /> Premium ({t.premiumType === 'yearly' ? 'Roční' : t.premiumType === 'school' ? 'Školní' : t.premiumType === 'trial' ? 'Zkušební' : 'Měsíční'})
                                               </span>
                                               <span className="text-[10px] text-muted-foreground mt-1 font-medium">zbývá {premiumDaysLeft} dní</span>
                                             </>
@@ -4625,7 +4633,7 @@ export default function ITestApp() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-indigo-950 flex items-center gap-1.5">
-                    Prémiový účet aktivní <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">PREMIUM ({currentUser.premiumType === 'yearly' ? 'Roční' : 'Měsíční'})</span>
+                    Prémiový účet aktivní <span className="text-[10px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full uppercase tracking-wider">PREMIUM ({currentUser.premiumType === 'yearly' ? 'Roční' : currentUser.premiumType === 'school' ? 'Školní' : currentUser.premiumType === 'trial' ? 'Zkušební' : 'Měsíční'})</span>
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Všechny limity jsou zrušeny. Placená verze vyprší za <span className="font-bold text-indigo-700">{premiumDaysLeft} dní</span> (platnost do: {currentUser.premiumExpiresAt ? new Date(currentUser.premiumExpiresAt).toLocaleDateString('cs-CZ') : 'neomezeně'}).

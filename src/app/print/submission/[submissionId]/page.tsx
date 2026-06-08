@@ -192,27 +192,28 @@ export default async function PrintSubmissionPage({ params }: PrintSubmissionPag
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased print:bg-white print:text-black">
-      <style>{`
-        @media print {
-          .no-print {
-            display: none !important;
-          }
-          body {
-            background-color: white !important;
-            color: black !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-          .avoid-break {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+      <script dangerouslySetInnerHTML={{ __html: `
+        function downloadPDF() {
+          const element = document.getElementById('printable-sheet');
+          if (!element) return;
+          const opt = {
+            margin:       10,
+            filename:     document.title.replace(/[/\\\\?%*:|"<>\s]+/g, '_') + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, logging: false },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          };
+          if (typeof html2pdf !== 'undefined') {
+            html2pdf().set(opt).from(element).save().then(() => {
+              setTimeout(() => { window.close(); }, 1500);
+            });
+          } else {
+            setTimeout(downloadPDF, 100);
           }
         }
-      `}</style>
-      <script dangerouslySetInnerHTML={{ __html: `
-        setTimeout(() => {
-          window.print();
-        }, 800);
+        window.downloadPDF = downloadPDF;
+        setTimeout(downloadPDF, 800);
       `}} />
       {/* Control panel for screen only */}
       <div className="no-print sticky top-0 z-50 bg-slate-900 text-white p-4 shadow-md flex justify-between items-center px-6 print:hidden">
@@ -226,19 +227,19 @@ export default async function PrintSubmissionPage({ params }: PrintSubmissionPag
         <div className="flex gap-2">
           <button 
             onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.print();
+              if (typeof window !== 'undefined' && (window as any).downloadPDF) {
+                (window as any).downloadPDF();
               }
             }}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition-all shadow flex items-center gap-2 cursor-pointer border-none"
           >
-            <Printer className="w-4 h-4" /> Vytisknout / Uložit do PDF
+            <Printer className="w-4 h-4" /> Stáhnout jako PDF (ihned)
           </button>
         </div>
       </div>
 
       {/* Main printable sheet */}
-      <div className="max-w-[210mm] mx-auto bg-white p-[20mm] min-h-[297mm] shadow-lg print:shadow-none print:p-0 print:mx-0">
+      <div id="printable-sheet" className="max-w-[210mm] mx-auto bg-white p-[20mm] min-h-[297mm] shadow-lg print:shadow-none print:p-0 print:mx-0">
         
         {/* Header Block */}
         <div className="border-b-2 border-slate-950 pb-6 mb-8 flex flex-col gap-4 text-left">
