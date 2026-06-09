@@ -3136,7 +3136,7 @@ export default function ITestApp() {
                                 </td>
                                 <td className="p-4 text-sm text-gray-600 font-mono">{t.username}</td>
                                 <td className="p-4 text-sm text-primary font-mono font-bold">{t.password || 'Nenastaveno'}</td>
-                                <td className="p-4 text-sm text-gray-650 font-semibold">
+                                <td className="p-4 text-sm text-gray-600 font-semibold">
                                   {schools.find(s => s.id === t.schoolId)?.name || 'Bez školy / Admin'}
                                 </td>
                                 <td className="p-4">
@@ -5127,7 +5127,7 @@ export default function ITestApp() {
                                   <p className="text-xs text-muted-foreground">⏱️ Bez časového limitu</p>
                                 )}
                                 {a.isPublicTemplate && (
-                                  <p className="text-xs font-bold text-indigo-650">🌐 Veřejná šablona</p>
+                                  <p className="text-xs font-bold text-indigo-600">🌐 Veřejná šablona</p>
                                 )}
                               </div>
                             </div>
@@ -6794,7 +6794,7 @@ export default function ITestApp() {
             <DialogContent className="max-w-md bg-white rounded-3xl border-none shadow-2xl p-6 text-slate-800">
               <DialogHeader className="space-y-3">
                 <DialogTitle className="text-2xl font-headline font-black text-indigo-700 flex items-center gap-2">
-                  <School className="w-6 h-6 text-violet-650" />
+                  <School className="w-6 h-6 text-violet-600" />
                   Balíček na míru pro školy
                 </DialogTitle>
                 <DialogDescription className="text-gray-500 text-sm leading-relaxed">

@@ -920,7 +920,7 @@ export function AssignmentCreator({
                               {(q.practiceQuestions || []).map((pq, pIdx) => (
                                 <div key={pq.id} className="p-3 bg-white border border-slate-200 rounded-lg space-y-2">
                                   <div className="flex justify-between items-center text-xs">
-                                    <span className="font-bold text-indigo-650">Úloha navíc #{pIdx + 1}</span>
+                                    <span className="font-bold text-indigo-600">Úloha navíc #{pIdx + 1}</span>
                                     <Button 
                                       variant="ghost" 
                                       size="icon" 
@@ -1024,7 +1024,7 @@ export function AssignmentCreator({
                                           newPqs[pIdx] = { ...pq, correctAnswer: pq.correctAnswer === true ? undefined : true };
                                           updateQuestion(q.id, { practiceQuestions: newPqs });
                                         }}
-                                        className={`flex-1 py-1 rounded-lg text-xs font-semibold border ${pq.correctAnswer === true ? 'bg-green-500 text-white border-green-500' : 'bg-white text-gray-650'}`}
+                                        className={`flex-1 py-1 rounded-lg text-xs font-semibold border ${pq.correctAnswer === true ? 'bg-green-500 text-white border-green-500' : 'bg-white text-gray-600'}`}
                                       >✓ Ano</button>
                                       <button
                                         type="button"
@@ -1033,7 +1033,7 @@ export function AssignmentCreator({
                                           newPqs[pIdx] = { ...pq, correctAnswer: pq.correctAnswer === false ? undefined : false };
                                           updateQuestion(q.id, { practiceQuestions: newPqs });
                                         }}
-                                        className={`flex-1 py-1 rounded-lg text-xs font-semibold border ${pq.correctAnswer === false ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-650'}`}
+                                        className={`flex-1 py-1 rounded-lg text-xs font-semibold border ${pq.correctAnswer === false ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600'}`}
                                       >✗ Ne</button>
                                     </div>
                                   )}

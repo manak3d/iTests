@@ -21,7 +21,7 @@ export default async function PrintPage({ params }: PrintPageProps) {
   if (!assignment) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold text-red-650">Zadání nebylo nalezeno</h1>
+        <h1 className="text-2xl font-bold text-red-600">Zadání nebylo nalezeno</h1>
         <p className="mt-2 text-slate-500">Zkontrolujte prosím URL adresu.</p>
         <div className="mt-6">
           <Link href="/" className="inline-flex items-center text-primary hover:underline gap-1.5 font-bold">
@@ -123,7 +123,7 @@ export default async function PrintPage({ params }: PrintPageProps) {
               </span>
               <h1 className="text-3xl font-black mt-1 leading-tight">{assignment.title}</h1>
               {assignment.description && (
-                <p className="text-sm text-slate-650 mt-1 italic leading-relaxed">{assignment.description}</p>
+                <p className="text-sm text-slate-600 mt-1 italic leading-relaxed">{assignment.description}</p>
               )}
             </div>
             <div className="text-right">

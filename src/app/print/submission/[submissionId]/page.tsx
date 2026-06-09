@@ -32,7 +32,7 @@ export default async function PrintSubmissionPage({ params }: PrintSubmissionPag
   if (!submission) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold text-red-650">Odevzdaná práce nebyla nalezena</h1>
+        <h1 className="text-2xl font-bold text-red-600">Odevzdaná práce nebyla nalezena</h1>
         <p className="mt-2 text-slate-500">Zkontrolujte prosím URL adresu.</p>
         <div className="mt-6">
           <Link href="/" className="inline-flex items-center text-primary hover:underline gap-1.5 font-bold">
@@ -48,7 +48,7 @@ export default async function PrintSubmissionPage({ params }: PrintSubmissionPag
   if (!assignment) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold text-red-650">Zadání k této práci nebylo nalezeno</h1>
+        <h1 className="text-2xl font-bold text-red-600">Zadání k této práci nebylo nalezeno</h1>
         <div className="mt-6">
           <Link href="/" className="inline-flex items-center text-primary hover:underline gap-1.5 font-bold">
             <ChevronLeft className="w-4 h-4" /> Zpět do iTestu
