@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap, Settings, MessageSquare } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap, Settings, MessageSquare, Search } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -546,6 +546,8 @@ export default function ITestApp() {
   };
 
   const [activeTab, setActiveTab] = useState('classes');
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+  const [templateSelectedSubject, setTemplateSelectedSubject] = useState('Vše');
   const [adminTab, setAdminTab] = useState<'overview' | 'classes' | 'teachers' | 'students' | 'assignments' | 'schools' | 'feedback'>('overview');
   const [adminSchoolFilter, setAdminSchoolFilter] = useState<string>('all');
   const [adminSearchFilter, setAdminSearchFilter] = useState<string>('');
@@ -4522,7 +4524,22 @@ export default function ITestApp() {
   if (currentUser.role === 'teacher') {
     const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
     const selectedClass = store.classes.find(c => c.id === selectedClassId);
-    const publicTemplates = store.assignments.filter(a => a.isPublicTemplate === true);
+    const unfilteredTemplates = store.assignments.filter(a => a.isPublicTemplate === true);
+    const publicTemplates = unfilteredTemplates.filter(a => {
+      if (templateSelectedSubject !== 'Vše') {
+        const sub = a.subject || 'Matematika';
+        if (sub !== templateSelectedSubject) return false;
+      }
+      if (templateSearchQuery.trim()) {
+        const query = templateSearchQuery.toLowerCase();
+        const titleMatch = a.title?.toLowerCase().includes(query);
+        const descMatch = a.description?.toLowerCase().includes(query);
+        const creator = store.users.find(u => u.id === a.teacherId);
+        const authorMatch = creator?.name?.toLowerCase().includes(query) || false;
+        if (!titleMatch && !descMatch && !authorMatch) return false;
+      }
+      return true;
+    });
 
     const now = new Date();
     const isPremium = !!(currentUser.isPremium && (!currentUser.premiumExpiresAt || new Date(currentUser.premiumExpiresAt) > now));
@@ -4967,11 +4984,61 @@ export default function ITestApp() {
                 </div>
               </div>
 
-              {publicTemplates.length === 0 ? (
+              {unfilteredTemplates.length > 0 && (
+                <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-grow w-full">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Vyhledat v šablonách (název, popis, autor)..."
+                      value={templateSearchQuery}
+                      onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                      className="pl-9 rounded-2xl h-10 border-slate-200"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 font-sans">
+                    <span className="text-xs font-bold text-slate-500 whitespace-nowrap">Předmět:</span>
+                    <select
+                      value={templateSelectedSubject}
+                      onChange={(e) => setTemplateSelectedSubject(e.target.value)}
+                      className="flex h-10 rounded-2xl border border-slate-200 bg-white px-3 py-1 text-sm font-semibold focus:outline-none w-full sm:w-48 shadow-sm"
+                    >
+                      <option value="Vše">Všechny předměty</option>
+                      <option value="Matematika">Matematika</option>
+                      <option value="Český jazyk">Český jazyk</option>
+                      <option value="Anglický jazyk">Anglický jazyk</option>
+                      <option value="Fyzika">Fyzika</option>
+                      <option value="Chemie">Chemie</option>
+                      <option value="Dějepis">Dějepis</option>
+                      <option value="Zeměpis">Zeměpis</option>
+                      <option value="Přírodopis">Přírodopis</option>
+                      <option value="Informatika">Informatika</option>
+                      <option value="Jiný">Jiný</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {unfilteredTemplates.length === 0 ? (
                 <Card className="border-none shadow-md bg-white p-12 text-center text-muted-foreground rounded-3xl border border-slate-100">
                   <span className="text-4xl block mb-3">📁</span>
                   <p className="font-semibold text-lg text-slate-800">Žádné veřejné šablony k dispozici</p>
                   <p className="text-sm text-slate-500 mt-1">Můžete vytvořit vlastní test a označit jej jako veřejnou šablonu.</p>
+                </Card>
+              ) : publicTemplates.length === 0 ? (
+                <Card className="border-none shadow-md bg-white p-12 text-center text-muted-foreground rounded-3xl border border-slate-100 animate-fade-in">
+                  <span className="text-4xl block mb-3">🔍</span>
+                  <p className="font-semibold text-lg text-slate-800">Nebyly nalezeny žádné šablony</p>
+                  <p className="text-sm text-slate-500 mt-1">Zkuste změnit klíčová slova vyhledávání nebo zvolit jiný předmět.</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4 rounded-2xl font-bold px-5 border-slate-200"
+                    onClick={() => {
+                      setTemplateSearchQuery('');
+                      setTemplateSelectedSubject('Vše');
+                    }}
+                  >
+                    Resetovat filtry
+                  </Button>
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
