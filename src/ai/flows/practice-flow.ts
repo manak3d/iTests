@@ -30,11 +30,14 @@ const prompt = ai.definePrompt({
 Otázka: "{{{questionText}}}"
 
 Vaším úkolem je:
-1. Poskytnout stručné, přehledné a motivující vysvětlení teorie k tomuto typu úlohy v češtině. Pomozte žákovi pochopit podstatu problému a ukažte, na co si dát pozor.
+1. Poskytnout velmi krátké, stručné, přímé a věcné vysvětlení teorie k tomuto typu úlohy v češtině (ideálně maximálně 3 až 4 věty). Jděte přímo k věci bez zbytečných úvodních frází, zdlouhavých pozdravů, oslovení či zdvořilostních řečí (např. nepoužívejte fráze typu "Ahoj! Vidím, že máš trochu potíže...").
 2. Vygenerovat přesně {{numQuestions}} nových, podobných procvičovacích úloh v češtině. Tyto úlohy by měly přímo procvičovat stejný koncept.
-3. Pro každou úlohu poskytněte správnou odpověď a podrobné vysvětlení správného postupu řešení krok za krokem v češtině.
+3. Pro každou úlohu poskytněte správnou odpověď a stručné vysvětlení správného postupu řešení v češtině.
 
-Ujistěte se, že všechny texty, vysvětlení a otázky jsou v češtině.`,
+DŮLEŽITÉ POKYNY PRO FORMÁT:
+- U všech textů a vysvětlení (jak v 'theoryExplanation', tak v 'explanation' u jednotlivých úloh) nepoužívejte ABSOLUTNĚ ŽÁDNÉ markdown formátování (jako jsou hvězdičky **, *, znaky #, odrážky atd.).
+- Pište výhradně čistý text bez formátovacích značek.
+- Ujistěte se, že všechny texty, vysvětlení a otázky jsou v češtině.`,
 });
 
 export async function practiceFlow(input: PracticeFlowInput): Promise<PracticeFlowOutput | { error: string }> {

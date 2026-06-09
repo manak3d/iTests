@@ -8,14 +8,16 @@ export function cn(...inputs: ClassValue[]) {
 
 export function renderRichText(text: string): React.ReactNode[] | string | null {
   if (!text) return null;
+  // Odstranění markdown hvězdiček (zabraňuje zobrazení ** v plain textu na UI)
+  const cleanText = text.replace(/\*\*/g, "").replace(/\*/g, "");
   const regex = /\[([^/\]\s]+)\/([^/\]\s]+)\]/g;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match;
-  while ((match = regex.exec(text)) !== null) {
+  while ((match = regex.exec(cleanText)) !== null) {
     const matchIndex = match.index;
     if (matchIndex > lastIndex) {
-      parts.push(text.substring(lastIndex, matchIndex));
+      parts.push(cleanText.substring(lastIndex, matchIndex));
     }
     const numerator = match[1];
     const denominator = match[2];
@@ -32,9 +34,9 @@ export function renderRichText(text: string): React.ReactNode[] | string | null 
     );
     lastIndex = regex.lastIndex;
   }
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
+  if (lastIndex < cleanText.length) {
+    parts.push(cleanText.substring(lastIndex));
   }
-  return parts.length > 0 ? parts : text;
+  return parts.length > 0 ? parts : cleanText;
 }
 
