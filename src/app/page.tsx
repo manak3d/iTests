@@ -6687,13 +6687,33 @@ export default function ITestApp() {
                       Zpět
                     </Button>
                     <Button 
-                      onClick={() => {
+                      onClick={async () => {
+                        const note = paymentDetails.type === 'credits'
+                          ? `Kredity: ${currentUser.name} (${currentUser.username})`
+                          : `${currentUser.name} - ${schools.find(s => s.id === currentUser.schoolId)?.name || 'iTest Škola'}`;
+                        const amountText = paymentDetails.type === 'credits'
+                          ? `dobití 50 AI kreditů (25 Kč)`
+                          : `aktivaci ${paymentDetails.type === 'monthly' ? 'Měsíčního' : 'Ročního'} předplatného (${paymentDetails.amount} Kč)`;
+                        
+                        const msgContent = `[ŽÁDOST O PLATBU] Uživatel potvrdil odeslání platby na bankovní účet pro ${amountText}. Zpráva pro příjemce platby: "${note}". Prosím o ověření a připsání.`;
+
+                        try {
+                          await fetch('/api/feedback', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: msgContent })
+                          });
+                        } catch (e) {
+                          console.error("Failed to notify admin:", e);
+                        }
+
                         toast({ 
-                          title: paymentDetails.type === 'credits' ? "Platba za kredity odeslána" : "Platba odeslána k ověření", 
+                          title: paymentDetails.type === 'credits' ? "Žádost o kredity odeslána" : "Žádost o předplatné odeslána", 
                           description: paymentDetails.type === 'credits'
-                            ? "Administrátor připíše 50 AI kreditů na váš účet po připsání platby 25 Kč na bankovní účet."
-                            : "Administrátor aktivuje Premium verzi vašeho účtu po připsání platby na bankovní účet." 
+                            ? "Administrátor připíše 50 AI kreditů na váš účet po ověření platby (25 Kč) na bankovním účtu."
+                            : "Administrátor aktivuje Premium verzi vašeho účtu po ověření platby na bankovním účtu." 
                         });
+
                         setPaymentDetails(null);
                         setIsUpgradeModalOpen(false);
                       }}
