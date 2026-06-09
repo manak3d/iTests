@@ -111,7 +111,7 @@ function MistakeTrainingWidget({
       <div className="mt-4 p-5 rounded-2xl border border-indigo-100 bg-indigo-50/20 text-indigo-955 space-y-3 animate-pulse">
         <div className="flex items-center gap-2">
           <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
-          <span className="text-xs font-black uppercase tracking-wider text-indigo-650">Generuji doplňující příklady přes AI...</span>
+          <span className="text-xs font-black uppercase tracking-wider text-indigo-600">Generuji doplňující příklady přes AI...</span>
         </div>
         <div className="h-4 bg-indigo-100/50 rounded w-3/4"></div>
         <div className="h-8 bg-indigo-100/50 rounded w-full"></div>
@@ -142,7 +142,7 @@ function MistakeTrainingWidget({
   return (
     <div className="mt-4 p-5 rounded-2xl border-2 border-indigo-100 bg-gradient-to-br from-indigo-50/30 to-purple-50/20 shadow-sm text-left space-y-4">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-black uppercase tracking-wider text-indigo-650 flex items-center gap-1.5">
+        <span className="text-sm font-black uppercase tracking-wider text-indigo-600 flex items-center gap-1.5">
           🏋️ Trénink chyb: Procvičování navíc ({activeQuestions.length}x)
         </span>
       </div>
@@ -204,7 +204,7 @@ function MistakeTrainingWidget({
                       
                       let btnClass = 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700';
                       if (isSelected) {
-                        btnClass = 'bg-indigo-600 border-indigo-650 text-white shadow-sm';
+                        btnClass = 'bg-indigo-600 border-indigo-600 text-white shadow-sm';
                       }
                       if (isChecked) {
                         if (isOptionCorrect) {
@@ -240,7 +240,7 @@ function MistakeTrainingWidget({
 
                       let btnClass = 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700';
                       if (isSelected) {
-                        btnClass = 'bg-indigo-600 border-indigo-650 text-white shadow-sm';
+                        btnClass = 'bg-indigo-600 border-indigo-600 text-white shadow-sm';
                       }
                       if (isChecked) {
                         if (isTfCorrect) {
@@ -1621,7 +1621,7 @@ export default function ITestApp() {
                               <div className="flex items-center gap-3">
                                 {sub ? (
                                     a.isPractice ? (
-                                      <Badge className="bg-indigo-650 hover:bg-indigo-700 text-white font-black text-xs px-3 py-1 rounded-full border-none">
+                                      <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-3 py-1 rounded-full border-none">
                                         Dokončeno · {earned} / {totalMax} b ({pct}%)
                                       </Badge>
                                     ) : sub.grade ? (
@@ -2745,7 +2745,7 @@ export default function ITestApp() {
 
               <div className="space-y-4 pt-4 border-t border-slate-200/60">
                 <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/50 space-y-2">
-                  <h3 className="text-xs font-black uppercase text-indigo-750 tracking-wider">Zkušební verze (Free trial)</h3>
+                  <h3 className="text-xs font-black uppercase text-indigo-700 tracking-wider">Zkušební verze (Free trial)</h3>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
                     Každý nový učitel získává po registraci **90 dní zdarma** na plné vyzkoušení platformy.
                   </p>
@@ -2774,7 +2774,7 @@ export default function ITestApp() {
                 </div>
 
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-150 space-y-2">
-                  <h3 className="text-xs font-black uppercase text-violet-750 tracking-wider flex items-center gap-1">
+                  <h3 className="text-xs font-black uppercase text-violet-700 tracking-wider flex items-center gap-1">
                     Školní licence 🏫
                   </h3>
                   <div className="flex justify-between items-baseline">
@@ -3177,9 +3177,9 @@ export default function ITestApp() {
                                             </>
                                           )}
                                         </div>
-                                        <div className="text-[10px] font-semibold text-indigo-950 font-mono bg-indigo-50 border border-indigo-150 px-2 py-0.5 rounded-lg flex flex-col shrink-0">
+                                        <div className="text-[10px] font-semibold text-indigo-950 font-mono bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg flex flex-col shrink-0">
                                           <span>AI: {t.aiCredits !== undefined ? t.aiCredits : 30} / {t.aiCreditsMax || 30}</span>
-                                          {t.aiExtraCredits ? <span className="text-[9px] text-indigo-650 font-bold font-sans">+{t.aiExtraCredits} extra</span> : null}
+                                          {t.aiExtraCredits ? <span className="text-[9px] text-indigo-600 font-bold font-sans">+{t.aiExtraCredits} extra</span> : null}
                                         </div>
                                       </div>
 
@@ -3188,7 +3188,7 @@ export default function ITestApp() {
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            className="h-6 text-[9px] px-2 rounded-xl font-bold border-red-200 text-red-650 hover:bg-red-50 hover:text-red-700"
+                                            className="h-6 text-[9px] px-2 rounded-xl font-bold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                                             onClick={() => store.toggleUserPremium(t.id, true)}
                                           >
                                             Zrušit Premium
@@ -3198,7 +3198,7 @@ export default function ITestApp() {
                                             <Button
                                               variant="outline"
                                               size="sm"
-                                              className="h-6 text-[9px] px-2 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-750 text-white border-none"
+                                              className="h-6 text-[9px] px-2 rounded-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white border-none"
                                               onClick={() => store.toggleUserPremium(t.id, false, 'monthly')}
                                             >
                                               Aktivovat Měsíční
@@ -3286,7 +3286,7 @@ export default function ITestApp() {
                   </div>
 
                   {/* Unified Search, Filter and Sort Bar */}
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
                       <div className="relative flex-1">
                         <Input 
@@ -3490,7 +3490,7 @@ export default function ITestApp() {
                   </div>
 
                   {/* Unified Search, Filter and Sort Bar */}
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
                       <div className="relative flex-1">
                         <Input 
@@ -3563,12 +3563,12 @@ export default function ITestApp() {
                                   <Users className="w-4 h-4 text-indigo-500" /> {s.name}
                                 </td>
                                 <td className="p-4 text-sm text-gray-600 font-mono">{s.username}</td>
-                                <td className="p-4 text-sm text-gray-650 font-semibold">
+                                <td className="p-4 text-sm text-gray-600 font-semibold">
                                   {schools.find(sc => sc.id === s.schoolId)?.name || 'Bez školy'}
                                 </td>
                                 <td className="p-4">
                                   {classroom ? (
-                                    <Badge variant="outline" className="font-bold text-green-600 bg-green-50 border-green-150">{classroom.name}</Badge>
+                                    <Badge variant="outline" className="font-bold text-green-600 bg-green-50 border-green-100">{classroom.name}</Badge>
                                   ) : (
                                     <span className="text-xs text-muted-foreground italic">Bez třídy</span>
                                   )}
@@ -3986,7 +3986,7 @@ export default function ITestApp() {
                       </div>
 
                       {/* Unified Search, Filter and Sort Bar */}
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-150 flex flex-col md:flex-row gap-4 items-center justify-between">
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col md:flex-row gap-4 items-center justify-between">
                         <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
                           <div className="relative flex-1">
                             <Input 
@@ -4075,7 +4075,7 @@ export default function ITestApp() {
                                     <td className="p-4 text-sm text-gray-600">
                                       {creator ? creator.name : <span className="text-xs text-muted-foreground italic">Legacy/Systém</span>}
                                     </td>
-                                    <td className="p-4 text-sm text-gray-650 font-semibold">
+                                    <td className="p-4 text-sm text-gray-600 font-semibold">
                                       {schools.find(sc => sc.id === a.schoolId)?.name || 'Bez školy'}
                                     </td>
                                     <td className="p-4">
@@ -4208,7 +4208,7 @@ export default function ITestApp() {
                         {store.feedbacks.map((f: any) => {
                           const school = schools.find(s => s.id === f.schoolId)?.name || 'Neznámá škola';
                           return (
-                            <Card key={f.id} className="border border-slate-150 shadow-sm rounded-2xl overflow-hidden bg-white">
+                            <Card key={f.id} className="border border-slate-100 shadow-sm rounded-2xl overflow-hidden bg-white">
                               <CardContent className="p-6 space-y-4">
                                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                                   <div className="space-y-1">
@@ -4572,7 +4572,7 @@ export default function ITestApp() {
                     setPaymentDetails({ amount: 99, type: 'monthly' });
                     setIsUpgradeModalOpen(true);
                   }}
-                  className="w-full rounded-2xl py-6 font-bold shadow-md bg-indigo-600 hover:bg-indigo-750 text-white flex justify-between px-6 border-none"
+                  className="w-full rounded-2xl py-6 font-bold shadow-md bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white flex justify-between px-6 border-none"
                 >
                   <span>Měsíční tarif (200 kr./měsíc)</span>
                   <span>99 Kč / měsíc</span>
@@ -4670,8 +4670,8 @@ export default function ITestApp() {
           ) : (
             <div className="bg-gradient-to-r from-indigo-50/50 via-indigo-600/5 to-purple-50/5 border border-indigo-200/50 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
               <div className="flex items-center gap-3">
-                <div className="bg-indigo-100/80 p-2 rounded-xl text-indigo-650 shrink-0">
-                  <Sparkles className="w-5 h-5 text-indigo-650 animate-pulse" />
+                <div className="bg-indigo-100/80 p-2 rounded-xl text-indigo-600 shrink-0">
+                  <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-indigo-950">
@@ -4698,7 +4698,7 @@ export default function ITestApp() {
                 </Button>
                 <Button 
                   onClick={() => setIsUpgradeModalOpen(true)}
-                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white rounded-xl text-xs font-bold py-2 px-4 shadow-sm border-none"
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl text-xs font-bold py-2 px-4 shadow-sm border-none"
                 >
                   Upgradovat na Premium
                 </Button>
@@ -6640,9 +6640,9 @@ export default function ITestApp() {
                 <>
                   <div className="grid md:grid-cols-4 gap-4 py-4">
                     {/* Monthly card */}
-                    <div className="bg-slate-50 border border-slate-200/60 hover:border-indigo-400 rounded-3xl p-5 flex flex-col justify-between transition-all hover:shadow-md">
+                    <div className="bg-gradient-to-b from-indigo-50/40 to-slate-50 border border-indigo-200 hover:border-indigo-400 rounded-3xl p-5 flex flex-col justify-between transition-all hover:shadow-md">
                       <div>
-                        <h3 className="font-bold text-lg text-slate-800">Měsíční tarif</h3>
+                        <h3 className="font-bold text-lg text-slate-850">Měsíční tarif</h3>
                         <p className="text-xs text-muted-foreground mt-1">Flexibilní předplatné na každý měsíc.</p>
                         <div className="mt-4 flex items-baseline">
                           <span className="text-3xl font-black text-indigo-700">99 Kč</span>
@@ -6656,16 +6656,16 @@ export default function ITestApp() {
                             <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Maximálně <strong>8 tříd</strong>
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Maximálně <strong>100 žáků</strong> celkem
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Maximálně <strong>100 žáků</strong> celkem
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Hromadné stahování výsledků
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Hromadné stahování výsledků
                           </li>
                         </ul>
                       </div>
                       <Button 
                         onClick={() => setPaymentDetails({ amount: 99, type: 'monthly' })}
-                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-indigo-650 hover:bg-indigo-700 text-white border-none"
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-indigo-600 hover:bg-indigo-700 text-white border-none"
                       >
                         Aktivovat měsíčně
                       </Button>
@@ -6702,7 +6702,7 @@ export default function ITestApp() {
                       </div>
                       <Button 
                         onClick={() => setPaymentDetails({ amount: 999, type: 'yearly' })}
-                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-750 hover:to-purple-750 text-white border-none"
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white border-none"
                       >
                         Aktivovat ročně
                       </Button>
@@ -6712,42 +6712,42 @@ export default function ITestApp() {
                     <div className="bg-slate-50 border border-indigo-200 rounded-3xl p-5 flex flex-col justify-between transition-all hover:border-indigo-400 hover:shadow-md">
                       <div>
                         <h3 className="font-bold text-lg text-slate-800 flex items-center gap-1">
-                          Dokoupit kredity <Zap className="w-4 h-4 text-indigo-650 fill-indigo-600" />
+                          Dokoupit kredity <Zap className="w-4 h-4 text-indigo-600 fill-indigo-600" />
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1">Jednorázové navýšení limitu bez expirace.</p>
                         <div className="mt-4 flex items-baseline">
-                          <span className="text-3xl font-black text-indigo-750">25 Kč</span>
+                          <span className="text-3xl font-black text-indigo-700">25 Kč</span>
                           <span className="text-xs text-muted-foreground ml-1">/ 50 ks</span>
                         </div>
                         <ul className="text-xs space-y-2 mt-5 text-slate-600 font-medium">
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> <strong>50 AI kreditů</strong> jednorázově
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> <strong>50 AI kreditů</strong> jednorázově
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Kredity nikdy neexpirují
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Kredity nikdy neexpirují
                           </li>
                           <li className="flex items-center gap-1.5">
-                            <Check className="w-3.5 h-3.5 text-indigo-650 shrink-0" /> Lze koupit opakovaně
+                            <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0" /> Lze koupit opakovaně
                           </li>
                         </ul>
                       </div>
                       <Button 
                         onClick={() => setPaymentDetails({ amount: 25, type: 'credits', credits: 50 })}
-                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-indigo-600 hover:bg-indigo-750 text-white border-none flex items-center justify-center gap-1"
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-indigo-600 hover:bg-indigo-700 text-white border-none flex items-center justify-center gap-1"
                       >
                         <Zap className="w-3.5 h-3.5 fill-white" /> Dokoupit 50 ks
                       </Button>
                     </div>
 
                     {/* School card */}
-                    <div className="bg-gradient-to-b from-violet-50/50 to-indigo-50/50 border border-violet-350 rounded-3xl p-5 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div className="bg-gradient-to-b from-violet-50/50 to-indigo-50/50 border border-violet-300 rounded-3xl p-5 flex flex-col justify-between hover:shadow-md transition-all">
                       <div>
                         <h3 className="font-bold text-lg text-violet-950 flex items-center gap-1">
                           Školní licence 🏫
                         </h3>
                         <p className="text-xs text-violet-900/60 mt-1">Pro celé školy a neomezený počet učitelů.</p>
                         <div className="mt-4 flex flex-col">
-                          <span className="text-2xl font-black text-violet-750">od 4 999 Kč</span>
+                          <span className="text-2xl font-black text-violet-700">od 4 999 Kč</span>
                           <span className="text-[10px] text-muted-foreground">/ rok (dle počtu žáků)</span>
                         </div>
                         <ul className="text-xs space-y-2 mt-5 text-violet-900 font-medium">
@@ -6772,7 +6772,7 @@ export default function ITestApp() {
                             description: "Pro individuální nacenění nás kontaktujte na e-mailu: info@itests.cz.",
                           });
                         }}
-                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-violet-600 hover:bg-violet-750 text-white border-none"
+                        className="w-full mt-6 rounded-2xl py-5 font-bold shadow-md bg-violet-600 hover:bg-violet-700 text-white border-none"
                       >
                         Kontaktovat podporu
                       </Button>
