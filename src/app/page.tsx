@@ -4574,7 +4574,7 @@ export default function ITestApp() {
                   }}
                   className="w-full rounded-2xl py-6 font-bold shadow-md bg-indigo-600 hover:bg-indigo-750 text-white flex justify-between px-6 border-none"
                 >
-                  <span>Měsíční tarif (300 kr./měsíc)</span>
+                  <span>Měsíční tarif (200 kr./měsíc)</span>
                   <span>99 Kč / měsíc</span>
                 </Button>
                 <Button 
