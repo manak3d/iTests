@@ -37,6 +37,12 @@ export async function POST(request: Request) {
     if (body.questionScores !== undefined) {
       updateData.questionScores = body.questionScores;
     }
+    if (body.questionFeedback !== undefined) {
+      updateData.questionFeedback = body.questionFeedback;
+    }
+    if (body.feedback !== undefined) {
+      updateData.feedback = body.feedback;
+    }
     if (body.tabFocusLostCount !== undefined) {
       updateData.tabFocusLostCount = body.tabFocusLostCount;
     }
@@ -65,6 +71,9 @@ export async function POST(request: Request) {
         }
         if (existing.questionScores) {
           updateData.questionScores = existing.questionScores;
+        }
+        if (existing.questionFeedback) {
+          updateData.questionFeedback = existing.questionFeedback;
         }
       }
     }

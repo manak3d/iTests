@@ -80,6 +80,7 @@ export interface Submission {
   grade?: number; // 1-5
   feedback?: string;
   questionScores?: Record<string, number>; // Udelené body učiteľom
+  questionFeedback?: Record<string, string>; // AI/Teacher explanations of individual questions
 }
 
 export const GRADES = [

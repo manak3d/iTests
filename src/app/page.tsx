@@ -659,6 +659,85 @@ export default function ITestApp() {
   const [practiceLoading, setPracticeLoading] = useState<Record<string, boolean>>({});
   const [practiceErrors, setPracticeErrors] = useState<Record<string, string>>({});
 
+  const [isEvaluatingPractice, setIsEvaluatingPractice] = useState(false);
+  const handlePracticeSubmit = async (a: Assignment) => {
+    setIsEvaluatingPractice(true);
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'grade',
+          assignmentId: a.id,
+          questions: a.questions,
+          answers: studentAnswers,
+          questionDrawings: questionDrawings || {},
+          mainWorkDrawing: mainWorkDrawing,
+          gradeThresholds: a.gradeThresholds
+        })
+      });
+
+      const data = await res.json();
+      let evalScores: Record<string, number> = {};
+      let evalQuestionFeedback: Record<string, string> = {};
+      let evalFeedback = "";
+
+      if (res.ok && data.success && data.evaluation) {
+        const evalData = data.evaluation;
+        if (evalData.questionScores) {
+          Object.entries(evalData.questionScores).forEach(([qId, val]) => {
+            evalScores[qId] = Number(val);
+          });
+        }
+        if (evalData.questionFeedback) {
+          Object.entries(evalData.questionFeedback).forEach(([qId, val]) => {
+            evalQuestionFeedback[qId] = String(val);
+          });
+        }
+        evalFeedback = evalData.suggestedFeedback || "";
+        toast({
+          title: "Vyhodnoceno pomocí AI",
+          description: "Tvé odpovědi byly zkontrolovány umělou inteligencí a bylo vygenerováno vysvětlení."
+        });
+      } else {
+        toast({
+          title: "AI vyhodnocení selhalo",
+          description: data.error || "Nepodařilo se vyhodnotit práci pomocí AI, ukládám bez vysvětlení.",
+          variant: "destructive"
+        });
+      }
+
+      await store.submitWork({
+        assignmentId: a.id,
+        studentId: store.currentUser?.id || "",
+        answers: studentAnswers,
+        questionDrawings,
+        mainWorkDrawing,
+        questionScores: evalScores,
+        questionFeedback: evalQuestionFeedback,
+        feedback: evalFeedback
+      });
+      selectStudentAssignment(null);
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Chyba sítě",
+        description: err.message || "Nepodařilo se připojit k AI službě, ukládám bez vyhodnocení.",
+        variant: "destructive"
+      });
+      await store.submitWork({
+        assignmentId: a.id,
+        studentId: store.currentUser?.id || "",
+        answers: studentAnswers,
+        questionDrawings,
+        mainWorkDrawing
+      });
+      selectStudentAssignment(null);
+    } finally {
+      setIsEvaluatingPractice(false);
+    }
+  };
+
   const handleLoadAiPractice = async (qId: string, questionText: string, numQuestions: number, assignmentId?: string) => {
     setPracticeLoading(prev => ({ ...prev, [qId]: true }));
     setPracticeErrors(prev => ({ ...prev, [qId]: '' }));
@@ -3759,6 +3838,12 @@ export default function ITestApp() {
                                                       <img src={drawing} className="border rounded-xl max-w-full max-h-64 object-contain bg-white" />
                                                     </div>
                                                   )}
+                                                  {sub.questionFeedback && (sub.questionFeedback instanceof Map ? sub.questionFeedback.get(q.id) : (sub.questionFeedback as Record<string, string>)[q.id]) && (
+                                                    <div className="mt-3 p-3 text-xs font-semibold text-indigo-700 bg-indigo-50/50 rounded-xl border border-indigo-100 flex flex-col gap-1 text-left">
+                                                      <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide">💡 Vysvětlení AI</span>
+                                                      <span className="font-medium text-indigo-900 leading-relaxed">{sub.questionFeedback instanceof Map ? sub.questionFeedback.get(q.id) : (sub.questionFeedback as Record<string, string>)[q.id]}</span>
+                                                    </div>
+                                                  )}
                                                 </div>
                                                 <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border self-stretch md:self-auto justify-center md:justify-start">
                                                   <span className="text-sm font-bold text-muted-foreground">Body:</span>
@@ -3799,6 +3884,47 @@ export default function ITestApp() {
                                       else if (pct >= (thresholds[1] ?? 65)) suggestedGrade = 2;
                                       else if (pct >= (thresholds[2] ?? 45)) suggestedGrade = 3;
                                       else if (pct >= (thresholds[3] ?? 25)) suggestedGrade = 4;
+
+                                      if (assignment.isPractice) {
+                                        return (
+                                          <div className="space-y-6 border-t pt-6">
+                                            <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 flex justify-between items-center">
+                                              <span className="font-bold text-primary">Celkové skóre:</span>
+                                              <span className="text-2xl font-black text-primary">{totalEarned} / {totalMax} bodů ({pct} %)</span>
+                                            </div>
+                                            
+                                            <div className="bg-indigo-50 border border-indigo-200 p-5 rounded-2xl space-y-3 text-left">
+                                              <div className="text-indigo-800 font-bold text-sm uppercase tracking-wider flex items-center gap-1.5">
+                                                <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
+                                                Neznámkované procvičování vyhodnoceno AI
+                                              </div>
+                                              <p className="text-sm font-medium text-indigo-950 leading-relaxed">
+                                                Tento úkol slouží jako procvičování. Byl automaticky vyhodnocen pomocí AI (Gemini) při odevzdání žákem. Jako učitel jej nemusíte kontrolovat ani známkovat.
+                                              </p>
+                                              {sub.feedback && (
+                                                <div className="mt-3 p-4 bg-white rounded-xl border border-indigo-100">
+                                                  <span className="text-xs font-bold text-muted-foreground uppercase block mb-1">Vygenerované hodnocení AI:</span>
+                                                  <p className="text-sm font-medium text-slate-800 italic leading-relaxed">"{sub.feedback}"</p>
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            {/* Výsledky pro tiskovou verzi */}
+                                            <div className="hidden print:block space-y-6 border-t pt-6 mt-6">
+                                              <div className="flex justify-between items-center bg-gray-50 p-5 rounded-2xl border">
+                                                <span className="font-bold text-lg text-gray-700">Vyhodnocení:</span>
+                                                <span className="text-4xl font-black text-primary">Procvičování</span>
+                                              </div>
+                                              {sub.feedback && (
+                                                <div className="space-y-2">
+                                                  <span className="font-bold text-sm text-gray-500 uppercase block">Hodnocení AI:</span>
+                                                  <p className="p-5 bg-gray-50 rounded-2xl border font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">{sub.feedback}</p>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      }
 
                                       return (
                                         <div className="space-y-6 border-t pt-6">
@@ -3959,12 +4085,14 @@ export default function ITestApp() {
                                             <p className="text-xs text-muted-foreground mt-0.5">{student?.username}</p>
                                           </div>
                                           <div className="flex items-center gap-3">
-                                            <Badge variant={s.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
-                                              {s.grade
-                                                ? `Známka: ${s.grade} (${earned}/${totalMax}b · ${pct}%)`
-                                                : earned > 0
-                                                  ? `Body: ${earned}/${totalMax} (${pct}%) · Neohodnoceno`
-                                                  : 'Neopraveno'}
+                                            <Badge variant={a.isPractice ? "outline" : (s.grade ? "default" : (earned > 0 ? "outline" : "secondary"))} className={`font-bold ${a.isPractice ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-50" : ""}`}>
+                                              {a.isPractice
+                                                ? `Procvičování (${earned}/${totalMax}b · ${pct}%)`
+                                                : s.grade
+                                                  ? `Známka: ${s.grade} (${earned}/${totalMax}b · ${pct}%)`
+                                                  : earned > 0
+                                                    ? `Body: ${earned}/${totalMax} (${pct}%) · Neohodnoceno`
+                                                    : 'Neopraveno'}
                                             </Badge>
                                             <ChevronRight className="w-4 h-4 text-gray-400" />
                                           </div>
@@ -5497,49 +5625,153 @@ export default function ITestApp() {
                   />
                 </div>
               ) : (
-                <div className="grid gap-4">
-                  <div className="flex justify-end">
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-2xl font-headline font-black text-gray-800">Zadané práce</h3>
+                      <p className="text-sm text-muted-foreground">Přehled a správa všech zadaných úkolů pro tuto třídu.</p>
+                    </div>
                     <Button className="rounded-full shadow-md" onClick={() => setIsCreatingAssignment(true)}>
                       <Plus className="w-4 h-4 mr-2" /> Vytvořit práci
                     </Button>
                   </div>
-                  {store.assignments.filter(a => a.classId === selectedClassId && (a.teacherId === currentUser.id || !a.teacherId)).map(a => (
-                    <Card key={a.id} className={`hover:border-primary cursor-pointer transition-all border-none shadow-sm ${a.isDraft ? 'bg-amber-50/40 border border-amber-200' : 'bg-white'}`} onClick={() => setViewingAssignment(a.id)}>
-                      <CardContent className="p-5 flex justify-between items-center">
-                        <div className="flex items-center gap-5">
-                          <ClipboardList className={`w-6 h-6 ${a.isDraft ? 'text-amber-500' : 'text-primary'}`} />
-                          <div>
-                            <h4 className="font-bold text-xl">{a.title}</h4>
-                            {a.isDraft && <span className="text-xs font-bold text-amber-600">💾 Koncept — neuveřejněno</span>}
-                          </div>
+
+                  {/* Split columns for Teacher assignments */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left">
+                    {/* LEVÝ SLOUPEC: TESTY (ZNÁMKOVANÉ) */}
+                    <div className="space-y-6 bg-slate-50/50 p-6 rounded-3xl border border-slate-100/80 shadow-sm flex flex-col">
+                      <div className="border-b pb-4 flex items-center gap-3">
+                        <div className="bg-primary/10 p-2.5 rounded-2xl text-primary">
+                          <ClipboardList className="w-6 h-6" />
                         </div>
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          <a
-                            href={`/print/${a.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-primary rounded-full">
-                              <Printer className="w-5 h-5" />
-                            </Button>
-                          </a>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full" 
-                            onClick={(e) => {
-                              if (confirm(`Opravdu chcete smazat úkol "${a.title}"? Tím smažete i všechny odevzdané práce žáků.`)) {
-                                store.deleteAssignment(a.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </Button>
-                          <ChevronRight className="w-5 h-5 text-gray-300 cursor-pointer" onClick={() => setViewingAssignment(a.id)} />
+                        <div>
+                          <h2 className="text-xl font-headline font-bold text-primary">Známkované testy</h2>
+                          <p className="text-xs text-muted-foreground">Práce, které známkujete vy nebo vyžadují ruční kontrolu.</p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                      </div>
+
+                      <div className="grid gap-3 flex-1 align-content-start">
+                        {(() => {
+                          const graded = store.assignments.filter(
+                            a => a.classId === selectedClassId && (a.teacherId === currentUser.id || !a.teacherId) && !a.isPractice
+                          );
+
+                          if (graded.length === 0) {
+                            return (
+                              <Card className="border-none shadow-xs bg-white p-6 text-center">
+                                <p className="text-xs text-muted-foreground">Zatím nebyly zadány žádné známkované testy.</p>
+                              </Card>
+                            );
+                          }
+
+                          return graded.map(a => (
+                            <Card key={a.id} className={`hover:border-primary cursor-pointer transition-all border-none shadow-sm ${a.isDraft ? 'bg-amber-50/40 border border-amber-200' : 'bg-white'}`} onClick={() => setViewingAssignment(a.id)}>
+                              <CardContent className="p-4 flex justify-between items-center">
+                                <div className="flex items-center gap-4">
+                                  <ClipboardList className={`w-5 h-5 ${a.isDraft ? 'text-amber-500' : 'text-primary'}`} />
+                                  <div>
+                                    <h4 className="font-bold text-base text-gray-800">{a.title}</h4>
+                                    {a.isDraft && <span className="text-[10px] font-bold text-amber-600 block">💾 Koncept — neuveřejněno</span>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <a
+                                    href={`/print/${a.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="icon" className="text-gray-500 hover:text-primary rounded-full w-8 h-8">
+                                      <Printer className="w-4 h-4" />
+                                    </Button>
+                                  </a>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full w-8 h-8" 
+                                    onClick={(e) => {
+                                      if (confirm(`Opravdu chcete smazat úkol "${a.title}"? Tím smažete i všechny odevzdané práce žáků.`)) {
+                                        store.deleteAssignment(a.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                  <ChevronRight className="w-5 h-5 text-gray-300 cursor-pointer" onClick={() => setViewingAssignment(a.id)} />
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* PRAVÝ SLOUPEC: PROCVIČOVÁNÍ (NEZNÁMKOVANÉ) */}
+                    <div className="space-y-6 bg-indigo-50/20 p-6 rounded-3xl border border-indigo-100/50 shadow-sm flex flex-col">
+                      <div className="border-b pb-4 flex items-center gap-3">
+                        <div className="bg-indigo-600/10 p-2.5 rounded-2xl text-indigo-750">
+                          <Sparkles className="w-6 h-6 text-indigo-650 animate-pulse" />
+                        </div>
+                        <div>
+                          <h2 className="text-xl font-headline font-bold text-indigo-950">Neznámkované procvičování</h2>
+                          <p className="text-xs text-indigo-600/80">Procvičování automaticky opravované a vysvětlované AI.</p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 flex-1 align-content-start">
+                        {(() => {
+                          const practice = store.assignments.filter(
+                            a => a.classId === selectedClassId && (a.teacherId === currentUser.id || !a.teacherId) && a.isPractice
+                          );
+
+                          if (practice.length === 0) {
+                            return (
+                              <Card className="border-none shadow-xs bg-white p-6 text-center">
+                                <p className="text-xs text-muted-foreground">Zatím nebylo zadáno žádné procvičování.</p>
+                              </Card>
+                            );
+                          }
+
+                          return practice.map(a => (
+                            <Card key={a.id} className={`hover:border-indigo-400 cursor-pointer transition-all border-none shadow-sm ${a.isDraft ? 'bg-amber-50/40 border border-amber-200' : 'bg-white'}`} onClick={() => setViewingAssignment(a.id)}>
+                              <CardContent className="p-4 flex justify-between items-center">
+                                <div className="flex items-center gap-4">
+                                  <Sparkles className={`w-5 h-5 ${a.isDraft ? 'text-amber-500' : 'text-indigo-650'}`} />
+                                  <div>
+                                    <h4 className="font-bold text-base text-gray-800">{a.title}</h4>
+                                    {a.isDraft && <span className="text-[10px] font-bold text-amber-600 block">💾 Koncept — neuveřejněno</span>}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  <a
+                                    href={`/print/${a.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Button variant="ghost" size="icon" className="text-gray-500 hover:text-indigo-650 rounded-full w-8 h-8">
+                                      <Printer className="w-4 h-4" />
+                                    </Button>
+                                  </a>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full w-8 h-8" 
+                                    onClick={(e) => {
+                                      if (confirm(`Opravdu chcete smazat úkol "${a.title}"? Tím smažete i všechny odevzdané práce žáků.`)) {
+                                        store.deleteAssignment(a.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                  <ChevronRight className="w-5 h-5 text-gray-300 cursor-pointer" onClick={() => setViewingAssignment(a.id)} />
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ));
+                        })()}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </TabsContent>
@@ -5722,6 +5954,12 @@ export default function ITestApp() {
                                             <img src={drawing} className="border rounded-xl max-w-full max-h-64 object-contain bg-white" />
                                           </div>
                                         )}
+                                        {sub.questionFeedback && (sub.questionFeedback instanceof Map ? sub.questionFeedback.get(q.id) : (sub.questionFeedback as Record<string, string>)[q.id]) && (
+                                          <div className="mt-3 p-3 text-xs font-semibold text-indigo-700 bg-indigo-50/50 rounded-xl border border-indigo-100 flex flex-col gap-1 text-left">
+                                            <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide">💡 Vysvětlení AI</span>
+                                            <span className="font-medium text-indigo-900 leading-relaxed">{sub.questionFeedback instanceof Map ? sub.questionFeedback.get(q.id) : (sub.questionFeedback as Record<string, string>)[q.id]}</span>
+                                          </div>
+                                        )}
                                       </div>
 
                                       <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border self-stretch md:self-auto justify-center md:justify-start">
@@ -5764,6 +6002,47 @@ export default function ITestApp() {
                             else if (pct >= (thresholds[1] ?? 65)) suggestedGrade = 2;
                             else if (pct >= (thresholds[2] ?? 45)) suggestedGrade = 3;
                             else if (pct >= (thresholds[3] ?? 25)) suggestedGrade = 4;
+
+                            if (assignment.isPractice) {
+                              return (
+                                <div className="space-y-6 border-t pt-6">
+                                  <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 flex justify-between items-center">
+                                    <span className="font-bold text-primary">Celkové skóre:</span>
+                                    <span className="text-2xl font-black text-primary">{totalEarned} / {totalMax} bodů ({pct} %)</span>
+                                  </div>
+                                  
+                                  <div className="bg-indigo-50 border border-indigo-200 p-5 rounded-2xl space-y-3 text-left">
+                                    <div className="text-indigo-800 font-bold text-sm uppercase tracking-wider flex items-center gap-1.5">
+                                      <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
+                                      Neznámkované procvičování vyhodnoceno AI
+                                    </div>
+                                    <p className="text-sm font-medium text-indigo-950 leading-relaxed">
+                                      Tento úkol slouží jako procvičování. Byl automaticky vyhodnocen pomocí AI (Gemini) při odevzdání žákem. Jako učitel jej nemusíte kontrolovat ani známkovat.
+                                    </p>
+                                    {sub.feedback && (
+                                      <div className="mt-3 p-4 bg-white rounded-xl border border-indigo-100">
+                                        <span className="text-xs font-bold text-muted-foreground uppercase block mb-1">Vygenerované hodnocení AI:</span>
+                                        <p className="text-sm font-medium text-slate-800 italic leading-relaxed">"{sub.feedback}"</p>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Výsledky pro tiskovou verzi */}
+                                  <div className="hidden print:block space-y-6 border-t pt-6 mt-6">
+                                    <div className="flex justify-between items-center bg-gray-50 p-5 rounded-2xl border">
+                                      <span className="font-bold text-lg text-gray-700">Vyhodnocení:</span>
+                                      <span className="text-4xl font-black text-primary">Procvičování</span>
+                                    </div>
+                                    {sub.feedback && (
+                                      <div className="space-y-2">
+                                        <span className="font-bold text-sm text-gray-500 uppercase block">Hodnocení AI:</span>
+                                        <p className="p-5 bg-gray-50 rounded-2xl border font-medium text-gray-800 whitespace-pre-wrap leading-relaxed">{sub.feedback}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            }
 
                             return (
                               <div className="space-y-6">
@@ -5999,7 +6278,7 @@ export default function ITestApp() {
                                             <Badge variant={!selAssignment.isPractice && sub.grade ? "default" : earned > 0 ? "outline" : "secondary"} className="font-bold">
                                               {sub.submittedAt === "" ? 'Rozpracováno' : (
                                                 selAssignment.isPractice
-                                                  ? `Body: ${earned}/${totalMax} (${pct}%)`
+                                                  ? `Procvičování (${earned}/${totalMax}b · ${pct}%)`
                                                   : (sub.grade
                                                       ? `Zn: ${sub.grade} (${earned}/${totalMax}b · ${pct}%)`
                                                       : earned > 0
@@ -7017,9 +7296,8 @@ export default function ITestApp() {
                               const pct = totalMax > 0 ? Math.round((earned / totalMax) * 100) : 0;
                               return (
                                   <div className="bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 mt-4 text-center space-y-4">
-                                    <div className="text-4xl font-black text-primary">Známka: {submission.grade || 'Nehodnoceno'}</div>
                                     {a.isPractice ? (
-                                      <div className="text-4xl font-black text-primary">Procvičování</div>
+                                      <div className="text-4xl font-black text-indigo-700 bg-indigo-50/50 border border-indigo-100 px-6 py-3 rounded-2xl inline-block">🏋️ Procvičování</div>
                                     ) : (
                                       <div className="text-4xl font-black text-primary">Známka: {submission.grade || 'Nehodnoceno'}</div>
                                     )}
@@ -7067,9 +7345,21 @@ export default function ITestApp() {
                                     )}
 
                                     {submission.feedback && (
-                                      <div className="mt-4 p-3 bg-white rounded-xl border border-primary/10 italic text-muted-foreground">
-                                        Odpověď učitele: "{submission.feedback}"
-                                      </div>
+                                      a.isPractice ? (
+                                        <div className="mt-4 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-left space-y-2">
+                                          <div className="text-indigo-800 font-bold text-sm uppercase tracking-wider flex items-center gap-1.5">
+                                            <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
+                                            Celkové hodnocení AI
+                                          </div>
+                                          <p className="text-sm font-medium text-indigo-950 whitespace-pre-wrap leading-relaxed">
+                                            {submission.feedback}
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <div className="mt-4 p-3 bg-white rounded-xl border border-primary/10 italic text-muted-foreground">
+                                          Odpověď učitele: "{submission.feedback}"
+                                        </div>
+                                      )
                                     )}
                                   </div>
                               );
@@ -7246,6 +7536,19 @@ export default function ITestApp() {
                                               onChange={() => {}}
                                             />
                                           )}
+                                        </div>
+                                      )}
+
+                                      {/* AI Vysvětlení */}
+                                      {submission.questionFeedback && (submission.questionFeedback instanceof Map ? submission.questionFeedback.get(q.id) : (submission.questionFeedback as Record<string, string>)[q.id]) && (
+                                        <div className="mt-3 p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl space-y-1 text-left animate-fade-in">
+                                          <div className="flex items-center gap-1.5 text-indigo-700 font-bold text-xs uppercase tracking-wider">
+                                            <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                                            Vysvětlení AI
+                                          </div>
+                                          <p className="text-sm font-medium text-indigo-900 leading-relaxed">
+                                            {submission.questionFeedback instanceof Map ? submission.questionFeedback.get(q.id) : (submission.questionFeedback as Record<string, string>)[q.id]}
+                                          </p>
                                         </div>
                                       )}
 
@@ -7484,9 +7787,29 @@ export default function ITestApp() {
                           ) : null}
                           
                           {!hasEnded && (
-                            <Button className="w-full h-14 text-xl shadow-lg" onClick={() => {
-                              store.submitWork({ assignmentId: selectedAssignmentId, studentId: currentUser.id, answers: studentAnswers, questionDrawings, mainWorkDrawing });
-                            }}>Odevzdat v cloudu</Button>
+                            a.isPractice ? (
+                              <Button 
+                                className="w-full h-14 text-xl shadow-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 rounded-2xl font-bold" 
+                                onClick={() => handlePracticeSubmit(a)}
+                                disabled={isEvaluatingPractice}
+                              >
+                                {isEvaluatingPractice ? (
+                                  <>
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <span>AI vyhodnocuje tvé odpovědi...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Sparkles className="w-5 h-5" />
+                                    <span>Odevzdat a vyhodnotit AI</span>
+                                  </>
+                                )}
+                              </Button>
+                            ) : (
+                              <Button className="w-full h-14 text-xl shadow-lg" onClick={() => {
+                                store.submitWork({ assignmentId: selectedAssignmentId, studentId: currentUser.id, answers: studentAnswers, questionDrawings, mainWorkDrawing });
+                              }}>Odevzdat v cloudu</Button>
+                            )
                           )}
                         </div>
                       )}
@@ -7511,168 +7834,327 @@ export default function ITestApp() {
                 </div>
               </div>
 
-              {/* Section A: Zadané úkoly k vypracování */}
-              <div className="space-y-4">
-                <h2 className="text-2xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-2">
-                  <ClipboardList className="w-6 h-6 text-accent" /> Úkoly k vypracování (To Do)
-                </h2>
-                {(() => {
-                  const pending = studentAssignments.filter(a =>
-                    (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
-                    !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
-                  );
+              {/* Rozdělení rozhraní na Známkované testy a Neznámkované procvičování (Svisle) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-left">
+                {/* LEVÝ SLOUPEC: TESTY (ZNÁMKOVANÉ) */}
+                <div className="space-y-6 bg-slate-50/50 p-6 rounded-3xl border border-slate-100/80 shadow-xs">
+                  <div className="border-b pb-4 flex items-center gap-3">
+                    <div className="bg-primary/10 p-2.5 rounded-2xl text-primary">
+                      <ClipboardList className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-headline font-bold text-primary">Známkované testy</h2>
+                      <p className="text-xs text-muted-foreground">Testy vyhodnocované a známkované učitelem.</p>
+                    </div>
+                  </div>
 
-                  if (pending.length === 0) {
-                    return (
-                      <Card className="border-none shadow-sm bg-white p-8 text-center space-y-2">
-                        <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto animate-pulse" />
-                        <h3 className="text-lg font-bold text-gray-800">Skvělé! Všechny úkoly máš hotové.</h3>
-                        <p className="text-sm text-muted-foreground">V tomto předmětu nemáš žádné úkoly k odevzdání.</p>
-                      </Card>
-                    );
-                  }
+                  {/* K vypracování (To Do) */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-primary/70 flex items-center gap-1.5 px-1">
+                      ⏳ K vypracování
+                    </h3>
+                    {(() => {
+                      const pendingTests = studentAssignments.filter(a =>
+                        (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
+                        !a.isPractice &&
+                        !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
+                      );
 
-                                    return (
-                    <div className="grid gap-4">
-                      {pending.map(a => {
-                        const now = new Date();
-                        const formatter = new Intl.DateTimeFormat('en-US', {
-                          timeZone: 'Europe/Prague',
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: false
-                        });
-                        const parts = formatter.formatToParts(now);
-                        const getVal = (type: string) => parts.find(p => p.type === type)?.value || '';
-                        let hourVal = getVal('hour');
-                        if (hourVal === '24') hourVal = '00';
-                        const nowStr = `${getVal('year')}-${getVal('month')}-${getVal('day')}T${hourVal}:${getVal('minute')}`;
-                        const hasStarted = !a.startTime || nowStr >= a.startTime;
-                        const hasEnded = a.endTime && nowStr > a.endTime;
-
+                      if (pendingTests.length === 0) {
                         return (
-                          <Card 
-                            key={a.id} 
-                            className={`transition-all border-none bg-white shadow-sm overflow-hidden ${
-                              !hasStarted 
-                                ? 'opacity-60 cursor-not-allowed select-none' 
-                                : 'cursor-pointer hover:shadow-md hover:border-primary'
-                            }`}
-                            onClick={() => {
-                              if (hasStarted) {
-                                selectStudentAssignment(a.id);
+                          <Card className="border-none shadow-sm bg-white p-6 text-center space-y-2">
+                            <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
+                            <h4 className="text-sm font-bold text-gray-800">Vše hotovo!</h4>
+                            <p className="text-xs text-muted-foreground">Nemáš žádné testy k vypracování.</p>
+                          </Card>
+                        );
+                      }
+
+                      return (
+                        <div className="grid gap-3">
+                          {pendingTests.map(a => {
+                            const now = new Date();
+                            const formatter = new Intl.DateTimeFormat('en-US', {
+                              timeZone: 'Europe/Prague',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false
+                            });
+                            const parts = formatter.formatToParts(now);
+                            const getVal = (type: string) => parts.find(p => p.type === type)?.value || '';
+                            let hourVal = getVal('hour');
+                            if (hourVal === '24') hourVal = '00';
+                            const nowStr = `${getVal('year')}-${getVal('month')}-${getVal('day')}T${hourVal}:${getVal('minute')}`;
+                            const hasStarted = !a.startTime || nowStr >= a.startTime;
+                            const hasEnded = a.endTime && nowStr > a.endTime;
+
+                            return (
+                              <Card 
+                                key={a.id} 
+                                className={`transition-all border-none bg-white shadow-xs overflow-hidden ${
+                                  !hasStarted 
+                                    ? 'opacity-60 cursor-not-allowed select-none' 
+                                    : 'cursor-pointer hover:shadow-md hover:border-primary'
+                                }`}
+                                onClick={() => {
+                                  if (hasStarted) {
+                                    selectStudentAssignment(a.id);
+                                  }
+                                }}
+                              >
+                                <div className={`h-1 w-full ${!hasStarted ? 'bg-gray-300' : hasEnded ? 'bg-amber-500' : 'bg-accent/30'}`} />
+                                <CardContent className="p-4 flex justify-between items-center">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-bold text-base text-gray-800">{a.title}</p>
+                                      {!hasStarted && (
+                                        <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full uppercase">🔒 Neaktivní</span>
+                                      )}
+                                      {hasEnded && (
+                                        <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase">⌛ Vypršel čas</span>
+                                      )}
+                                    </div>
+                                    {a.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
+                                    )}
+                                    <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-muted-foreground">
+                                      {a.startTime && <span>Od: {formatDateTime(a.startTime)}</span>}
+                                      {a.endTime && <span className={hasEnded ? 'text-amber-600 font-bold' : ''}>Do: {formatDateTime(a.endTime)}</span>}
+                                    </div>
+                                  </div>
+                                  <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Vypracované testy */}
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-primary/70 flex items-center gap-1.5 px-1">
+                      ✓ Vypracované testy
+                    </h3>
+                    {(() => {
+                      const completedTests = studentAssignments.filter(a =>
+                        (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
+                        !a.isPractice &&
+                        store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
+                      );
+
+                      if (completedTests.length === 0) {
+                        return (
+                          <Card className="border-none shadow-xs bg-white p-6 text-center">
+                            <p className="text-xs text-muted-foreground">Zatím žádné odevzdané testy.</p>
+                          </Card>
+                        );
+                      }
+
+                      return (
+                        <div className="grid gap-3">
+                          {completedTests.map(a => {
+                            const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
+                            const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                            let earned = 0;
+                            if (sub.questionScores) {
+                              if (sub.questionScores instanceof Map) {
+                                sub.questionScores.forEach(val => { earned += val; });
+                              } else {
+                                Object.values(sub.questionScores).forEach(val => { earned += val as number; });
                               }
-                            }}
-                          >
-                            <div className={`h-1 w-full ${!hasStarted ? 'bg-gray-300' : hasEnded ? 'bg-amber-500' : 'bg-accent/30'}`} />
-                            <CardContent className="p-5 flex justify-between items-center">
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="font-bold text-lg text-gray-800">{a.title}</p>
-                                  {!hasStarted && (
-                                    <span className="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full uppercase">🔒 Neaktivní</span>
-                                  )}
-                                  {hasEnded && (
-                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase">⌛ Vypršel čas</span>
-                                  )}
-                                </div>
-                                {a.description && (
-                                  <p className="text-sm text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
-                                )}
-                                <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                                  {a.startTime && (
-                                    <span>Od: {formatDateTime(a.startTime)}</span>
-                                  )}
-                                  {a.endTime && (
-                                    <span className={hasEnded ? 'text-amber-600 font-bold' : ''}>Do: {formatDateTime(a.endTime)}</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {!hasStarted ? (
-                                  <span className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full">Začne {formatDateTime(a.startTime)}</span>
-                                ) : hasEnded ? (
-                                  <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full flex items-center gap-1">Prohlédnout (vypršelo)</span>
-                                ) : (
-                                  <span className="text-xs font-bold text-primary bg-primary/5 px-3 py-1.5 rounded-full">Vypracovat úkol</span>
-                                )}
-                                <ChevronRight className="w-5 h-5 text-gray-300" />
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
+                            }
+                            const badgeText = sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)';
+
+                            return (
+                              <Card 
+                                key={a.id} 
+                                className="cursor-pointer hover:shadow-md transition-all border-none bg-white shadow-xs overflow-hidden" 
+                                onClick={() => selectStudentAssignment(a.id)}
+                              >
+                                <CardContent className="p-4 flex justify-between items-center">
+                                  <div>
+                                    <p className="font-bold text-base text-gray-800">{a.title}</p>
+                                    <div className="mt-1">
+                                      <Badge variant={sub.grade ? "default" : "secondary"} className="text-[10px]">
+                                        {badgeText}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* PRAVÝ SLOUPEC: PROCVIČOVÁNÍ (NEZNÁMKOVANÉ) */}
+                <div className="space-y-6 bg-indigo-50/20 p-6 rounded-3xl border border-indigo-100/50 shadow-xs">
+                  <div className="border-b pb-4 flex items-center gap-3">
+                    <div className="bg-indigo-600/10 p-2.5 rounded-2xl text-indigo-700">
+                      <Sparkles className="w-6 h-6 text-indigo-600 animate-pulse" />
                     </div>
-                  );
-                })()}
-              </div>
+                    <div>
+                      <h2 className="text-xl font-headline font-bold text-indigo-900">Neznámkované procvičování</h2>
+                      <p className="text-xs text-indigo-600/80">Cvičení s okamžitým vyhodnocením a vysvětlením od AI.</p>
+                    </div>
+                  </div>
 
-              {/* Section B: Dokončené a opravené testy */}
-              <div className="space-y-4">
-                <h2 className="text-2xl font-headline font-bold text-primary flex items-center gap-2 border-b pb-2">
-                  <CheckCircle2 className="w-6 h-6 text-green-500" /> Dokončené testy (Done)
-                </h2>
-                {(() => {
-                  const completed = studentAssignments.filter(a =>
-                    (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
-                    store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
-                  );
+                  {/* K vypracování (To Do) */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700/70 flex items-center gap-1.5 px-1">
+                      ⏳ K vypracování
+                    </h3>
+                    {(() => {
+                      const pendingPractice = studentAssignments.filter(a =>
+                        (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
+                        a.isPractice &&
+                        !store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
+                      );
 
-                  if (completed.length === 0) {
-                    return (
-                      <Card className="border-none shadow-sm bg-white p-8 text-center space-y-2">
-                        <span className="text-3xl block">💤</span>
-                        <h3 className="text-lg font-bold text-gray-800">Žádné dokončené testy</h3>
-                        <p className="text-sm text-muted-foreground">V tomto předmětu jsi ještě nevyplnil žádné testy.</p>
-                      </Card>
-                    );
-                  }
-
-                  return (
-                    <div className="grid gap-4">
-                      {completed.map(a => {
-                        const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
-                        const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
-                        
-                        let earned = 0;
-                        if (sub.questionScores) {
-                          if (sub.questionScores instanceof Map) {
-                            sub.questionScores.forEach(val => { earned += val; });
-                          } else {
-                            Object.values(sub.questionScores).forEach(val => { earned += val as number; });
-                          }
-                        }
-                        
-                        let badgeText = a.isPractice
-                          ? `Procvičování (${earned}/${totalMax} b)`
-                          : (sub.grade ? `Známka: ${sub.grade} (${earned}/${totalMax} b)` : 'Odevzdáno (Neopraveno)');
-
+                      if (pendingPractice.length === 0) {
                         return (
-                                                    <Card 
-                            key={a.id} 
-                            className="cursor-pointer hover:shadow-md transition-all border-none bg-white shadow-sm overflow-hidden" 
-                            onClick={() => selectStudentAssignment(a.id)}
-                          >
-                            <CardContent className="p-5 flex justify-between items-center">
-                              <div>
-                                <p className="font-bold text-lg text-gray-800">{a.title}</p>
-                                <div className="mt-1 flex gap-2">
-                                  <Badge variant={!a.isPractice && sub.grade ? "default" : "secondary"} className="text-xs">
-                                    {badgeText}
-                                  </Badge>
-                                </div>
-                              </div>
-                              <ChevronRight className="w-5 h-5 text-gray-300" />
-                            </CardContent>
+                          <Card className="border-none shadow-sm bg-white p-6 text-center space-y-2">
+                            <CheckCircle2 className="w-10 h-10 text-indigo-500 mx-auto" />
+                            <h4 className="text-sm font-bold text-gray-800">Hotovo!</h4>
+                            <p className="text-xs text-muted-foreground">Všechna cvičení máš vypracovaná.</p>
                           </Card>
                         );
-                      })}
-                    </div>
-                  );
-                })()}
+                      }
+
+                      return (
+                        <div className="grid gap-3">
+                          {pendingPractice.map(a => {
+                            const now = new Date();
+                            const formatter = new Intl.DateTimeFormat('en-US', {
+                              timeZone: 'Europe/Prague',
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false
+                            });
+                            const parts = formatter.formatToParts(now);
+                            const getVal = (type: string) => parts.find(p => p.type === type)?.value || '';
+                            let hourVal = getVal('hour');
+                            if (hourVal === '24') hourVal = '00';
+                            const nowStr = `${getVal('year')}-${getVal('month')}-${getVal('day')}T${hourVal}:${getVal('minute')}`;
+                            const hasStarted = !a.startTime || nowStr >= a.startTime;
+                            const hasEnded = a.endTime && nowStr > a.endTime;
+
+                            return (
+                              <Card 
+                                key={a.id} 
+                                className={`transition-all border-none bg-white shadow-xs overflow-hidden ${
+                                  !hasStarted 
+                                    ? 'opacity-60 cursor-not-allowed select-none' 
+                                    : 'cursor-pointer hover:shadow-md hover:border-indigo-450'
+                                }`}
+                                onClick={() => {
+                                  if (hasStarted) {
+                                    selectStudentAssignment(a.id);
+                                  }
+                                }}
+                              >
+                                <div className={`h-1 w-full ${!hasStarted ? 'bg-gray-300' : hasEnded ? 'bg-amber-500' : 'bg-indigo-400/40'}`} />
+                                <CardContent className="p-4 flex justify-between items-center">
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-bold text-base text-gray-800">{a.title}</p>
+                                      {!hasStarted && (
+                                        <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full uppercase">🔒 Neaktivní</span>
+                                      )}
+                                      {hasEnded && (
+                                        <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase">⌛ Vypršel čas</span>
+                                      )}
+                                    </div>
+                                    {a.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-1 mt-1">{a.description}</p>
+                                    )}
+                                    <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-muted-foreground">
+                                      {a.startTime && <span>Od: {formatDateTime(a.startTime)}</span>}
+                                      {a.endTime && <span className={hasEnded ? 'text-amber-600 font-bold' : ''}>Do: {formatDateTime(a.endTime)}</span>}
+                                    </div>
+                                  </div>
+                                  <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Vyhodnocená cvičení */}
+                  <div className="space-y-3 pt-2">
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-indigo-700/70 flex items-center gap-1.5 px-1">
+                      ✓ Vyhodnocená cvičení
+                    </h3>
+                    {(() => {
+                      const completedPractice = studentAssignments.filter(a =>
+                        (a.subject === selectedSubject || (selectedSubject === 'Jiný' && !a.subject)) &&
+                        a.isPractice &&
+                        store.submissions.some(s => s.assignmentId === a.id && s.studentId === currentUser.id && s.submittedAt)
+                      );
+
+                      if (completedPractice.length === 0) {
+                        return (
+                          <Card className="border-none shadow-xs bg-white p-6 text-center">
+                            <p className="text-xs text-muted-foreground">Zatím žádné odevzdané procvičování.</p>
+                          </Card>
+                        );
+                      }
+
+                      return (
+                        <div className="grid gap-3">
+                          {completedPractice.map(a => {
+                            const sub = store.submissions.find(s => s.assignmentId === a.id && s.studentId === currentUser.id)!;
+                            const totalMax = a.questions?.reduce((acc, q) => acc + (q.points || 1), 0) || 0;
+                            let earned = 0;
+                            if (sub.questionScores) {
+                              if (sub.questionScores instanceof Map) {
+                                sub.questionScores.forEach(val => { earned += val; });
+                              } else {
+                                Object.values(sub.questionScores).forEach(val => { earned += val as number; });
+                              }
+                            }
+                            const badgeText = `Procvičování (${earned}/${totalMax} b)`;
+
+                            return (
+                              <Card 
+                                key={a.id} 
+                                className="cursor-pointer hover:shadow-md transition-all border-none bg-white shadow-xs overflow-hidden" 
+                                onClick={() => selectStudentAssignment(a.id)}
+                              >
+                                <CardContent className="p-4 flex justify-between items-center">
+                                  <div>
+                                    <p className="font-bold text-base text-gray-800">{a.title}</p>
+                                    <div className="mt-1">
+                                      <Badge variant="outline" className="text-[10px] bg-indigo-50/50 text-indigo-750 border-indigo-200">
+                                        {badgeText}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (

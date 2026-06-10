@@ -14,6 +14,7 @@ export interface ISubmission extends Document<string> {
   grade?: number; // 1-5
   feedback?: string;
   questionScores?: Map<string, number>; // Body za konkrétne otázky
+  questionFeedback?: Map<string, string>; // AI/Teacher explanations of individual questions
   schoolId: string; // přidáno pro multi-school
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +35,7 @@ const SubmissionSchema: Schema = new Schema(
     grade: { type: Number, min: 1, max: 5 },
     feedback: { type: String },
     questionScores: { type: Map, of: Number, default: {} },
+    questionFeedback: { type: Map, of: String, default: {} },
     schoolId: { type: String, required: true } // povinné pro rozdělení škol
   },
   {

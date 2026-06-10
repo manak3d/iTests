@@ -4,6 +4,7 @@ import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-question
 import { gradeSubmissionFlow } from '@/ai/flows/grade-submission';
 import { getUserSession } from '@/lib/auth';
 import { Teacher } from '@/models/Teacher';
+import { Assignment } from '@/models/Assignment';
 import dbConnect from '@/lib/mongodb';
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,9 @@ export async function POST(request: NextRequest) {
     }
 
     await dbConnect();
+    const body = await request.json();
+    const { action } = body;
+
     let teacher = null;
 
     if (session.role === 'teacher') {
@@ -45,12 +49,43 @@ export async function POST(request: NextRequest) {
           error: 'Nemáte dostatek AI kreditů. Pro pokračování si prosím dokupte kredity (50 ks za 25 Kč) nebo upgradujte svůj tarif.' 
         }, { status: 403 });
       }
+    } else if (session.role === 'student') {
+      if (action !== 'grade') {
+        return NextResponse.json({ error: 'Nedostatečná oprávnění pro využití AI funkcí.' }, { status: 403 });
+      }
+      const { assignmentId } = body;
+      if (!assignmentId) {
+        return NextResponse.json({ error: 'Chybí ID úkolu.' }, { status: 400 });
+      }
+      const assignment = await Assignment.findById(assignmentId);
+      if (!assignment) {
+        return NextResponse.json({ error: 'Úkol nebyl nalezen.' }, { status: 404 });
+      }
+      if (!assignment.isPractice) {
+        return NextResponse.json({ error: 'AI vyhodnocení můžete spustit pouze u cvičných úkolů.' }, { status: 403 });
+      }
+
+      if (assignment.teacherId) {
+        teacher = await Teacher.findById(assignment.teacherId);
+        if (!teacher) {
+          return NextResponse.json({ error: 'Učitel přiřazený k úkolu nebyl nalezen.' }, { status: 404 });
+        }
+        if (teacher.role !== 'admin') {
+          if ((teacher.aiCredits || 0) <= 0) {
+            return NextResponse.json({ 
+              error: 'Učitel nemá dostatek AI kreditů pro vyhodnocení.' 
+            }, { status: 403 });
+          }
+          if (teacher.premiumType !== 'yearly' && teacher.premiumType !== 'school') {
+            return NextResponse.json({ 
+              error: 'AI vyhodnocení cvičných úkolů je dostupné pouze pro školy nebo učitele s ročním Premium předplatným.' 
+            }, { status: 403 });
+          }
+        }
+      }
     } else if (session.role !== 'admin') {
       return NextResponse.json({ error: 'Nedostatečná oprávnění pro využití AI funkcí.' }, { status: 403 });
     }
-
-    const body = await request.json();
-    const { action } = body;
 
     if (action === 'grade' && session.role === 'teacher' && teacher) {
       if (teacher.premiumType !== 'yearly' && teacher.premiumType !== 'school') {
