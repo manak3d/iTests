@@ -5890,17 +5890,56 @@ export default function ITestApp() {
                             <h3 className="font-semibold text-xl mb-4">Otázky v testu:</h3>
                             <div className="space-y-3">
                               {a.questions.map(q => (
-                                <div key={q.id} className="p-4 bg-gray-50 rounded-lg flex justify-between items-center">
-                                  <span className="font-medium">{q.text}</span>
-                                  <Badge variant="outline">
-                                    {q.type === 'short_answer' ? 'Krátká odpověď' : 
-                                     q.type === 'long_answer' ? 'Dlouhá odpověď' : 
-                                     q.type === 'multiple_choice' ? 'Výběr z možností' : 
-                                     q.type === 'axis' ? 'Osa X/Y' : 
-                                     q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
-                                     q.type === 'drawing' ? 'Kresba' : 
-                                     q.type === 'graph' ? 'Graf' : q.type}
-                                  </Badge>
+                                <div key={q.id} className="p-4 bg-gray-50 rounded-lg flex flex-col gap-2 border w-full">
+                                  <div className="flex justify-between items-center w-full">
+                                    <span className="font-medium">{q.text}</span>
+                                    <Badge variant="outline">
+                                      {q.type === 'short_answer' ? 'Krátká odpověď' : 
+                                       q.type === 'long_answer' ? 'Dlouhá odpověď' : 
+                                       q.type === 'multiple_choice' ? 'Výběr z možností' : 
+                                       q.type === 'axis' ? 'Osa X/Y' : 
+                                       q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
+                                       q.type === 'drawing' ? 'Kresba' : 
+                                       q.type === 'graph' ? 'Graf' : q.type}
+                                    </Badge>
+                                  </div>
+                                  {q.type === 'cloze' && (
+                                    <div className="p-3 bg-white rounded-xl border border-slate-200 leading-relaxed text-slate-800 font-medium text-sm mt-1 select-none w-full">
+                                      {(() => {
+                                        const parts = parseClozeText(q.clozeText || q.text || '');
+                                        return parts.map((part, i) => {
+                                          if (part.type === 'text') {
+                                            return <span key={i}>{part.text}</span>;
+                                          } else if (part.type === 'dropdown') {
+                                            const sortedOptions = [...(part.options || [])].sort((a, b) => a.localeCompare(b));
+                                            return (
+                                              <select
+                                                key={i}
+                                                disabled
+                                                className="mx-1 h-7 rounded bg-slate-50 border border-slate-300 px-1 text-xs font-bold text-indigo-750 inline-block align-middle"
+                                              >
+                                                <option>{part.correctAnswer} (správně)</option>
+                                                {sortedOptions.filter(opt => opt !== part.correctAnswer).map((opt, optIdx) => (
+                                                  <option key={optIdx}>{opt}</option>
+                                                ))}
+                                              </select>
+                                            );
+                                          } else {
+                                            return (
+                                              <input
+                                                key={i}
+                                                type="text"
+                                                disabled
+                                                value={part.correctAnswer || ''}
+                                                style={{ width: `${Math.max(4, (part.correctAnswer || '').length + 1)}ch` }}
+                                                className="mx-1 h-7 rounded bg-green-50 border border-green-300 px-1 text-xs font-bold text-green-700 text-center inline-block align-middle"
+                                              />
+                                            );
+                                          }
+                                        });
+                                      })()}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
