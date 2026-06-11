@@ -49,6 +49,7 @@ export function AssignmentCreator({
   const [aiNumMultipleChoice, setAiNumMultipleChoice] = useState('');
   const [aiNumTrueFalse, setAiNumTrueFalse] = useState('');
   const [aiNumShortAnswer, setAiNumShortAnswer] = useState('');
+  const [aiNumCloze, setAiNumCloze] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDigitizing, setIsDigitizing] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
@@ -108,13 +109,14 @@ export function AssignmentCreator({
     const newQuestion: Question = {
       id: Math.random().toString(36).substr(2, 9),
       type,
-      text: '',
+      text: type === 'cloze' ? 'Doplňte chybějící slova nebo i/y:' : '',
       points: 1,
       options: type === 'multiple_choice' ? ['', '', '', ''] : (type === 'matching' ? ['|', '|', '|'] : undefined),
       correctAnswer: type === 'matching' ? { "0": 0, "1": 1, "2": 2 } : undefined,
       numPracticeQuestions: 0,
       useAiForPractice: false,
       practiceQuestions: [],
+      clozeText: type === 'cloze' ? '' : undefined,
       ...(type === 'graph' ? {
         graphType: 'pie',
         graphData: {
@@ -143,11 +145,13 @@ export function AssignmentCreator({
       if (q.type === 'multiple_choice') type = 'multiple_choice';
       else if (q.type === 'true_false') type = 'true_false';
       else if (q.type === 'matching') type = 'matching';
+      else if (q.type === 'cloze') type = 'cloze';
 
       return {
         id: Math.random().toString(36).substr(2, 9),
         type,
         text: q.questionText || '',
+        clozeText: type === 'cloze' ? (q.clozeText || '') : undefined,
         points: 1,
         options: type === 'matching' ? q.options : (type === 'multiple_choice' ? q.options : undefined),
         correctAnswer: type === 'matching'
@@ -209,7 +213,8 @@ export function AssignmentCreator({
           topic: aiTopic ? aiTopic : undefined,
           numMultipleChoice: aiNumMultipleChoice ? Number(aiNumMultipleChoice) : undefined,
           numTrueFalse: aiNumTrueFalse ? Number(aiNumTrueFalse) : undefined,
-          numShortAnswer: aiNumShortAnswer ? Number(aiNumShortAnswer) : undefined
+          numShortAnswer: aiNumShortAnswer ? Number(aiNumShortAnswer) : undefined,
+          numCloze: aiNumCloze ? Number(aiNumCloze) : undefined
         })
       });
       const genData = await genRes.json();
@@ -886,18 +891,18 @@ export function AssignmentCreator({
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Doplňovaný text (šablona):</label>
                       <Textarea
                         placeholder="Zadejte text s doplňovacími poli..."
-                        value={q.text}
-                        onChange={e => updateQuestion(q.id, { text: e.target.value })}
+                        value={q.clozeText || ''}
+                        onChange={e => updateQuestion(q.id, { clozeText: e.target.value })}
                         className="min-h-[120px] text-base focus-visible:ring-indigo-500 font-medium"
                       />
                     </div>
 
-                    {q.text && (
+                    {q.clozeText && (
                       <div className="space-y-2 pt-2">
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block">Náhled doplňovačky pro žáky:</label>
                         <div className="p-4 bg-white rounded-xl border border-slate-200 leading-relaxed text-slate-800 font-medium text-sm">
                           {(() => {
-                            const parts = parseClozeText(q.text);
+                            const parts = parseClozeText(q.clozeText || '');
                             if (parts.length === 0) {
                               return <span className="italic text-gray-400 text-xs">Text zatím neobsahuje žádné doplňovací závorky.</span>;
                             }
@@ -1249,7 +1254,7 @@ export function AssignmentCreator({
                   <label className="text-xs font-bold uppercase tracking-wider text-gray-500 block mb-2">
                     Počet otázek jednotlivých typů (nepovinné)
                   </label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="space-y-1">
                       <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Výběr z možností</span>
                       <Input
@@ -1280,6 +1285,17 @@ export function AssignmentCreator({
                         placeholder="např. 1"
                         value={aiNumShortAnswer}
                         onChange={(e) => setAiNumShortAnswer(e.target.value)}
+                        className="rounded-xl text-sm text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Doplňovačka</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="např. 2"
+                        value={aiNumCloze}
+                        onChange={(e) => setAiNumCloze(e.target.value)}
                         className="rounded-xl text-sm text-slate-800"
                       />
                     </div>
@@ -1390,7 +1406,8 @@ export function AssignmentCreator({
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-violet-100 text-violet-700">
                               {q.type === 'short_answer' ? 'Krátká odpověď' :
                                q.type === 'multiple_choice' ? 'Výběr z možností' :
-                               q.type === 'true_false' ? 'Ano/Ne' : q.type}
+                               q.type === 'true_false' ? 'Ano/Ne' :
+                               q.type === 'cloze' ? 'Doplňovačka' : q.type}
                             </span>
                           </div>
                           <p className="text-sm font-bold text-gray-800">{q.questionText}</p>
@@ -1414,6 +1431,11 @@ export function AssignmentCreator({
                           {q.type === 'true_false' && (
                             <p className="text-xs font-semibold text-gray-500">
                               Správná odpověď: <span className="font-bold text-violet-600">{q.correctAnswer ? 'Ano' : 'Ne'}</span>
+                            </p>
+                          )}
+                          {q.type === 'cloze' && q.clozeText && (
+                            <p className="text-xs font-semibold text-gray-500 italic bg-gray-50 border p-2 rounded-lg">
+                              Šablona: <span className="font-medium text-slate-700">{q.clozeText}</span>
                             </p>
                           )}
                         </div>

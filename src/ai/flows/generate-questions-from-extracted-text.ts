@@ -34,12 +34,19 @@ const MatchingQuestionSchema = z.object({
   options: z.array(z.string()).describe('An array of matching pairs formatted as "Left Part|Right Part", e.g. "1/2|0.5".'),
 });
 
+const ClozeQuestionSchema = z.object({
+  type: z.literal('cloze'),
+  questionText: z.string().describe('The Cloze question title/instruction, e.g. "Doplňte chybějící slova nebo i/y:".'),
+  clozeText: z.string().describe('The Cloze template text using square brackets for answers, e.g., "Když jsem [šel/šly] do lesa, potkal jsem [vlk/medvěd].". Note: First option inside the bracket is the correct one, or a single word if it is an input field.'),
+});
+
 const GenerateQuestionsInputSchema = z.object({
   extractedText: z.string().optional().describe('The text extracted from a document, used to generate questions.'),
   topic: z.string().optional().describe('The topic to generate questions from directly.'),
   numMultipleChoice: z.number().optional().describe('Number of multiple choice questions to generate.'),
   numTrueFalse: z.number().optional().describe('Number of true/false questions to generate.'),
   numShortAnswer: z.number().optional().describe('Number of short answer questions to generate.'),
+  numCloze: z.number().optional().describe('Number of cloze questions to generate.'),
 });
 export type GenerateQuestionsInput = z.infer<typeof GenerateQuestionsInputSchema>;
 
@@ -49,6 +56,7 @@ const GenerateQuestionsOutputSchema = z.object({
     MultipleChoiceQuestionSchema,
     TrueFalseQuestionSchema,
     MatchingQuestionSchema,
+    ClozeQuestionSchema,
   ])).optional().describe('An array of generated comprehension questions of various types.'),
   error: z.string().optional().describe('Error message if the generation failed.'),
 });
@@ -59,7 +67,7 @@ const prompt = ai.definePrompt({
   input: { schema: GenerateQuestionsInputSchema },
   output: { schema: GenerateQuestionsOutputSchema },
   prompt: `You are an AI assistant specialized in creating engaging and diverse comprehension questions for educational purposes.
-Based on the provided text or topic, generate a set of questions including short answer, multiple choice, true/false, and matching.
+Based on the provided text or topic, generate a set of questions including short answer, multiple choice, true/false, matching, and cloze (doplňovačky).
 Ensure the questions are relevant and cover key information.
 
 The language of all generated questions, options, and answers must be Czech.
@@ -78,6 +86,7 @@ Please generate exactly the following number of questions for each type if speci
 - Multiple Choice: {{#if numMultipleChoice}}{{numMultipleChoice}}{{else}}at least 1{{/if}}
 - True/False: {{#if numTrueFalse}}{{numTrueFalse}}{{else}}at least 1{{/if}}
 - Short Answer: {{#if numShortAnswer}}{{numShortAnswer}}{{else}}at least 1{{/if}}
+- Cloze (Doplňovačky): {{#if numCloze}}{{numCloze}}{{else}}at least 1{{/if}}
 
 Please output a JSON array of questions, adhering to the following schema for each question type:
 
@@ -108,6 +117,17 @@ Matching (Přiřazování):
   "questionText": "Přiřaďte správné dvojice.",
   "options": ["Zlomek 1/2|0.5", "Zlomek 1/4|0.25", "Zlomek 3/4|0.75"]
 }
+
+Cloze (Doplňovačka):
+{
+  "type": "cloze",
+  "questionText": "Doplňte chybějící slova nebo i/y:",
+  "clozeText": "Na mýtě stál starý m[y/i]livec, který chytal m[y/i]ši. Hlavním městem ČR je [Praha]."
+}
+Note on Cloze:
+- Use dropdown format [correct/incorrect1/incorrect2] (where the first option inside the bracket is the correct one).
+- Use input format [correct_word] (single word, no slashes, case-insensitive check).
+- You MUST provide the instructions/title in "questionText" and the template text with brackets in "clozeText". Do NOT put the template text in "questionText".
 
 Ensure the questions cover the topic/context comprehensively.`,
 });

@@ -43,6 +43,7 @@ export interface Question {
   numPracticeQuestions?: number;
   useAiForPractice?: boolean;
   practiceQuestions?: Question[];
+  clozeText?: string;
 }
 
 export interface Assignment {

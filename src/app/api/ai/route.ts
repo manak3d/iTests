@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'generate') {
-      const { extractedText, topic, numMultipleChoice, numTrueFalse, numShortAnswer } = body;
+      const { extractedText, topic, numMultipleChoice, numTrueFalse, numShortAnswer, numCloze } = body;
       if (!extractedText && !topic) {
         return NextResponse.json({ error: 'Missing both extractedText and topic' }, { status: 400 });
       }
@@ -128,7 +128,8 @@ export async function POST(request: NextRequest) {
         topic,
         numMultipleChoice: numMultipleChoice ? Number(numMultipleChoice) : undefined,
         numTrueFalse: numTrueFalse ? Number(numTrueFalse) : undefined,
-        numShortAnswer: numShortAnswer ? Number(numShortAnswer) : undefined
+        numShortAnswer: numShortAnswer ? Number(numShortAnswer) : undefined,
+        numCloze: numCloze ? Number(numCloze) : undefined
       });
       if (result.error) {
         return NextResponse.json({ error: result.error }, { status: 500 });

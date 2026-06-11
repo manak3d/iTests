@@ -435,7 +435,7 @@ export function useITestStore() {
         } else if (q.type === 'true_false') {
           isCorrect = studentAnswer === q.correctAnswer;
         } else if (q.type === 'cloze') {
-          const parts = parseClozeText(q.text);
+          const parts = parseClozeText(q.clozeText || q.text || '');
           const blanks = parts.filter(p => p.type === 'dropdown' || p.type === 'input');
           const totalBlanks = blanks.length;
           if (totalBlanks > 0) {

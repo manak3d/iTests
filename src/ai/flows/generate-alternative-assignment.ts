@@ -11,7 +11,8 @@ const QuestionSchema = z.object({
   correctAnswer: z.any().optional().describe('Updated correctAnswer value matching the new text/options.'),
   points: z.number().optional().describe('Should match the original question points.'),
   graphType: z.string().optional(),
-  graphData: z.any().optional()
+  graphData: z.any().optional(),
+  clozeText: z.string().optional().describe('The alternative Cloze template text using brackets if type is cloze.')
 });
 
 const GenerateAlternativeInputSchema = z.object({
@@ -36,7 +37,7 @@ For each question in the input:
 3. Change the specific numbers, names, variables, text examples, or multiple choice options so that students cannot simply copy the answers from the original group.
 4. Update the "correctAnswer" and "options" fields to correspond to your new question.
 5. If the type is "matching", each matching pair is formatted as "Left Part|Right Part" (e.g. "2+3|5"). Make sure to update them correctly.
-6. If the type is "cloze", the text format uses brackets like "V[y/i]děl jsem v[y/i]ra." where the first option in the bracket is the correct one. Generate a parallel sentence with similar spelling traps (e.g. i/y, mě/mně) using the exact same brackets format.
+6. If the type is "cloze", keep the instructions in "text", and generate a parallel/alternative template sentence with similar spelling traps (e.g. i/y, mě/mně) in "clozeText" using the exact same brackets format where the first option is correct.
 7. Keep the "points" and "graphType" fields exactly the same as the original.
 8. The language of all generated texts, options, and answers must be Czech.
 

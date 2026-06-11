@@ -13,6 +13,7 @@ export interface IQuestion {
   numPracticeQuestions?: number;
   useAiForPractice?: boolean;
   practiceQuestions?: IQuestion[];
+  clozeText?: string;
 }
 
 const QuestionSchema = new Schema({
@@ -26,7 +27,8 @@ const QuestionSchema = new Schema({
   graphData: { type: Schema.Types.Mixed },
   numPracticeQuestions: { type: Number, default: 0 },
   useAiForPractice: { type: Boolean, default: false },
-  practiceQuestions: { type: [Schema.Types.Mixed], default: [] }
+  practiceQuestions: { type: [Schema.Types.Mixed], default: [] },
+  clozeText: { type: String, default: "" }
 }, { _id: false }); // Vypnutí _id pro pod-dokumenty, protože používáme vlastní id z Firebase pole
 
 export interface IAssignment extends Document<string> {

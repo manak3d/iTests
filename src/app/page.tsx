@@ -3941,7 +3941,7 @@ export default function ITestApp() {
                                                       ) : (
                                                         <div className="p-3 bg-white rounded-xl border border-slate-200 leading-relaxed text-slate-800 font-medium text-sm inline-block">
                                                           {(() => {
-                                                            const parts = parseClozeText(q.text);
+                                                            const parts = parseClozeText(q.clozeText || q.text || '');
                                                             const given = answer && typeof answer === 'object' ? answer : {};
                                                             return parts.map((part, idx) => {
                                                               if (part.type === 'text') {
@@ -6211,7 +6211,7 @@ export default function ITestApp() {
                                             ) : (
                                               <div className="p-3 bg-white rounded-xl border border-slate-200 leading-relaxed text-slate-800 font-medium text-sm inline-block">
                                                 {(() => {
-                                                  const parts = parseClozeText(q.text);
+                                                  const parts = parseClozeText(q.clozeText || q.text || '');
                                                   const given = answer && typeof answer === 'object' ? answer : {};
                                                   return parts.map((part, idx) => {
                                                     if (part.type === 'text') {
@@ -7853,7 +7853,7 @@ export default function ITestApp() {
                                             ) : (
                                               <div className="leading-relaxed text-slate-800 font-medium text-sm text-left mt-1">
                                                 {(() => {
-                                                  const parts = parseClozeText(q.text);
+                                                  const parts = parseClozeText(q.clozeText || q.text || '');
                                                   const given = answer && typeof answer === 'object' ? answer : {};
                                                   return parts.map((part, idx) => {
                                                     if (part.type === 'text') {
@@ -8199,7 +8199,7 @@ export default function ITestApp() {
                                   {q.type === 'cloze' && (
                                     <div className="p-4 bg-white rounded-xl border border-slate-150 leading-relaxed text-slate-800 font-medium text-base select-none">
                                       {(() => {
-                                        const parts = parseClozeText(q.text);
+                                        const parts = parseClozeText(q.clozeText || q.text || '');
                                         const currentAns = studentAnswers[q.id] || {};
                                         return parts.map((part, i) => {
                                           if (part.type === 'text') {
