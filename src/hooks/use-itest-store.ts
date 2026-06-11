@@ -6,6 +6,7 @@ import { useFirestore } from '@/firebase/provider';
 import { collection, doc, setDoc, updateDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter } from '@/firebase/error-emitter';
+import { parseClozeText } from '@/lib/utils';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 function cleanData(obj: any): any {
@@ -433,6 +434,24 @@ export function useITestStore() {
           }
         } else if (q.type === 'true_false') {
           isCorrect = studentAnswer === q.correctAnswer;
+        } else if (q.type === 'cloze') {
+          const parts = parseClozeText(q.text);
+          const blanks = parts.filter(p => p.type === 'dropdown' || p.type === 'input');
+          const totalBlanks = blanks.length;
+          if (totalBlanks > 0) {
+            let correctCount = 0;
+            const given = studentAnswer && typeof studentAnswer === 'object' ? studentAnswer : {};
+            blanks.forEach(b => {
+              const studentVal = String(given[b.index!] || '').trim().toLowerCase();
+              const correctVal = String(b.correctAnswer || '').trim().toLowerCase();
+              if (studentVal === correctVal) {
+                correctCount++;
+              }
+            });
+            const earned = (correctCount / totalBlanks) * points;
+            autoScores[q.id] = Math.round(earned * 100) / 100;
+            continue;
+          }
         } else if (q.type === 'graph') {
           const gType = q.graphType;
           if (gType === 'pie' || gType === 'bar') {
@@ -762,7 +781,7 @@ export function useITestStore() {
     });
   }, [users, currentUser, mongoUser, toast]);
 
-  const updateProfile = useCallback((updates: { firstName?: string; lastName?: string; education?: string; yearsOfExperience?: number; schoolName?: string }) => {
+  const updateProfile = useCallback((updates: { firstName?: string; lastName?: string; education?: string; yearsOfExperience?: number; schoolName?: string; password?: string; currentPassword?: string }) => {
     return fetch('/api/teachers', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -781,6 +800,7 @@ export function useITestStore() {
             name: (updates.firstName && updates.lastName) ? `${updates.firstName} ${updates.lastName}` : currentUser.name,
             education: updates.education !== undefined ? updates.education : currentUser.education,
             yearsOfExperience: updates.yearsOfExperience !== undefined ? updates.yearsOfExperience : currentUser.yearsOfExperience,
+            password: updates.password !== undefined ? updates.password : currentUser.password,
           };
 
           setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, ...updatedUser } : u));

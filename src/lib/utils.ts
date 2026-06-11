@@ -40,3 +40,59 @@ export function renderRichText(text: string): React.ReactNode[] | string | null 
   return parts.length > 0 ? parts : cleanText;
 }
 
+export interface ClozePart {
+  type: 'text' | 'dropdown' | 'input';
+  text?: string;
+  index?: number;
+  options?: string[];
+  correctAnswer?: string;
+}
+
+export function parseClozeText(text: string): ClozePart[] {
+  if (!text) return [];
+  const parts: ClozePart[] = [];
+  const regex = /\[([^\]]+)\]/g;
+  let lastIndex = 0;
+  let match;
+  let blankIndex = 0;
+
+  while ((match = regex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    if (matchIndex > lastIndex) {
+      parts.push({
+        type: 'text',
+        text: text.substring(lastIndex, matchIndex)
+      });
+    }
+
+    const content = match[1];
+    if (content.includes('/')) {
+      const options = content.split('/');
+      const correctAnswer = options[0]; // first one is correct
+      parts.push({
+        type: 'dropdown',
+        options: options,
+        correctAnswer: correctAnswer,
+        index: blankIndex++
+      });
+    } else {
+      parts.push({
+        type: 'input',
+        correctAnswer: content,
+        index: blankIndex++
+      });
+    }
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({
+      type: 'text',
+      text: text.substring(lastIndex)
+    });
+  }
+
+  return parts;
+}
+

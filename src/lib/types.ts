@@ -26,9 +26,10 @@ export interface Class {
   teacherId: string;
   studentIds: string[];
   schoolId?: string; // přidáno pro multi-school
+  joinCode?: string; // zvací kód třídy pro žáky
 }
 
-export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'number_line' | 'true_false' | 'drawing' | 'graph' | 'matching';
+export type QuestionType = 'short_answer' | 'long_answer' | 'multiple_choice' | 'axis' | 'number_line' | 'true_false' | 'drawing' | 'graph' | 'matching' | 'cloze';
 
 export interface Question {
   id: string;

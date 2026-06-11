@@ -57,6 +57,19 @@ export async function POST(request: Request) {
       }
     }
 
+    // Vygenerování unikátního 6místného kódu třídy pro žáky
+    let joinCode = "";
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 10) {
+      joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const existing = await Classroom.findOne({ joinCode });
+      if (!existing) {
+        isUnique = true;
+      }
+      attempts++;
+    }
+
     // Uložení třídy do DB
     const newClassroom = await Classroom.create({
       _id: body.id,
@@ -64,6 +77,7 @@ export async function POST(request: Request) {
       teacherId: body.teacherId || session.id,
       year: new Date().getFullYear(),
       schoolId: schoolId,
+      joinCode: joinCode || undefined,
     });
 
     return NextResponse.json({ success: true, data: newClassroom }, { status: 201 });

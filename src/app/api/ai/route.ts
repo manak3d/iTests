@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { digitizePdfContentForAssignment } from '@/ai/flows/digitize-pdf-content-for-assignment';
 import { generateQuestionsFromExtractedText } from '@/ai/flows/generate-questions-from-extracted-text';
 import { gradeSubmissionFlow } from '@/ai/flows/grade-submission';
+import { generateAlternativeAssignment } from '@/ai/flows/generate-alternative-assignment';
 import { getUserSession } from '@/lib/auth';
 import { Teacher } from '@/models/Teacher';
 import { Assignment } from '@/models/Assignment';
@@ -162,6 +163,26 @@ export async function POST(request: NextRequest) {
         await deductTeacherCredit(teacher._id.toString());
       }
       return NextResponse.json({ success: true, evaluation: result });
+    }
+
+    if (action === 'generateAlternative') {
+      const { questions } = body;
+      if (!questions || !Array.isArray(questions)) {
+        return NextResponse.json({ error: 'Chybí nebo je neplatné pole questions.' }, { status: 400 });
+      }
+
+      const result = await generateAlternativeAssignment({
+        questionsJson: JSON.stringify(questions)
+      });
+
+      if (result.error) {
+        return NextResponse.json({ error: result.error }, { status: 500 });
+      }
+
+      if (teacher) {
+        await deductTeacherCredit(teacher._id.toString());
+      }
+      return NextResponse.json({ success: true, questions: result.questions });
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

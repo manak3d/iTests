@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GraphQuestionCreator, AxisQuestionCreator, NumberLineQuestionCreator } from '@/components/itest/GraphQuestion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { parseClozeText } from '@/lib/utils';
 
 import { Class } from '@/lib/types';
 
@@ -674,7 +675,8 @@ export function AssignmentCreator({
                         q.type === 'number_line' ? 'Číselná osa' : 
                         q.type === 'true_false' ? 'Ano / Ne' : 
                         q.type === 'drawing' ? 'Kresba' : 
-                        q.type === 'graph' ? 'Graf' : q.type}
+                        q.type === 'graph' ? 'Graf' : 
+                        q.type === 'cloze' ? 'Doplňovačka' : q.type}
                     </span>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-gray-50 border px-2 py-1 rounded-md">
                       <span className="font-semibold">Body:</span>
@@ -864,6 +866,74 @@ export function AssignmentCreator({
                         + Přidat pár
                       </Button>
                     </div>
+                  </div>
+                )}
+
+                {q.type === 'cloze' && (
+                  <div className="space-y-3 mt-4 text-left">
+                    <div className="bg-indigo-50 border border-indigo-150 rounded-xl p-4 text-xs text-indigo-950 leading-relaxed shadow-sm space-y-2">
+                      <p className="font-bold flex items-center gap-1">
+                        <span>💡 Jak psát doplňovací text?</span>
+                      </p>
+                      <ul className="list-disc pl-4 space-y-1 text-indigo-900/95">
+                        <li><strong>Výběr z možností (dropdown)</strong>: Zadejte možnosti oddělené lomítkem v hranatých závorkách, např. <code>[s/z]</code> nebo <code>[mě/mně]</code>. <strong>První možnost je vždy považována za správnou</strong> (žákům se zobrazí v zamíchaném pořadí).</li>
+                        <li><strong>Vypisovací pole (input)</strong>: Zadejte pouze jedno slovo bez lomítek v hranatých závorkách, např. <code>[Praha]</code> nebo <code>[vlk]</code>. Žák bude muset slovo přesně vypsat.</li>
+                        <li>Příklad: <code>Viděl jsem na mýtě v[y/i]sokého v[y/i]ra. Hlavním městem ČR je [Praha].</code></li>
+                      </ul>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Doplňovaný text (šablona):</label>
+                      <Textarea
+                        placeholder="Zadejte text s doplňovacími poli..."
+                        value={q.text}
+                        onChange={e => updateQuestion(q.id, { text: e.target.value })}
+                        className="min-h-[120px] text-base focus-visible:ring-indigo-500 font-medium"
+                      />
+                    </div>
+
+                    {q.text && (
+                      <div className="space-y-2 pt-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block">Náhled doplňovačky pro žáky:</label>
+                        <div className="p-4 bg-white rounded-xl border border-slate-200 leading-relaxed text-slate-800 font-medium text-sm">
+                          {(() => {
+                            const parts = parseClozeText(q.text);
+                            if (parts.length === 0) {
+                              return <span className="italic text-gray-400 text-xs">Text zatím neobsahuje žádné doplňovací závorky.</span>;
+                            }
+                            return parts.map((part, i) => {
+                              if (part.type === 'text') {
+                                return <span key={i}>{part.text}</span>;
+                              } else if (part.type === 'dropdown') {
+                                return (
+                                  <select
+                                    key={i}
+                                    disabled
+                                    className="mx-1 h-7 rounded bg-slate-50 border border-slate-300 px-1 text-xs font-bold text-indigo-700"
+                                  >
+                                    <option>{part.correctAnswer} (správně)</option>
+                                    {part.options?.slice(1).map((opt, optIdx) => (
+                                      <option key={optIdx}>{opt}</option>
+                                    ))}
+                                  </select>
+                                );
+                              } else {
+                                return (
+                                  <input
+                                    key={i}
+                                    type="text"
+                                    disabled
+                                    value={part.correctAnswer || ''}
+                                    style={{ width: `${Math.max(4, (part.correctAnswer || '').length + 1)}ch` }}
+                                    className="mx-1 h-7 rounded bg-green-50 border border-green-300 px-1 text-xs font-bold text-green-700 text-center"
+                                  />
+                                );
+                              }
+                            });
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1090,8 +1160,11 @@ export function AssignmentCreator({
           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('number_line')}>
             <BarChart4 className="w-4 h-4 mr-2" /> Číselná osa
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('true_false')}>
+           <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('true_false')}>
             <Plus className="w-4 h-4 mr-2" /> Ano / Ne
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => addQuestion('cloze')}>
+            <Plus className="w-4 h-4 mr-2" /> Doplňovačka
           </Button>
           <Button variant="secondary" size="sm" className="rounded-full bg-accent/10 text-accent hover:bg-accent/20" onClick={() => addQuestion('drawing')}>
             <PenTool className="w-4 h-4 mr-2" /> Kresba

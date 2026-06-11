@@ -7,6 +7,7 @@ export interface IClassroom extends Document<string> {
   year: number; // Školní rok (např. 2024 pro 2024/2025)
   studentIds: string[]; // Odkazy na žáky
   schoolId: string; // přidáno pro multi-school
+  joinCode?: string; // zvací kód třídy pro žáky
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +20,7 @@ const ClassroomSchema: Schema = new Schema(
     year: { type: Number, required: true },
     studentIds: { type: [String], default: [] },
     schoolId: { type: String, required: true }, // povinné pro rozdělení škol
+    joinCode: { type: String, unique: true, sparse: true },
   },
   {
     timestamps: true,

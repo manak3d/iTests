@@ -13,7 +13,7 @@ import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
 import { GraphQuestionStudent, GraphQuestionEvaluation, AxisQuestionStudent, AxisQuestionEvaluation, NumberLineQuestionStudent, NumberLineQuestionEvaluation } from '@/components/itest/GraphQuestion';
 import { MatchingQuestionStudent, MatchingQuestionReview } from '@/components/itest/MatchingQuestion';
-import { renderRichText } from '@/lib/utils';
+import { renderRichText, parseClozeText } from '@/lib/utils';
 import { Assignment, User, Submission, Question } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -327,6 +327,7 @@ export default function ITestApp() {
   const { toast } = useToast();
   
   const [monitorAssignmentId, setMonitorAssignmentId] = useState<string | null>(null);
+  const [pendingTestId, setPendingTestId] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -334,6 +335,17 @@ export default function ITestApp() {
       const mId = params.get('monitor');
       if (mId) {
         setMonitorAssignmentId(mId);
+      }
+      
+      const testId = params.get('test');
+      if (testId) {
+        setPendingTestId(testId);
+        localStorage.setItem('pendingTestId', testId);
+      } else {
+        const cached = localStorage.getItem('pendingTestId');
+        if (cached) {
+          setPendingTestId(cached);
+        }
       }
     }
   }, []);
@@ -343,7 +355,7 @@ export default function ITestApp() {
     setIsMounted(true);
   }, []);
   
-  const [authMode, setAuthMode] = useState<'login' | 'register' | 'register-trial'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'register-trial' | 'student-register'>('login');
   const [loginRole, setLoginRole] = useState<'admin' | 'teacher' | 'student'>('teacher');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -643,6 +655,19 @@ export default function ITestApp() {
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
   const [viewingAssignmentSubs, setViewingAssignmentSubs] = useState<string | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (store.currentUser && store.currentUser.role === 'student' && pendingTestId) {
+      // Check if this student is assigned/allowed or if the test exists
+      const testExists = store.assignments.some(a => a.id === pendingTestId);
+      if (testExists) {
+        setSelectedAssignmentId(pendingTestId);
+        setPendingTestId(null);
+        localStorage.removeItem('pendingTestId');
+        toast({ title: "Test automaticky načten", description: "Byl jsi přesměrován na zadaný test." });
+      }
+    }
+  }, [store.currentUser, pendingTestId, store.assignments]);
   const [selectedGradebookStudent, setSelectedGradebookStudent] = useState<User | null>(null);
   const [selectedGradebookSubject, setSelectedGradebookSubject] = useState<string>('Matematika');
   const [selectedTeacherSubject, setSelectedTeacherSubject] = useState<string>('Matematika');
@@ -948,6 +973,7 @@ export default function ITestApp() {
   const [copyEndTime, setCopyEndTime] = useState('');
   const [copyAssignType, setCopyAssignType] = useState<'all' | 'specific'>('all');
   const [copySelectedStudentIds, setCopySelectedStudentIds] = useState<string[]>([]);
+  const [isGeneratingAlternative, setIsGeneratingAlternative] = useState(false);
 
   const handleStartEditSettings = (a: Assignment) => {
     setEditStartTime(a.startTime || '');
@@ -2201,7 +2227,66 @@ export default function ITestApp() {
         toast({ title: "Chyba serveru", variant: "destructive" });
       }
     } else {
-      if (name && username && password) {
+      if (authMode === 'student-register') {
+        if (name && username && password && inviteCode) {
+          const usernameLower = username.trim().toLowerCase();
+          const exists = store.users.some(u => u.username.toLowerCase() === usernameLower);
+          if (exists) {
+            toast({ title: "Registrace selhala", description: "Tento uživatel (login) již existuje.", variant: "destructive" });
+            return;
+          }
+
+          try {
+            const nameParts = name.trim().split(' ');
+            const firstName = nameParts[0] || 'Neznámé';
+            const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
+
+            const response = await fetch('/api/students/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                firstName,
+                lastName,
+                username,
+                password,
+                joinCode: inviteCode.trim()
+              })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              toast({ title: "Registrace selhala", description: data.error || "Chyba databáze", variant: "destructive" });
+              return;
+            }
+
+            // Pokud MongoDB projde, uložíme i do lokálního Firebase store
+            store.register(name, username, password);
+
+            // Automatické přihlášení studenta
+            const loginResponse = await fetch('/api/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ username, password, role: 'student' })
+            });
+            const loginData = await loginResponse.json();
+
+            if (loginData.success) {
+              toast({ title: "Registrace úspěšná", description: "Byl jsi úspěšně zaregistrován a přihlášen!" });
+              store.forceLogin(loginData.user.id, loginData.user.role, loginData.user.username, loginData.user.name, loginData.user.classId);
+            } else {
+              setAuthMode('login');
+              setLoginRole('student');
+              toast({ title: "Registrace úspěšná", description: "Nyní se můžeš přihlásit svým uživatelským jménem a heslem." });
+            }
+          } catch (error) {
+            console.error("Chyba při registraci studenta:", error);
+            toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+          }
+        } else {
+          toast({ title: "Registrace selhala", description: "Vyplňte prosím všechna pole.", variant: "destructive" });
+        }
+      } else if (name && username && password) {
         const isTrial = authMode === 'register-trial';
         if (!isTrial && !inviteCode.trim()) {
           toast({ title: "Registrace selhala", description: "Zadejte kód školy (zvací kód).", variant: "destructive" });
@@ -2599,7 +2684,8 @@ export default function ITestApp() {
       return;
     }
 
-    if (!targetClassId) {
+    const classId = targetClassId || selectedClassId;
+    if (!classId) {
       toast({ title: "Chyba", description: "Musíte vybrat cílovou třídu.", variant: "destructive" });
       return;
     }
@@ -2612,45 +2698,43 @@ export default function ITestApp() {
       return;
     }
     
-    if (targetClassId) {
-      try {
-        const nameParts = newStudentName.split(' ');
-        const firstName = nameParts[0] || 'Neznámé';
-        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
+    try {
+      const nameParts = newStudentName.split(' ');
+      const firstName = nameParts[0] || 'Neznámé';
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'Neznámé';
 
-        const studentRes = await fetch('/api/students', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            username: newStudentUsername,
-            password: newStudentPassword,
-            classroomId: targetClassId
-          })
-        });
+      const studentRes = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          username: newStudentUsername,
+          password: newStudentPassword,
+          classroomId: classId
+        })
+      });
 
-        const data = await studentRes.json();
+      const data = await studentRes.json();
 
-        if (!studentRes.ok) {
-          toast({ title: "Registrace žáka selhala", description: data.error || "Chyba databáze", variant: "destructive" });
-          return; // DŮLEŽITÉ: Nepokračujeme dál, abychom nezavřeli modal a nesmazali data učitele
-        }
-
-        // Uložení s reálným ID z MongoDB
-        store.addStudent(targetClassId, newStudentName, newStudentUsername, newStudentPassword, data.data._id);
-
-        toast({ title: "Žák zapsán", description: "Žák byl úspěšně vytvořen v databázi i cloudu." });
-
-        setNewStudentName('');
-        setNewStudentUsername('');
-        setNewStudentPassword('');
-        setIsAddingStudent(false);
-        setTargetClassId(null);
-      } catch (error) {
-        console.error("Chyba při zápisu žáka do MongoDB:", error);
-        toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      if (!studentRes.ok) {
+        toast({ title: "Registrace žáka selhala", description: data.error || "Chyba databáze", variant: "destructive" });
+        return; // DŮLEŽITÉ: Nepokračujeme dál, abychom nezavřeli modal a nesmazali data učitele
       }
+
+      // Uložení s reálným ID z MongoDB
+      store.addStudent(classId, newStudentName, newStudentUsername, newStudentPassword, data.data._id);
+
+      toast({ title: "Žák zapsán", description: "Žák byl úspěšně vytvořen v databázi i cloudu." });
+
+      setNewStudentName('');
+      setNewStudentUsername('');
+      setNewStudentPassword('');
+      setIsAddingStudent(false);
+      setTargetClassId(null);
+    } catch (error) {
+      console.error("Chyba při zápisu žáka do MongoDB:", error);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
     }
   };
 
@@ -2748,23 +2832,43 @@ export default function ITestApp() {
             </CardHeader>
             <CardContent className="p-8 flex-1 flex flex-col justify-center">
               <form onSubmit={handleAuth} className="space-y-6">
-                <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-4 border-b pb-4">
-                  <button 
-                    type="button" 
-                    onClick={() => setAuthMode('login')}
-                    className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'login' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
-                  >Přihlášení</button>
-                  <button 
-                    type="button" 
-                    onClick={() => setAuthMode('register')}
-                    className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'register' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
-                  >Registrace s kódem</button>
-                  <button 
-                    type="button" 
-                    onClick={() => setAuthMode('register-trial')}
-                    className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'register-trial' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
-                  >Zkouška zdarma</button>
-                </div>
+                {authMode !== 'student-register' ? (
+                  <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 mb-4 border-b pb-4">
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthMode('login')}
+                      className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'login' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
+                    >Přihlášení</button>
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthMode('register')}
+                      className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'register' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
+                    >Registrace s kódem</button>
+                    <button 
+                      type="button" 
+                      onClick={() => setAuthMode('register-trial')}
+                      className={`text-sm font-bold pb-2 border-b-2 -mb-5 transition-all text-center ${authMode === 'register-trial' ? 'border-primary text-primary font-black' : 'border-transparent text-muted-foreground hover:text-slate-800'}`}
+                    >Zkouška zdarma</button>
+                  </div>
+                ) : (
+                  <div className="mb-4 border-b pb-4 flex justify-between items-center">
+                    <span className="text-sm font-black text-primary">Registrace žáka</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setLoginRole('student');
+                        setName('');
+                        setInviteCode('');
+                        setUsername('');
+                        setPassword('');
+                      }}
+                      className="text-xs font-bold text-gray-500 hover:text-primary transition-colors flex items-center gap-1"
+                    >
+                      ← Zpět na přihlášení
+                    </button>
+                  </div>
+                )}
 
                 {authMode === 'login' && (
                   <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-xl">
@@ -2782,10 +2886,10 @@ export default function ITestApp() {
                 )}
 
                 <div className="space-y-4">
-                  {(authMode === 'register' || authMode === 'register-trial') && (
+                  {(authMode === 'register' || authMode === 'register-trial' || authMode === 'student-register') && (
                     <div className="space-y-2">
                       <Label className="font-bold text-gray-700">Vaše jméno</Label>
-                      <Input placeholder="Mgr. Jan Novák" value={name} onChange={e => setName(e.target.value)} className="h-12 rounded-xl" />
+                      <Input placeholder={authMode === 'student-register' ? "Michal Novák" : "Mgr. Jan Novák"} value={name} onChange={e => setName(e.target.value)} className="h-12 rounded-xl" />
                     </div>
                   )}
                   {authMode === 'register' && (
@@ -2794,9 +2898,15 @@ export default function ITestApp() {
                       <Input placeholder="např. testskola" value={inviteCode} onChange={e => setInviteCode(e.target.value)} className="h-12 rounded-xl" />
                     </div>
                   )}
+                  {authMode === 'student-register' && (
+                    <div className="space-y-2">
+                      <Label className="font-bold text-gray-700">Kód třídy (od učitele)</Label>
+                      <Input placeholder="např. A8X2B7" value={inviteCode} onChange={e => setInviteCode(e.target.value)} className="h-12 rounded-xl" />
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label className="font-bold text-gray-700">Uživatelské jméno</Label>
-                    <Input placeholder="jan.novak" value={username} onChange={e => setUsername(e.target.value)} className="h-12 rounded-xl" />
+                    <Input placeholder={authMode === 'student-register' ? "michal.novak" : "jan.novak"} value={username} onChange={e => setUsername(e.target.value)} className="h-12 rounded-xl" />
                   </div>
                   <div className="space-y-2">
                     <Label className="font-bold text-gray-700">Heslo</Label>
@@ -2805,8 +2915,26 @@ export default function ITestApp() {
                 </div>
                 
                 <Button type="submit" className="w-full h-12 text-base font-headline font-bold shadow-lg rounded-xl">
-                  {authMode === 'login' ? 'Vstoupit do iTestu' : authMode === 'register' ? 'Vytvořit účet' : 'Vytvořit zkušební účet'}
+                  {authMode === 'login' ? 'Vstoupit do iTestu' : authMode === 'register' ? 'Vytvořit účet' : authMode === 'student-register' ? 'Zaregistrovat se a přihlásit' : 'Vytvořit zkušební účet'}
                 </Button>
+
+                {authMode === 'login' && loginRole === 'student' && (
+                  <div className="mt-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('student-register');
+                        setName('');
+                        setInviteCode('');
+                        setUsername('');
+                        setPassword('');
+                      }}
+                      className="text-xs font-bold text-indigo-650 hover:text-indigo-850 hover:underline transition-all"
+                    >
+                      🎓 Nemáš účet? Zaregistruj se přes kód třídy
+                    </button>
+                  </div>
+                )}
               </form>
             </CardContent>
           </Card>
@@ -3440,6 +3568,11 @@ export default function ITestApp() {
                                   </h4>
                                   <p className="text-xs text-muted-foreground">
                                     Třídní učitel: <span className="font-bold text-gray-700">{classTeacher ? classTeacher.name : 'Nespecifikován'}</span>
+                                    {c.joinCode && (
+                                      <span className="ml-3 font-semibold text-slate-500">
+                                        Kód třídy: <span className="font-mono bg-slate-200 px-1 py-0.5 rounded text-primary font-bold">{c.joinCode}</span>
+                                      </span>
+                                    )}
                                   </p>
                                 </div>
                               </div>
@@ -3767,7 +3900,7 @@ export default function ITestApp() {
                                                        q.type === 'graph' ? 'Graf' : q.type}
                                                     </Badge>
                                                   </div>
-                                                  {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && (
+                                                  {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && q.type !== 'cloze' && (
                                                     <div className="mt-2">
                                                       <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                                       {answer === undefined || answer === null || answer === '' ? (
@@ -3778,6 +3911,63 @@ export default function ITestApp() {
                                                         <span className="font-bold">{answer ? '✓ Ano' : '✗ Ne'}</span>
                                                       ) : (
                                                         <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
+                                                      )}
+                                                    </div>
+                                                  )}
+
+                                                  {q.type === 'cloze' && (
+                                                    <div className="mt-2 text-left">
+                                                      <span className="text-sm font-medium text-muted-foreground block mb-1">Odpověď (doplňovačka):</span>
+                                                      {answer === undefined || answer === null || Object.keys(answer).length === 0 ? (
+                                                        <span className="italic text-gray-400">Neodpovězeno</span>
+                                                      ) : (
+                                                        <div className="p-3 bg-white rounded-xl border border-slate-200 leading-relaxed text-slate-800 font-medium text-sm inline-block">
+                                                          {(() => {
+                                                            const parts = parseClozeText(q.text);
+                                                            const given = answer && typeof answer === 'object' ? answer : {};
+                                                            return parts.map((part, idx) => {
+                                                              if (part.type === 'text') {
+                                                                return <span key={idx}>{part.text}</span>;
+                                                              } else {
+                                                                const studentVal = String(given[part.index!] || '').trim();
+                                                                const correctVal = String(part.correctAnswer || '').trim();
+                                                                const isPartCorrect = studentVal.toLowerCase() === correctVal.toLowerCase();
+
+                                                                if (!studentVal) {
+                                                                  return (
+                                                                    <span
+                                                                      key={idx}
+                                                                      className="mx-1 px-1.5 py-0.5 rounded bg-yellow-50 border border-yellow-300 text-yellow-700 text-xs font-bold"
+                                                                    >
+                                                                      [chybí, správně: {correctVal}]
+                                                                    </span>
+                                                                  );
+                                                                }
+
+                                                                if (isPartCorrect) {
+                                                                  return (
+                                                                    <span
+                                                                      key={idx}
+                                                                      className="mx-1 px-1.5 py-0.5 rounded bg-green-50 border border-green-300 text-green-700 text-xs font-bold"
+                                                                    >
+                                                                      {studentVal} ✓
+                                                                    </span>
+                                                                  );
+                                                                } else {
+                                                                  return (
+                                                                    <span
+                                                                      key={idx}
+                                                                      className="mx-1 px-1.5 py-0.5 rounded bg-red-50 border border-red-300 text-red-700 text-xs font-bold inline-flex items-center gap-1"
+                                                                    >
+                                                                      <span className="line-through opacity-70">{studentVal}</span>
+                                                                      <span className="text-green-700 font-bold ml-1">({correctVal})</span> ✗
+                                                                    </span>
+                                                                  );
+                                                                }
+                                                              }
+                                                            });
+                                                          })()}
+                                                        </div>
                                                       )}
                                                     </div>
                                                   )}
@@ -5081,7 +5271,14 @@ export default function ITestApp() {
                   <Card key={c.id} className={`cursor-pointer transition-all hover:shadow-xl group border-none ${selectedClassId === c.id ? 'ring-2 ring-primary bg-primary/5' : 'bg-white'}`} onClick={() => { setSelectedClassId(c.id); setActiveTab('assignments'); }}>
                     <div className="h-2 bg-accent/20 w-full" />
                     <CardHeader className="flex flex-row items-center justify-between pb-4">
-                      <CardTitle className="font-headline text-2xl group-hover:text-primary transition-colors">{c.name}</CardTitle>
+                      <div>
+                        <CardTitle className="font-headline text-2xl group-hover:text-primary transition-colors">{c.name}</CardTitle>
+                        {c.joinCode && (
+                          <p className="text-xs font-semibold text-slate-500/80 mt-1">
+                            Kód třídy: <span className="font-mono bg-slate-100 px-1 py-0.5 rounded text-primary font-bold">{c.joinCode}</span>
+                          </p>
+                        )}
+                      </div>
                       <Users className="w-6 h-6 text-accent opacity-40" />
                     </CardHeader>
                     <CardContent>
@@ -5457,6 +5654,47 @@ export default function ITestApp() {
                           )}
                         </div>
 
+                        {!a.isDraft && (
+                          <div className="bg-indigo-50/40 p-5 rounded-2xl border border-indigo-105 mt-4 space-y-4 print-exclude">
+                            <div className="flex flex-col sm:flex-row items-center gap-6">
+                              <div className="bg-white p-2.5 rounded-xl border border-slate-150 shadow-sm shrink-0">
+                                <img
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin + '/?test=' + a.id : '')}`}
+                                  alt="QR kód pro vstup do testu"
+                                  className="w-[120px] h-[120px]"
+                                />
+                              </div>
+                              <div className="space-y-2 text-center sm:text-left flex-1">
+                                <h3 className="font-bold text-sm text-indigo-700 uppercase tracking-wider">🔗 Vstup do testu přes odkaz / QR kód</h3>
+                                <p className="text-xs text-indigo-900/80 leading-relaxed">
+                                  Ukažte tento QR kód žákům nebo jim pošlete přímý odkaz. Po načtení kódu nebo kliknutí na odkaz a přihlášení se žákovi automaticky otevře tento test.
+                                </p>
+                                <div className="flex gap-2">
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={typeof window !== 'undefined' ? `${window.location.origin}/?test=${a.id}` : ''}
+                                    className="bg-white border text-xs px-3 py-1.5 rounded-lg font-mono text-gray-650 flex-1 focus:outline-none"
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-xs font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50 bg-white"
+                                    onClick={() => {
+                                      if (typeof window !== 'undefined') {
+                                        navigator.clipboard.writeText(`${window.location.origin}/?test=${a.id}`);
+                                        toast({ title: "Odkaz zkopírován", description: "Odkaz na test byl uložen do schránky." });
+                                      }
+                                    }}
+                                  >
+                                    Kopírovat
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="bg-emerald-50/40 p-5 rounded-2xl border border-emerald-100 mt-4 space-y-3 print-exclude">
                           <div className="flex items-center justify-between">
                             <h3 className="font-bold text-sm text-emerald-700 uppercase tracking-wider">📦 Hromadný export prací</h3>
@@ -5573,6 +5811,57 @@ export default function ITestApp() {
                                 }}
                               >
                                 📋 Duplikovat jako koncept (stejná třída)
+                              </Button>
+
+                              <Button
+                                variant="outline" size="sm"
+                                disabled={isGeneratingAlternative}
+                                className="w-full h-9 text-xs font-bold text-violet-700 border-violet-250 hover:bg-violet-50 bg-violet-50/30 flex items-center justify-center gap-1.5"
+                                onClick={async () => {
+                                  setIsGeneratingAlternative(true);
+                                  try {
+                                    const res = await fetch('/api/ai', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        action: 'generateAlternative',
+                                        questions: a.questions
+                                      })
+                                    });
+                                    const data = await res.json();
+                                    if (data.error) {
+                                      toast({ title: "Chyba generování", description: data.error, variant: "destructive" });
+                                    } else if (data.questions) {
+                                      store.addAssignment({
+                                        title: `${a.title} - Skupina B`,
+                                        description: a.description,
+                                        classId: a.classId,
+                                        teacherId: a.teacherId,
+                                        subject: a.subject || 'Jiný',
+                                        questions: data.questions,
+                                        dueDate: a.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                                        fileUri: a.fileUri,
+                                        studentIds: a.studentIds || [],
+                                        isDraft: true,
+                                      });
+                                      toast({ title: "Skupina B vytvořena", description: `Byla vygenerována nová verze testu a uložena jako koncept.`, variant: "default" });
+                                    }
+                                  } catch (err: any) {
+                                    console.error(err);
+                                    toast({ title: "Chyba", description: "Nepodařilo se komunikovat s AI serverem.", variant: "destructive" });
+                                  } finally {
+                                    setIsGeneratingAlternative(false);
+                                  }
+                                }}
+                              >
+                                {isGeneratingAlternative ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-750" />
+                                    Generuji skupinu B...
+                                  </>
+                                ) : (
+                                  <>✨ Generovat Skupinu B (AI)</>
+                                )}
                               </Button>
                             </div>
                           )}
@@ -5881,7 +6170,7 @@ export default function ITestApp() {
                                            </Badge>
                                         </div>
                                         
-                                        {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && (
+                                        {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && q.type !== 'cloze' && (
                                           <div className="mt-2">
                                             <span className="text-sm font-medium text-muted-foreground mr-2">Odpověď:</span>
                                             {answer === undefined || answer === null || answer === '' ? (
@@ -5892,6 +6181,63 @@ export default function ITestApp() {
                                               <span className="font-bold">{answer ? '✓ Ano' : '✗ Ne'}</span>
                                             ) : (
                                               <span className="font-bold whitespace-pre-wrap">{String(answer)}</span>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {q.type === 'cloze' && (
+                                          <div className="mt-2 text-left">
+                                            <span className="text-sm font-medium text-muted-foreground block mb-1">Odpověď (doplňovačka):</span>
+                                            {answer === undefined || answer === null || Object.keys(answer).length === 0 ? (
+                                              <span className="italic text-gray-400">Neodpovězeno</span>
+                                            ) : (
+                                              <div className="p-3 bg-white rounded-xl border border-slate-200 leading-relaxed text-slate-800 font-medium text-sm inline-block">
+                                                {(() => {
+                                                  const parts = parseClozeText(q.text);
+                                                  const given = answer && typeof answer === 'object' ? answer : {};
+                                                  return parts.map((part, idx) => {
+                                                    if (part.type === 'text') {
+                                                      return <span key={idx}>{part.text}</span>;
+                                                    } else {
+                                                      const studentVal = String(given[part.index!] || '').trim();
+                                                      const correctVal = String(part.correctAnswer || '').trim();
+                                                      const isPartCorrect = studentVal.toLowerCase() === correctVal.toLowerCase();
+
+                                                      if (!studentVal) {
+                                                        return (
+                                                          <span
+                                                            key={idx}
+                                                            className="mx-1 px-1.5 py-0.5 rounded bg-yellow-50 border border-yellow-300 text-yellow-700 text-xs font-bold"
+                                                          >
+                                                            [chybí, správně: {correctVal}]
+                                                          </span>
+                                                        );
+                                                      }
+
+                                                      if (isPartCorrect) {
+                                                        return (
+                                                          <span
+                                                            key={idx}
+                                                            className="mx-1 px-1.5 py-0.5 rounded bg-green-50 border border-green-300 text-green-700 text-xs font-bold"
+                                                          >
+                                                            {studentVal} ✓
+                                                          </span>
+                                                        );
+                                                      } else {
+                                                        return (
+                                                          <span
+                                                            key={idx}
+                                                            className="mx-1 px-1.5 py-0.5 rounded bg-red-50 border border-red-300 text-red-700 text-xs font-bold inline-flex items-center gap-1"
+                                                          >
+                                                            <span className="line-through opacity-70">{studentVal}</span>
+                                                            <span className="text-green-700 font-bold ml-1">({correctVal})</span> ✗
+                                                          </span>
+                                                        );
+                                                      }
+                                                    }
+                                                  });
+                                                })()}
+                                              </div>
                                             )}
                                           </div>
                                         )}
@@ -6332,6 +6678,32 @@ export default function ITestApp() {
                                   </div>
                                 </div>
 
+                                {(() => {
+                                  const failedQuestions = questionStats
+                                    .map((stat, idx) => ({ ...stat, idx: idx + 1 }))
+                                    .filter(stat => stat.pct < 50);
+                                  
+                                  if (failedQuestions.length === 0) return null;
+
+                                  return (
+                                    <div className="bg-rose-50 border border-rose-150 rounded-xl p-4 text-xs text-rose-950 shadow-sm space-y-1.5 mt-2">
+                                      <p className="font-bold flex items-center gap-1.5 text-rose-800">
+                                        <span>⚠️ Doporučení k procvičení</span>
+                                      </p>
+                                      <p className="text-rose-900/90 leading-relaxed">
+                                        Následující otázky měly úspěšnost pod 50 % a dělaly žákům největší potíže:
+                                      </p>
+                                      <ul className="list-disc pl-4 space-y-1 text-rose-900/90 font-semibold">
+                                        {failedQuestions.map(q => (
+                                          <li key={q.id}>
+                                            Otázka č. {q.idx} (úspěšnost {q.pct}%) – neuspělo {100 - q.pct}% žáků.
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  );
+                                })()}
+
                                 {/* Rozložení známek */}
                                 <div className="space-y-3">
                                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rozložení známek</h4>
@@ -6757,22 +7129,23 @@ export default function ITestApp() {
 
               <DialogFooter>
                 {studentActionType === 'create' ? (
-                  <Button onClick={handleAddStudent} disabled={store.currentUser?.role === 'admin' && !targetClassId}>Vytvořit</Button>
+                  <Button onClick={handleAddStudent} disabled={!(targetClassId || selectedClassId)}>Vytvořit</Button>
                 ) : studentActionType === 'select' ? (
                   <Button 
                     onClick={() => {
-                      if (selectedExistingStudentId && targetClassId) {
-                        store.assignStudent(selectedExistingStudentId, targetClassId);
+                      const classId = targetClassId || selectedClassId;
+                      if (selectedExistingStudentId && classId) {
+                        store.assignStudent(selectedExistingStudentId, classId);
                         setIsAddingStudent(false);
                         setSelectedExistingStudentId('');
                       }
                     }} 
-                    disabled={!selectedExistingStudentId || !targetClassId}
+                    disabled={!selectedExistingStudentId || !(targetClassId || selectedClassId)}
                   >Přiřadit žáka</Button>
                 ) : (
                   <Button
                     onClick={handleImportCSVToExisting}
-                    disabled={!csvFile || !!csvImportProgress || (store.currentUser?.role === 'admin' && !targetClassId)}
+                    disabled={!csvFile || !!csvImportProgress || !(targetClassId || selectedClassId)}
                     className="w-full"
                   >
                     Importovat žáky z CSV
@@ -7429,7 +7802,7 @@ export default function ITestApp() {
                                       </div>
 
                                       {/* Odpověď */}
-                                      {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && q.type !== 'matching' && (
+                                      {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && q.type !== 'matching' && q.type !== 'cloze' && (
                                         <div className="bg-white/80 p-3.5 rounded-xl border border-gray-100 space-y-1">
                                           <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moje odpověď:</span>
                                           <div>
@@ -7447,6 +7820,66 @@ export default function ITestApp() {
                                               <span className="font-semibold text-gray-800 whitespace-pre-wrap">
                                                 {String(answer)}
                                               </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {/* Cloze results renderer */}
+                                      {q.type === 'cloze' && (
+                                        <div className="bg-white/80 p-3.5 rounded-xl border border-gray-100 space-y-1 text-left">
+                                          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Moje odpověď:</span>
+                                          <div>
+                                            {answer === undefined || answer === null || Object.keys(answer).length === 0 ? (
+                                              <span className="italic text-gray-400">Neodpovězeno</span>
+                                            ) : (
+                                              <div className="leading-relaxed text-slate-800 font-medium text-sm text-left mt-1">
+                                                {(() => {
+                                                  const parts = parseClozeText(q.text);
+                                                  const given = answer && typeof answer === 'object' ? answer : {};
+                                                  return parts.map((part, idx) => {
+                                                    if (part.type === 'text') {
+                                                      return <span key={idx}>{part.text}</span>;
+                                                    } else {
+                                                      const studentVal = String(given[part.index!] || '').trim();
+                                                      const correctVal = String(part.correctAnswer || '').trim();
+                                                      const isPartCorrect = studentVal.toLowerCase() === correctVal.toLowerCase();
+
+                                                      if (!studentVal) {
+                                                        return (
+                                                          <span
+                                                            key={idx}
+                                                            className="mx-1 px-1.5 py-0.5 rounded bg-yellow-50 border border-yellow-300 text-yellow-700 text-xs font-bold"
+                                                          >
+                                                            [chybí, správně: {correctVal}]
+                                                          </span>
+                                                        );
+                                                      }
+
+                                                      if (isPartCorrect) {
+                                                        return (
+                                                          <span
+                                                            key={idx}
+                                                            className="mx-1 px-1.5 py-0.5 rounded bg-green-50 border border-green-300 text-green-700 text-xs font-bold"
+                                                          >
+                                                            {studentVal} ✓
+                                                          </span>
+                                                        );
+                                                      } else {
+                                                        return (
+                                                          <span
+                                                            key={idx}
+                                                            className="mx-1 px-1.5 py-0.5 rounded bg-red-50 border border-red-300 text-red-700 text-xs font-bold inline-flex items-center gap-1"
+                                                          >
+                                                            <span className="line-through opacity-70">{studentVal}</span>
+                                                            <span className="text-green-700 font-bold ml-1">({correctVal})</span> ✗
+                                                          </span>
+                                                        );
+                                                      }
+                                                    }
+                                                  });
+                                                })()}
+                                              </div>
                                             )}
                                           </div>
                                         </div>
@@ -7742,6 +8175,69 @@ export default function ITestApp() {
                                       value={studentAnswers[q.id]}
                                       onChange={(val) => setStudentAnswers(prev => ({ ...prev, [q.id]: val }))}
                                     />
+                                  )}
+
+                                  {/* Cloze solver */}
+                                  {q.type === 'cloze' && (
+                                    <div className="p-4 bg-white rounded-xl border border-slate-150 leading-relaxed text-slate-800 font-medium text-base select-none">
+                                      {(() => {
+                                        const parts = parseClozeText(q.text);
+                                        const currentAns = studentAnswers[q.id] || {};
+                                        return parts.map((part, i) => {
+                                          if (part.type === 'text') {
+                                            return <span key={i} className="whitespace-pre-wrap">{part.text}</span>;
+                                          } else if (part.type === 'dropdown') {
+                                            const currentVal = currentAns[part.index!] ?? '';
+                                            const sortedOptions = [...(part.options || [])].sort((a, b) => a.localeCompare(b));
+                                            return (
+                                              <select
+                                                key={i}
+                                                value={currentVal}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setStudentAnswers(prev => ({
+                                                    ...prev,
+                                                    [q.id]: {
+                                                      ...(prev[q.id] || {}),
+                                                      [part.index!]: val
+                                                    }
+                                                  }));
+                                                }}
+                                                disabled={hasEnded}
+                                                className="mx-1 h-8 rounded-lg border border-slate-350 bg-white px-2 text-sm font-bold text-indigo-750 focus:outline-none focus:ring-2 focus:ring-primary inline-block align-middle"
+                                              >
+                                                <option value="">—</option>
+                                                {sortedOptions.map((opt, optIdx) => (
+                                                  <option key={optIdx} value={opt}>{opt}</option>
+                                                ))}
+                                              </select>
+                                            );
+                                          } else {
+                                            const currentVal = currentAns[part.index!] ?? '';
+                                            return (
+                                              <input
+                                                key={i}
+                                                type="text"
+                                                value={currentVal}
+                                                onChange={(e) => {
+                                                  const val = e.target.value;
+                                                  setStudentAnswers(prev => ({
+                                                    ...prev,
+                                                    [q.id]: {
+                                                      ...(prev[q.id] || {}),
+                                                      [part.index!]: val
+                                                    }
+                                                  }));
+                                                }}
+                                                disabled={hasEnded}
+                                                style={{ width: `${Math.max(4, (part.correctAnswer || '').length + 2)}ch` }}
+                                                className="mx-1 h-8 rounded-lg border border-slate-350 bg-white px-2 text-sm font-bold text-indigo-750 focus:outline-none focus:ring-2 focus:ring-primary inline-block align-middle text-center"
+                                              />
+                                            );
+                                          }
+                                        });
+                                      })()}
+                                    </div>
                                   )}
 
                                   {/* Toggle: Dokreslit perem (pro všechny typy kromě drawing a graph) */}

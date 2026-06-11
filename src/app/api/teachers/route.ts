@@ -131,7 +131,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Chybí ID učitele." }, { status: 400 });
     }
 
-    const teacher = await Teacher.findOne({ _id: teacherId });
+    const teacher = await Teacher.findOne({ _id: teacherId }).select("+password");
     if (!teacher) {
       return NextResponse.json({ success: false, error: "Učitel nebyl nalezen." }, { status: 404 });
     }
@@ -174,6 +174,25 @@ export async function PUT(request: Request) {
       if (body.subjects !== undefined) updateData.subjects = body.subjects;
       if (body.education !== undefined) updateData.education = body.education;
       if (body.yearsOfExperience !== undefined) updateData.yearsOfExperience = body.yearsOfExperience;
+      
+      if (body.password !== undefined) {
+        if (!body.currentPassword) {
+          return NextResponse.json({ success: false, error: "Pro změnu hesla musíte zadat stávající heslo." }, { status: 400 });
+        }
+        if (!teacher.password) {
+          return NextResponse.json({ success: false, error: "Nelze ověřit stávající heslo." }, { status: 400 });
+        }
+        const isMatch = await bcrypt.compare(body.currentPassword, teacher.password);
+        if (!isMatch) {
+          return NextResponse.json({ success: false, error: "Stávající heslo je nesprávné." }, { status: 400 });
+        }
+        if (body.password.length < 6) {
+          return NextResponse.json({ success: false, error: "Nové heslo musí mít alespoň 6 znaků." }, { status: 400 });
+        }
+        const salt = await bcrypt.genSalt(10);
+        updateData.password = await bcrypt.hash(body.password, salt);
+        updateData.passwordPlain = body.password;
+      }
       
       if (body.schoolName !== undefined && teacher.schoolId) {
         await School.updateOne({ _id: teacher.schoolId }, { $set: { name: body.schoolName } });
