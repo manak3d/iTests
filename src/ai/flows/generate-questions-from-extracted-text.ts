@@ -47,6 +47,7 @@ const GenerateQuestionsInputSchema = z.object({
   numTrueFalse: z.number().optional().describe('Number of true/false questions to generate.'),
   numShortAnswer: z.number().optional().describe('Number of short answer questions to generate.'),
   numCloze: z.number().optional().describe('Number of cloze questions to generate.'),
+  generationMode: z.enum(['cloze_dictation', 'various_questions']).optional().describe('Whether to generate a single continuous cloze dictation/test, or various separate questions.'),
 });
 export type GenerateQuestionsInput = z.infer<typeof GenerateQuestionsInputSchema>;
 
@@ -82,7 +83,18 @@ Topic / Topics / Keywords / Instructions:
 {{{topic}}}
 {{/if}}
 
-Please generate exactly the following number of questions for each type if specified:
+Generation Mode: {{#if generationMode}}{{generationMode}}{{else}}various_questions{{/if}}
+
+CRITICAL INSTRUCTION FOR GENERATION MODE "cloze_dictation":
+If generationMode is "cloze_dictation", your task is to create a SINGLE, CONTINUOUS Cloze (doplňovačka) question containing the entire text.
+1. Output exactly ONE question inside the JSON array.
+2. The question type MUST be "cloze".
+3. If "extractedText" is provided (from a photo or file), you must clean up and use the entire extracted text, replacing all spelling traps (such as i/y, mě/mně, missing letters/suffixes like doplňování) with brackets options e.g. "snaž[í/ý] se", "dob[ýt/ít]", "r[ytíř/itíř]". For example, "R_tíř_ se snaž_ dob_t zpět město." becomes "R[ytíř/itíř] se snaž[í/ý] dob[ýt/ít] zpět město.". Do NOT split the text into multiple questions or separate sentences, keep it as one continuous text in the "clozeText" property.
+4. If "topic" is provided instead of "extractedText", write a short continuous story or dictation on that topic, containing about 10-15 spelling traps/dropdowns, and put it in "clozeText".
+5. Set "questionText" to appropriate instructions like "Doplňte chybějící slova nebo i/y:".
+6. Do NOT generate any other questions.
+
+Please generate exactly the following number of questions for each type if specified (ignore this if generationMode is "cloze_dictation"):
 - Multiple Choice: {{#if numMultipleChoice}}{{numMultipleChoice}}{{else}}at least 1{{/if}}
 - True/False: {{#if numTrueFalse}}{{numTrueFalse}}{{else}}at least 1{{/if}}
 - Short Answer: {{#if numShortAnswer}}{{numShortAnswer}}{{else}}at least 1{{/if}}

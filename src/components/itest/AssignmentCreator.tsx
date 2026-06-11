@@ -45,11 +45,13 @@ export function AssignmentCreator({
   // AI Generator state
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiInputMode, setAiInputMode] = useState<'topic' | 'document'>('topic');
+  const [aiGenerationMode, setAiGenerationMode] = useState<'cloze_dictation' | 'various_questions'>('cloze_dictation');
   const [aiTopic, setAiTopic] = useState('');
   const [aiNumMultipleChoice, setAiNumMultipleChoice] = useState('');
   const [aiNumTrueFalse, setAiNumTrueFalse] = useState('');
   const [aiNumShortAnswer, setAiNumShortAnswer] = useState('');
   const [aiNumCloze, setAiNumCloze] = useState('');
+  const [aiFileUri, setAiFileUri] = useState<string | undefined>();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDigitizing, setIsDigitizing] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
@@ -177,7 +179,7 @@ export function AssignmentCreator({
     let textToUse = '';
 
     if (aiInputMode === 'document') {
-      if (!fileUri) {
+      if (!aiFileUri) {
         setAiError('Chybí připojený soubor.');
         return;
       }
@@ -186,14 +188,13 @@ export function AssignmentCreator({
         const digRes = await fetch('/api/ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'digitize', fileDataUri: fileUri })
+          body: JSON.stringify({ action: 'digitize', fileDataUri: aiFileUri })
         });
         const digData = await digRes.json();
         if (!digRes.ok || !digData.success) {
           throw new Error(digData.error || 'Digitalizace selhala.');
         }
         textToUse = digData.extractedText || '';
-        setDescription(textToUse); 
       } catch (err: any) {
         setAiError(err.message || 'Nepodařilo se digitalizovat dokument.');
         setIsDigitizing(false);
@@ -211,10 +212,11 @@ export function AssignmentCreator({
           action: 'generate',
           extractedText: aiInputMode === 'document' ? textToUse : undefined,
           topic: aiTopic ? aiTopic : undefined,
-          numMultipleChoice: aiNumMultipleChoice ? Number(aiNumMultipleChoice) : undefined,
-          numTrueFalse: aiNumTrueFalse ? Number(aiNumTrueFalse) : undefined,
-          numShortAnswer: aiNumShortAnswer ? Number(aiNumShortAnswer) : undefined,
-          numCloze: aiNumCloze ? Number(aiNumCloze) : undefined
+          numMultipleChoice: aiGenerationMode === 'various_questions' ? (aiNumMultipleChoice ? Number(aiNumMultipleChoice) : undefined) : undefined,
+          numTrueFalse: aiGenerationMode === 'various_questions' ? (aiNumTrueFalse ? Number(aiNumTrueFalse) : undefined) : undefined,
+          numShortAnswer: aiGenerationMode === 'various_questions' ? (aiNumShortAnswer ? Number(aiNumShortAnswer) : undefined) : undefined,
+          numCloze: aiGenerationMode === 'various_questions' ? (aiNumCloze ? Number(aiNumCloze) : undefined) : undefined,
+          generationMode: aiGenerationMode
         })
       });
       const genData = await genRes.json();
@@ -263,6 +265,34 @@ export function AssignmentCreator({
         toast({ 
           title: "Chyba cloudu", 
           description: "Nepodařilo se dokument připravit pro nahrání.",
+          variant: "destructive" 
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+    
+    reader.readAsDataURL(file);
+  };
+
+  const handleAiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsProcessing(true);
+    const reader = new FileReader();
+    
+    reader.onload = async (event) => {
+      const rawDataUri = event.target?.result as string;
+      
+      try {
+        const compressedUri = await compressImage(rawDataUri);
+        setAiFileUri(compressedUri);
+        toast({ title: "Dokument pro AI načten", description: "Soubor byl úspěšně připraven k analýze." });
+      } catch (error: any) {
+        toast({ 
+          title: "Chyba cloudu", 
+          description: "Nepodařilo se dokument připravit.",
           variant: "destructive" 
         });
       } finally {
@@ -1232,6 +1262,33 @@ export function AssignmentCreator({
               </button>
             </div>
 
+            {/* Generation Mode Selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block">
+                Režim generování AI
+              </label>
+              <div className="flex gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setAiGenerationMode('cloze_dictation')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    aiGenerationMode === 'cloze_dictation' ? 'bg-white text-indigo-650 shadow-sm border border-slate-200' : 'text-gray-500 hover:bg-white/30'
+                  }`}
+                >
+                  📖 Souvislý diktát / doplňovačka (Doporučeno)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiGenerationMode('various_questions')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    aiGenerationMode === 'various_questions' ? 'bg-white text-indigo-650 shadow-sm border border-slate-200' : 'text-gray-500 hover:bg-white/30'
+                  }`}
+                >
+                  ❓ Různé samostatné otázky
+                </button>
+              </div>
+            </div>
+
             {/* TAB 1: TOPIC */}
             {aiInputMode === 'topic' && (
               <div className="space-y-4">
@@ -1250,76 +1307,78 @@ export function AssignmentCreator({
                   </div>
                 </div>
 
-                <div className="pt-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500 block mb-2">
-                    Počet otázek jednotlivých typů (nepovinné)
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Výběr z možností</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        placeholder="např. 3"
-                        value={aiNumMultipleChoice}
-                        onChange={(e) => setAiNumMultipleChoice(e.target.value)}
-                        className="rounded-xl text-sm text-slate-800"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Pravda / Nepravda</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        placeholder="např. 2"
-                        value={aiNumTrueFalse}
-                        onChange={(e) => setAiNumTrueFalse(e.target.value)}
-                        className="rounded-xl text-sm text-slate-800"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Krátká odpověď</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        placeholder="např. 1"
-                        value={aiNumShortAnswer}
-                        onChange={(e) => setAiNumShortAnswer(e.target.value)}
-                        className="rounded-xl text-sm text-slate-800"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Doplňovačka</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        placeholder="např. 2"
-                        value={aiNumCloze}
-                        onChange={(e) => setAiNumCloze(e.target.value)}
-                        className="rounded-xl text-sm text-slate-800"
-                      />
+                {aiGenerationMode === 'various_questions' && (
+                  <div className="pt-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500 block mb-2">
+                      Počet otázek jednotlivých typů (nepovinné)
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Výběr z možností</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="např. 3"
+                          value={aiNumMultipleChoice}
+                          onChange={(e) => setAiNumMultipleChoice(e.target.value)}
+                          className="rounded-xl text-sm text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Pravda / Nepravda</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="např. 2"
+                          value={aiNumTrueFalse}
+                          onChange={(e) => setAiNumTrueFalse(e.target.value)}
+                          className="rounded-xl text-sm text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Krátká odpověď</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="např. 1"
+                          value={aiNumShortAnswer}
+                          onChange={(e) => setAiNumShortAnswer(e.target.value)}
+                          className="rounded-xl text-sm text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Doplňovačka</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="např. 2"
+                          value={aiNumCloze}
+                          onChange={(e) => setAiNumCloze(e.target.value)}
+                          className="rounded-xl text-sm text-slate-800"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
             {/* TAB 2: DOCUMENT */}
             {aiInputMode === 'document' && (
               <div className="space-y-4">
-                {fileUri ? (
+                {aiFileUri ? (
                   <div className="bg-slate-50 p-4 rounded-xl border flex flex-col sm:flex-row items-center gap-4">
                     <div className="w-20 h-20 bg-gray-200 border rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                      <img src={fileUri} alt="Dokument" className="w-full h-full object-cover" />
+                      <img src={aiFileUri} alt="Dokument" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 text-center sm:text-left space-y-1">
-                      <p className="text-sm font-bold text-gray-800">Připojený dokument k úkolu</p>
-                      <p className="text-xs text-gray-400">Tento soubor/fotka bude odeslán do AI k OCR přepisu a tvorbě otázek.</p>
+                      <p className="text-sm font-bold text-gray-800">Pracovní dokument načtený pro AI</p>
+                      <p className="text-xs text-gray-400">Tato fotka/soubor se použije pouze k přepisu a tvorbě otázek. Žákům se nezobrazí.</p>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setFileUri(undefined)}
+                      onClick={() => setAiFileUri(undefined)}
                       className="text-destructive hover:bg-destructive/5 rounded-lg border-dashed flex-shrink-0"
                     >
                       <Trash2 className="w-4 h-4 mr-1" /> Odebrat
@@ -1339,13 +1398,13 @@ export function AssignmentCreator({
                         <div className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center hover:bg-gray-50 transition-colors h-10">
                           <FileUp className="w-4 h-4 mr-2 text-gray-500" /> Nahrát soubor
                         </div>
-                        <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleFileUpload} />
+                        <input type="file" className="hidden" accept="application/pdf,image/*" onChange={handleAiFileUpload} />
                       </label>
                       <label className="cursor-pointer">
                         <div className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center hover:bg-gray-50 transition-colors h-10">
                           <Camera className="w-4 h-4 mr-2 text-gray-500" /> Vyfotit mobilním
                         </div>
-                        <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleFileUpload} />
+                        <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleAiFileUpload} />
                       </label>
                     </div>
                   </div>
@@ -1486,7 +1545,7 @@ export function AssignmentCreator({
                     isGenerating ||
                     isDigitizing ||
                     (aiInputMode === 'topic' && !aiTopic.trim()) ||
-                    (aiInputMode === 'document' && !fileUri)
+                    (aiInputMode === 'document' && !aiFileUri)
                   }
                   className="bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-700 hover:to-fuchsia-700 text-white rounded-xl font-bold px-8 shadow-md"
                 >
