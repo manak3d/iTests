@@ -1147,7 +1147,8 @@ export default function ITestApp() {
                                q.type === 'axis' ? 'Osa X/Y' : 
                                q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                q.type === 'drawing' ? 'Kresba' : 
-                               q.type === 'graph' ? 'Graf' : q.type;
+                               q.type === 'graph' ? 'Graf' : 
+                               q.type === 'cloze' ? 'Doplňovačka' : q.type;
                                
             const qLines = doc.splitTextToSize(`${idx + 1}. ${q.text} [${qTypeLabel}]`, 122); // Necháme místo pro body pill
             const aLines = q.type !== 'drawing' ? doc.splitTextToSize(`Odpověď: ${ansText}`, 168) : [];
@@ -3915,7 +3916,8 @@ export default function ITestApp() {
                                                        q.type === 'axis' ? 'Osa X/Y' :
                                                        q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' :
                                                        q.type === 'drawing' ? 'Kresba' : 
-                                                       q.type === 'graph' ? 'Graf' : q.type}
+                                                       q.type === 'graph' ? 'Graf' : 
+                                                       q.type === 'cloze' ? 'Doplňovačka' : q.type}
                                                     </Badge>
                                                   </div>
                                                   {q.type !== 'drawing' && q.type !== 'graph' && q.type !== 'axis' && q.type !== 'number_line' && q.type !== 'cloze' && (
@@ -5900,7 +5902,8 @@ export default function ITestApp() {
                                        q.type === 'axis' ? 'Osa X/Y' : 
                                        q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                        q.type === 'drawing' ? 'Kresba' : 
-                                       q.type === 'graph' ? 'Graf' : q.type}
+                                       q.type === 'graph' ? 'Graf' : 
+                                       q.type === 'cloze' ? 'Doplňovačka' : q.type}
                                     </Badge>
                                   </div>
                                   {q.type === 'cloze' && (
@@ -6223,7 +6226,8 @@ export default function ITestApp() {
                                               q.type === 'axis' ? 'Osa X/Y' : 
                                               q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                               q.type === 'drawing' ? 'Kresba' : 
-                                              q.type === 'graph' ? 'Graf' : q.type}
+                                              q.type === 'graph' ? 'Graf' : 
+                                              q.type === 'cloze' ? 'Doplňovačka' : q.type}
                                            </Badge>
                                         </div>
                                         
@@ -8112,7 +8116,8 @@ export default function ITestApp() {
                                        q.type === 'axis' ? 'Osa X/Y' : 
                                        q.type === 'number_line' ? 'Číselná osa' : q.type === 'true_false' ? 'Ano / Ne' : 
                                        q.type === 'matching' ? 'Přiřazování' : 
-                                       q.type === 'drawing' ? 'Kresba' : q.type}
+                                       q.type === 'drawing' ? 'Kresba' : 
+                                       q.type === 'cloze' ? 'Doplňovačka' : q.type}
                                     </Badge>
                                   </div>
 
