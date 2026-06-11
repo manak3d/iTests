@@ -1547,6 +1547,7 @@ export default function ITestApp() {
     };
 
     const isTeacherOrAdmin = store.currentUser?.role === 'teacher' || store.currentUser?.role === 'admin';
+    const showAverages = isTeacherOrAdmin && gradebookViewMode === 'teacher';
 
     return (
       <Dialog open={selectedGradebookStudent !== null} onOpenChange={(open) => { if (!open) setSelectedGradebookStudent(null); }}>
@@ -1565,14 +1566,16 @@ export default function ITestApp() {
             </div>
 
             {/* Overall average */}
-            <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3 border border-white/10 shrink-0 self-stretch sm:self-auto">
-              <div className="text-4xl">{overallEmoji}</div>
-              <div>
-                <span className="text-[10px] font-black uppercase text-indigo-200 tracking-wider block">Celkový Průměr</span>
-                <span className="text-2xl font-black text-white">{overallAverage !== null ? overallAverage.toFixed(2).replace('.', ',') : '--'}</span>
-                <span className="text-xs text-indigo-100 block font-medium">{overallText}</span>
+            {showAverages && (
+              <div className="bg-white/15 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3 border border-white/10 shrink-0 self-stretch sm:self-auto">
+                <div className="text-4xl">{overallEmoji}</div>
+                <div>
+                  <span className="text-[10px] font-black uppercase text-indigo-200 tracking-wider block">Celkový Průměr</span>
+                  <span className="text-2xl font-black text-white">{overallAverage !== null ? overallAverage.toFixed(2).replace('.', ',') : '--'}</span>
+                  <span className="text-xs text-indigo-100 block font-medium">{overallText}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Main Layout Grid */}
@@ -1598,16 +1601,18 @@ export default function ITestApp() {
                       }`}
                     >
                       <span className="truncate">{subj}</span>
-                      {avg !== null ? (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                          isActive 
-                            ? 'bg-white/20 text-white' 
-                            : 'bg-primary/10 text-primary'
-                        }`}>
-                          {avg.toFixed(1).replace('.', ',')}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-normal italic">--</span>
+                      {showAverages && (
+                        avg !== null ? (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                            isActive 
+                              ? 'bg-white/20 text-white' 
+                              : 'bg-primary/10 text-primary'
+                          }`}>
+                            {avg.toFixed(1).replace('.', ',')}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-normal italic">--</span>
+                        )
                       )}
                     </button>
                   );
@@ -1659,16 +1664,29 @@ export default function ITestApp() {
               }`}>
                 {subjectAverage !== null ? (
                   <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <span className="text-5xl">{subjectEmoji}</span>
-                      <div>
-                        <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Průměrná známka</span>
-                        <h4 className="text-2xl font-black text-primary mt-0.5">
-                          {subjectAverage.toFixed(2).replace('.', ',')}
-                        </h4>
-                        <span className="text-xs text-muted-foreground font-semibold">{subjectText}</span>
+                    {showAverages ? (
+                      <div className="flex items-center gap-4">
+                        <span className="text-5xl">{subjectEmoji}</span>
+                        <div>
+                          <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Průměrná známka</span>
+                          <h4 className="text-2xl font-black text-primary mt-0.5">
+                            {subjectAverage.toFixed(2).replace('.', ',')}
+                          </h4>
+                          <span className="text-xs text-muted-foreground font-semibold">{subjectText}</span>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        <span className="text-5xl">📊</span>
+                        <div>
+                          <span className="text-xs font-bold uppercase text-slate-400 tracking-wider">Přehled předmětu</span>
+                          <h4 className="text-2xl font-black text-primary mt-0.5">
+                            {selectedGradebookSubject}
+                          </h4>
+                          <span className="text-xs text-muted-foreground font-semibold">Moje dosavadní klasifikace</span>
+                        </div>
+                      </div>
+                    )}
                     <div className="text-right">
                       <p className="text-2xl font-black text-slate-700">{selectedSubjectGradedSubmissions.length}</p>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Klasifikovaných testů</p>
@@ -8661,7 +8679,7 @@ export default function ITestApp() {
                   <h3 className="text-xl font-headline font-bold text-primary flex items-center gap-2">
                     📖 Moje Žákovská knížka
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">Podívej se na své známky, průměry a hodnocení ze všech testů.</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Podívej se na své známky a hodnocení ze všech testů.</p>
                 </div>
                 <Button 
                   className="w-full md:w-auto rounded-xl px-6 h-12 text-sm font-headline font-bold shadow-md bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white flex items-center justify-center gap-2"
