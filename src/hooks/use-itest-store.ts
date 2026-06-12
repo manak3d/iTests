@@ -344,6 +344,27 @@ export function useITestStore() {
     .catch(console.error);
   }, [db, toast]);
 
+  const deleteSubmission = useCallback((id: string) => {
+    return fetch(`/api/submissions?id=${id}`, {
+      method: 'DELETE'
+    })
+    .then(async res => {
+      if (res.ok) {
+        toast({ title: "Odevzdání smazáno", description: "Práce žáka byla smazána. Žák může test vypracovat znovu." });
+        setSubmissions(prev => prev.filter(s => s.id !== id));
+        
+        if (db) {
+          deleteDoc(doc(db, 'submissions', id)).catch(console.error);
+        }
+        return true;
+      } else {
+        toast({ title: "Chyba", description: "Nepodařilo se smazat odevzdání.", variant: "destructive" });
+        return false;
+      }
+    })
+    .catch(console.error);
+  }, [db, toast]);
+
 
   const startAssignmentTimer = useCallback((assignmentId: string, studentId: string, schoolId: string) => {
     const id = assignmentId + "-" + studentId;
@@ -935,7 +956,7 @@ export function useITestStore() {
 
   return {
     isLoaded, currentUser, classes, users, assignments, submissions, feedbacks,
-    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, submitWork, gradeSubmission,
+    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, deleteSubmission, submitWork, gradeSubmission,
     assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh, updateProfile, sendFeedback, updateFeedbackStatus, deleteFeedback
   };
 }

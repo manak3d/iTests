@@ -3884,17 +3884,31 @@ export default function ITestApp() {
                                       <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
                                       <CardDescription>Odevzdal: {student.name}</CardDescription>
                                     </div>
-                                    <a
-                                      href={`/print/submission/${sub.id}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      <Button 
-                                        className="rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                                    <div className="flex items-center gap-3">
+                                      <Button
+                                        variant="outline"
+                                        className="rounded-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 flex items-center gap-1.5 h-10 shadow-sm"
+                                        onClick={() => {
+                                          if (confirm("Opravdu chcete smazat toto odevzdání? Žák bude moci test vypracovat a odevzdat znovu.")) {
+                                            store.deleteSubmission(sub.id);
+                                            setViewingSubmission(null);
+                                          }
+                                        }}
                                       >
-                                        🖨️ Tisk / Uložit PDF
+                                        <Trash2 className="w-4 h-4" /> Smazat práci (Reset)
                                       </Button>
-                                    </a>
+                                      <a
+                                        href={`/print/submission/${sub.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <Button 
+                                          className="rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                                        >
+                                          🖨️ Tisk / Uložit PDF
+                                        </Button>
+                                      </a>
+                                    </div>
                                   </CardHeader>
                                   <CardContent className="p-8 space-y-8">
                                     {assignment.questions && assignment.questions.length > 0 && (
@@ -6194,17 +6208,31 @@ export default function ITestApp() {
                             <CardTitle className="font-headline text-3xl text-primary">{assignment.title}</CardTitle>
                             <CardDescription>Odevzdal: {student.name}</CardDescription>
                           </div>
-                          <a
-                            href={`/print/submission/${sub.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Button 
-                              className="rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                          <div className="flex items-center gap-3">
+                            <Button
+                              variant="outline"
+                              className="rounded-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 flex items-center gap-1.5 h-10 shadow-sm"
+                              onClick={() => {
+                                if (confirm("Opravdu chcete smazat toto odevzdání? Žák bude moci test vypracovat a odevzdat znovu.")) {
+                                  store.deleteSubmission(sub.id);
+                                  setViewingSubmission(null);
+                                }
+                              }}
                             >
-                              🖨️ Tisk / Uložit PDF
+                              <Trash2 className="w-4 h-4" /> Smazat práci (Reset)
                             </Button>
-                          </a>
+                            <a
+                              href={`/print/submission/${sub.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button 
+                                className="rounded-full shadow-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                              >
+                                🖨️ Tisk / Uložit PDF
+                              </Button>
+                            </a>
+                          </div>
                         </CardHeader>
                         <CardContent className="p-8 space-y-8">
                           {assignment.questions && assignment.questions.length > 0 && (

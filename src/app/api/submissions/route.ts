@@ -133,3 +133,32 @@ export async function PUT(request: Request) {
     return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    await dbConnect();
+    const session = await getUserSession();
+
+    if (!session || (session.role !== "teacher" && session.role !== "admin")) {
+      return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Chybí ID odevzdání." }, { status: 400 });
+    }
+
+    const filter = session.role === "admin" ? { _id: id } : { _id: id, schoolId: session.schoolId };
+    const deleted = await Submission.findOneAndDelete(filter);
+
+    if (!deleted) {
+      return NextResponse.json({ success: false, error: "Odevzdaná práce nebyla nalezena nebo na ni nemáte práva." }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}

@@ -52,13 +52,16 @@ export async function GET() {
       }
     }
     
-    // Automatické čistenie databázy - vymazanie dát starších ako 30 dní
-    const limitDate = new Date();
-    limitDate.setDate(limitDate.getDate() - 30);
+    // Automatické čištění databáze - smazání žákovských odevzdání (Submission) vždy 30. srpna, 2 roky po uložení
+    // Zadání testů (Assignment) od učitelů ponecháváme
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const august30ThisYear = new Date(currentYear, 7, 30); // 30. srpna (0-indexed, 7 = srpen)
 
-    // Vymažeme staré odovzdané práce aj samotné zadania testov staršie ako 30 dní
+    const thresholdYear = now >= august30ThisYear ? (currentYear - 1) : (currentYear - 2);
+    const limitDate = new Date(thresholdYear, 0, 1); // 1. ledna hraničního roku
+
     await Submission.deleteMany({ createdAt: { $lt: limitDate } });
-    await Assignment.deleteMany({ createdAt: { $lt: limitDate } });
 
     let teachers: any[] = [];
     let students: any[] = [];
