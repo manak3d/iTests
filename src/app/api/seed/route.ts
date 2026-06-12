@@ -6,113 +6,51 @@ import { Classroom } from "@/models/Classroom";
 import { Student } from "@/models/Student";
 import { Assignment } from "@/models/Assignment";
 import { Submission } from "@/models/Submission";
+import { Feedback } from "@/models/Feedback";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
   try {
     await dbConnect();
 
-    // 1. Vyčištění předchozích testovacích dat
+    // 1. Vyčištění všech kolekcí v databázi
+    console.log("Clearing all collections...");
     await School.deleteMany({});
     await Teacher.deleteMany({});
     await Classroom.deleteMany({});
     await Student.deleteMany({});
     await Assignment.deleteMany({});
     await Submission.deleteMany({});
+    await Feedback.deleteMany({});
 
-    // 2. Vytvoření testovací školy
-    const school = await School.create({
-      name: "Základní škola Komenského",
-      inviteCode: "testskola",
-    });
-    const schoolId = school._id.toString();
+    // 2. Hashování nového hesla pro admina
+    const adminPasswordHash = await bcrypt.hash("admin1234", 10);
 
-    // 3. Hashování hesel
-    const teacherPasswordHash = await bcrypt.hash("heslo", 10);
-    const adminPasswordHash = await bcrypt.hash("admin123", 10);
-    const studentPasswordHash1 = await bcrypt.hash("123456", 10);
-    const studentPasswordHash2 = await bcrypt.hash("QWERT135", 10);
-
-    // 4. Vytvoření testovacího učitele (testu)
-    const teacher = await Teacher.create({
-      firstName: "Jan",
-      lastName: "Komenský",
-      email: "jan.komensky@skola.cz",
-      username: "testu",
-      password: teacherPasswordHash,
-      passwordPlain: "heslo",
-      role: "teacher",
-      subjects: ["Matematika", "Fyzika"],
-      schoolId: schoolId,
-      aiCredits: 30,
-      aiCreditsMax: 30,
-      aiExtraCredits: 0,
-      premiumType: "trial",
-      aiCreditsResetDate: null,
-    });
-
-    // 4.1. Vytvoření administrátora (v modelu Teacher s role: "admin", bez schoolId)
+    // 3. Vytvoření administrátora (v kolekci teachers s role: "admin")
     const adminUser = await Teacher.create({
       firstName: "Hlavní",
       lastName: "Administrátor",
       email: "admin@itests.cz",
       username: "admin",
       password: adminPasswordHash,
-      passwordPlain: "admin123",
+      passwordPlain: "admin1234",
       role: "admin",
       subjects: ["Všechny"],
     });
 
-    // 5. Vytvoření testovací třídy
-    const classroom = await Classroom.create({
-      _id: "0.A",
-      name: "0.A",
-      teacherId: teacher._id.toString(),
-      year: 2024,
-      studentIds: ["tests1", "nina.sekerkova"],
-      schoolId: schoolId,
-    });
-
-    // 6. Vytvoření testovacích žáků
-    const student1 = await Student.create({
-      _id: "tests1",
-      firstName: "tests1",
-      lastName: "Neznámé",
-      email: "student1@zaci.cz",
-      username: "tests1",
-      password: studentPasswordHash1,
-      passwordPlain: "123456",
-      role: "student",
-      classroomId: classroom._id.toString(),
-      schoolId: schoolId,
-    });
-
-    const student2 = await Student.create({
-      _id: "nina.sekerkova",
-      firstName: "Nina",
-      lastName: "Sekerková",
-      email: "nina.sekerkova@zaci.cz",
-      username: "nina.sekerkova",
-      password: studentPasswordHash2,
-      passwordPlain: "QWERT135",
-      role: "student",
-      classroomId: classroom._id.toString(),
-      schoolId: schoolId,
-    });
-
     return NextResponse.json({
-      message: "Data byla úspěšně uložena do databáze!",
+      success: true,
+      message: "Databáze byla kompletně smazána a byl vytvořen nový administrátorský účet!",
       data: {
-        school,
-        teacher,
-        classroom,
-        students: [student1, student2],
-      },
+        username: adminUser.username,
+        role: adminUser.role,
+        passwordPlain: adminUser.passwordPlain
+      }
     });
   } catch (error: any) {
-    console.error("Chyba při ukládání dat do DB:", error);
+    console.error("Chyba při mazání a seeding dat do DB:", error);
     return NextResponse.json(
-      { error: "Nepodařilo se uložit data do databáze", details: error.message },
+      { error: "Nepodařilo se vymazat a nasadit nová data do databáze", details: error.message },
       { status: 500 }
     );
   }
