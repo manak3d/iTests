@@ -1,6 +1,8 @@
 "use client";
 import { StudentDashboard } from '@/components/dashboard/StudentDashboard';
 import { TeacherDashboard } from '@/components/dashboard/TeacherDashboard';
+import { TeacherHub } from '@/components/dashboard/TeacherHub';
+import { AiPedagogDashboard } from '@/components/dashboard/AiPedagogDashboard';
 import { AdminDashboard } from '@/components/dashboard/AdminDashboard';
 
 import { useState, useEffect, useRef } from 'react';
@@ -658,6 +660,7 @@ export default function ITestApp() {
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
   const [viewingAssignmentSubs, setViewingAssignmentSubs] = useState<string | null>(null);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [teacherMode, setTeacherMode] = useState<'hub' | 'itest' | 'ai'>('hub');
 
   useEffect(() => {
     if (store.currentUser && store.currentUser.role === 'student' && pendingTestId) {
@@ -3031,6 +3034,27 @@ export default function ITestApp() {
   }
 
   const currentUser = store.currentUser;
+
+  if (currentUser.role === 'admin' || currentUser.role === 'teacher') {
+    if (teacherMode === 'hub') {
+      return (
+        <TeacherHub 
+          userName={currentUser.name} 
+          onSelectMode={setTeacherMode} 
+          onLogout={() => store.logout()} 
+        />
+      );
+    }
+    
+    if (teacherMode === 'ai') {
+      return (
+        <AiPedagogDashboard 
+          userName={currentUser.name}
+          onBack={() => setTeacherMode('hub')}
+        />
+      );
+    }
+  }
 
   if (currentUser.role === 'admin') {
     const rawTeachers = store.users.filter(u => u.role === 'teacher');
