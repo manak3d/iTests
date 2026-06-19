@@ -1588,6 +1588,14 @@ export function AdminDashboard(props: any) {
                                   )}
 
                                   <Button 
+                                    size="sm" 
+                                    className="rounded-xl font-bold h-9 bg-amber-500 hover:bg-amber-600 text-white"
+                                    onClick={() => store.toggleUserPremium(f.teacherId, true, 'yearly')}
+                                  >
+                                    👑 Aktivovat Premium
+                                  </Button>
+
+                                  <Button 
                                     variant="ghost" 
                                     size="sm" 
                                     className="rounded-xl font-bold h-9 text-red-500 hover:text-red-700 hover:bg-red-50"
