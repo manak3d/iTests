@@ -39,7 +39,7 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
     return () => clearInterval(clockInterval);
   }, []);
 
-  const assignment = store.assignments.find((a: any) => a.id === assignmentId);
+  const assignment = store.assignments.find((a: any) => a?.id === assignmentId);
   if (!assignment) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col items-center justify-center p-6 text-center">
@@ -51,25 +51,25 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
     );
   }
 
-  const classroom = store.classes.find((c: any) => c.id === assignment.classId);
+  const classroom = store.classes.find((c: any) => c?.id === assignment?.classId);
   const className = classroom ? classroom.name : 'Neznámá třída';
 
   // Find students assigned to this test
   const students = store.users.filter((u: any) => 
-    u.role === 'student' && 
+    u?.role === 'student' && 
     (assignment.studentIds && assignment.studentIds.length > 0 
-      ? assignment.studentIds.includes(u.id) 
-      : u.classId === assignment.classId)
+      ? assignment?.studentIds?.includes(u?.id) 
+      : u?.classId === assignment?.classId)
   );
 
   // Stats calculation
   const totalStudents = students.length;
-  const submissionsForAssignment = store.submissions.filter((s: any) => s.assignmentId === assignmentId);
+  const submissionsForAssignment = store.submissions.filter((s: any) => s?.assignmentId === assignmentId);
   
-  const completedCount = submissionsForAssignment.filter((s: any) => s.submittedAt !== "").length;
-  const inProgressCount = submissionsForAssignment.filter((s: any) => s.startedAt && s.submittedAt === "").length;
+  const completedCount = submissionsForAssignment.filter((s: any) => s?.submittedAt !== "").length;
+  const inProgressCount = submissionsForAssignment.filter((s: any) => s?.startedAt && s?.submittedAt === "").length;
   const notStartedCount = totalStudents - completedCount - inProgressCount;
-  const cheatAlertsCount = submissionsForAssignment.filter((s: any) => (s.tabFocusLostCount || 0) > 0).length;
+  const cheatAlertsCount = submissionsForAssignment.filter((s: any) => (s?.tabFocusLostCount || 0) > 0).length;
 
   const handleManualRefresh = () => {
     setIsRefreshing(true);
@@ -192,7 +192,7 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
       {/* Main Grid: Student Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {students.map((student: any) => {
-          const sub = submissionsForAssignment.find((s: any) => s.studentId === student.id);
+          const sub = submissionsForAssignment.find((s: any) => s?.studentId === student?.id);
           
           let status: 'not_started' | 'in_progress' | 'completed' = 'not_started';
           if (sub) {
@@ -220,7 +220,7 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
 
           return (
             <Card 
-              key={student.id} 
+              key={student?.id || Math.random().toString()} 
               className={`transition-all duration-300 relative overflow-hidden backdrop-blur flex flex-col justify-between ${
                 status === 'completed' 
                   ? 'bg-emerald-950/15 border-emerald-900/30' 
@@ -240,9 +240,9 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
                 <div className="flex items-start justify-between gap-2">
                   <div className="truncate">
                     <h4 className="font-bold text-base tracking-tight truncate text-white">
-                      {student.name}
+                      {student?.name || "?"}
                     </h4>
-                    <span className="text-xs font-mono text-slate-500">@{student.username}</span>
+                    <span className="text-xs font-mono text-slate-500">@{student?.username || "?"}</span>
                   </div>
 
                   {/* Status Indicator */}
@@ -352,25 +352,25 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
               {status !== 'not_started' && sub && (
                 <div className="border-t border-slate-800 p-3 bg-slate-950/20">
                   <button 
-                    onClick={() => setExpandedStudentId(expandedStudentId === student.id ? null : student.id)}
+                    onClick={() => setExpandedStudentId(expandedStudentId === student?.id ? null : student.id)}
                     className="w-full flex items-center justify-between text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
                   >
-                    <span>{expandedStudentId === student.id ? 'Skrýt přehled odpovědí' : 'Nahlédnout na odpovědi'}</span>
+                    <span>{expandedStudentId === student?.id ? 'Skrýt přehled odpovědí' : 'Nahlédnout na odpovědi'}</span>
                     <ExternalLink className="w-3 h-3" />
                   </button>
                   
-                  {expandedStudentId === student.id && (
+                  {expandedStudentId === student?.id && (
                     <div className="mt-3 pt-3 border-t border-slate-800/40 text-xs space-y-2.5 max-h-48 overflow-y-auto scrollbar-thin">
-                      {assignment.questions?.map((q: any, idx: number) => {
-                        const ans = sub.answers?.[q.id];
+                      {(assignment?.questions || [])?.map((q: any, idx: number) => {
+                        const ans = sub.answers?.[q?.id];
                         let displayText = "Neodpovězeno";
-                        if (q.type === 'drawing') {
-                          displayText = sub.questionDrawings?.[q.id] ? "🎨 Obrázek zakreslen" : "Neodpovězeno";
-                        } else if (q.type === 'multiple_choice') {
+                        if (q?.type === 'drawing') {
+                          displayText = sub.questionDrawings?.[q?.id] ? "🎨 Obrázek zakreslen" : "Neodpovězeno";
+                        } else if (q?.type === 'multiple_choice') {
                           displayText = ans !== undefined && ans !== null && ans !== ''
-                            ? `${String.fromCharCode(65 + Number(ans))}. ${q.options?.[Number(ans)] || ''}`
+                            ? `${String.fromCharCode(65 + Number(ans))}. ${q?.options?.[Number(ans)] || ''}`
                             : "Neodpovězeno";
-                        } else if (q.type === 'true_false') {
+                        } else if (q?.type === 'true_false') {
                           displayText = ans !== undefined && ans !== null && ans !== ''
                             ? (ans ? "✓ Ano" : "✗ Ne")
                             : "Neodpovězeno";
@@ -379,9 +379,9 @@ export function LiveMonitor({ assignmentId, store, onClose }: LiveMonitorProps) 
                         }
 
                         return (
-                          <div key={q.id} className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/45">
+                          <div key={q?.id} className="bg-slate-950/50 p-2 rounded-lg border border-slate-800/45">
                             <div className="font-semibold text-slate-400 truncate mb-1">
-                              {idx + 1}. {q.text}
+                              {idx + 1}. {q?.text}
                             </div>
                             <div className={`italic ${ans !== undefined && ans !== null && ans !== '' ? 'text-indigo-200 not-italic font-medium' : 'text-slate-600'}`}>
                               {displayText}
