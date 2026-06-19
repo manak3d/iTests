@@ -2,6 +2,31 @@ import { NextResponse } from "next/server";
 import dbConnect from "@/lib/mongodb";
 import { Submission } from "@/models/Submission";
 import { getUserSession } from "@/lib/auth";
+import { z } from "zod";
+
+const submissionPostSchema = z.object({
+  id: z.string().optional(),
+  assignmentId: z.string().min(1, "Chybí ID zadání."),
+  studentId: z.string().optional(),
+  schoolId: z.string().optional(),
+  answers: z.record(z.any()).optional().default({}),
+  questionDrawings: z.record(z.any()).optional().default({}),
+  mainWorkDrawing: z.string().nullable().optional(),
+  submittedAt: z.string().optional(),
+  startedAt: z.string().optional(),
+  questionScores: z.record(z.number()).optional(),
+  questionFeedback: z.record(z.string()).optional(),
+  feedback: z.string().optional(),
+  tabFocusLostCount: z.number().optional(),
+  lastActiveAt: z.string().optional(),
+});
+
+const submissionPutSchema = z.object({
+  id: z.string().min(1, "Chybí ID."),
+  feedback: z.string().optional(),
+  questionScores: z.record(z.number()).optional(),
+  grade: z.number().nullable().optional(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +37,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Nepřihlášený uživatel." }, { status: 401 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = submissionPostSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
+
     const schoolId = session.role === "admin" ? body.schoolId : session.schoolId;
 
     if (!schoolId) {
@@ -99,7 +130,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = submissionPutSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
     
     if (!body.id) throw new Error("Missing submission ID");
 

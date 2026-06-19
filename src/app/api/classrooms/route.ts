@@ -6,6 +6,20 @@ import { Assignment } from "@/models/Assignment";
 import { Submission } from "@/models/Submission";
 import { Teacher } from "@/models/Teacher";
 import { getUserSession } from "@/lib/auth";
+import { z } from "zod";
+
+const classroomPostSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Chybí název třídy."),
+  teacherId: z.string().optional(),
+  schoolId: z.string().optional(),
+});
+
+const classroomPutSchema = z.object({
+  id: z.string().min(1, "Chybí ID třídy."),
+  teacherId: z.string().optional(),
+  name: z.string().optional(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +30,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = classroomPostSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
+
     let schoolId = session.role === "admin" ? body.schoolId : session.schoolId;
 
     // Pokud chybí ID školy (např. u admina), zkusíme ho dohledat z učitele
@@ -95,7 +115,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = classroomPutSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
     
     const updateData: any = {};
     if (body.teacherId !== undefined) updateData.teacherId = body.teacherId;

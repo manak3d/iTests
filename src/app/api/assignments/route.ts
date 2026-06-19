@@ -3,6 +3,42 @@ import dbConnect from "@/lib/mongodb";
 import { Assignment } from "@/models/Assignment";
 import { Submission } from "@/models/Submission";
 import { getUserSession } from "@/lib/auth";
+import { z } from "zod";
+
+const assignmentPostSchema = z.object({
+  id: z.string().min(1, "Chybí ID zadání."),
+  title: z.string().min(1, "Chybí název testu."),
+  description: z.string().optional(),
+  classId: z.string().min(1, "Chybí ID třídy."),
+  teacherId: z.string().optional(),
+  subject: z.string().optional(),
+  questions: z.array(z.any()).optional().default([]),
+  dueDate: z.string().optional(),
+  fileUri: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  studentIds: z.array(z.string()).optional(),
+  sharedWithClassIds: z.array(z.string()).optional(),
+  gradeThresholds: z.array(z.any()).optional(),
+  isDraft: z.boolean().optional(),
+  isPublicTemplate: z.boolean().optional(),
+  timeLimit: z.number().optional(),
+  isPractice: z.boolean().optional(),
+  schoolId: z.string().optional(),
+});
+
+const assignmentPutSchema = z.object({
+  id: z.string().min(1, "Chybí ID."),
+  startTime: z.string().optional().nullable(),
+  endTime: z.string().optional().nullable(),
+  studentIds: z.array(z.string()).optional(),
+  sharedWithClassIds: z.array(z.string()).optional(),
+  gradeThresholds: z.array(z.any()).optional(),
+  isDraft: z.boolean().optional(),
+  isPublicTemplate: z.boolean().optional(),
+  timeLimit: z.number().optional(),
+  isPractice: z.boolean().optional(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +49,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = assignmentPostSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
+
     const schoolId = session.role === "admin" ? body.schoolId : session.schoolId;
 
     if (!schoolId) {
@@ -61,7 +103,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = assignmentPutSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
     const { id, startTime, endTime, studentIds, sharedWithClassIds, gradeThresholds, isDraft, isPublicTemplate, timeLimit, isPractice } = body;
     
     if (!id) {

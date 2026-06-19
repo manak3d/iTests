@@ -514,7 +514,7 @@ export function useITestStore() {
       id,
       submittedAt: new Date().toISOString(),
       ...(mergedScores ? { questionScores: mergedScores } : {}),
-      tabFocusLostCount: existingSub?.tabFocusLostCount || 0,
+      tabFocusLostCount: submission.tabFocusLostCount !== undefined ? submission.tabFocusLostCount : (existingSub?.tabFocusLostCount || 0),
       lastActiveAt: new Date().toISOString()
     };
     

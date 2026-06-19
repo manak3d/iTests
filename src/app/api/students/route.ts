@@ -6,6 +6,24 @@ import { Submission } from "@/models/Submission";
 import { Classroom } from "@/models/Classroom";
 import { getUserSession } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
+
+const studentPostSchema = z.object({
+  id: z.string().optional(),
+  firstName: z.string().min(1, "Chybí jméno."),
+  lastName: z.string().min(1, "Chybí příjmení."),
+  username: z.string().min(1, "Chybí uživatelské jméno."),
+  password: z.string().optional(),
+  classroomId: z.string().optional(),
+  email: z.string().optional(),
+  schoolId: z.string().optional(),
+});
+
+const studentPutSchema = z.object({
+  id: z.string().min(1, "Chybí ID."),
+  classId: z.string().optional(),
+  password: z.string().optional(),
+});
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +34,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = studentPostSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
+
     let schoolId = session.role === "admin" ? body.schoolId : session.schoolId;
 
     let classroom = null;
@@ -120,7 +144,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = studentPutSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
     
     const filter = session.role === "admin" ? { _id: body.id } : { _id: body.id, schoolId: session.schoolId };
     const oldStudent = await Student.findOne(filter);

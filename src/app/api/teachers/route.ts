@@ -8,11 +8,44 @@ import { Submission } from "@/models/Submission";
 import { School } from "@/models/School";
 import { getUserSession } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
+
+const teacherPostSchema = z.object({
+  isTrialRegistration: z.boolean().optional(),
+  firstName: z.string().min(1, "Chybí jméno."),
+  lastName: z.string().min(1, "Chybí příjmení."),
+  username: z.string().min(1, "Chybí uživatelské jméno."),
+  password: z.string().optional(),
+  email: z.string().email("Neplatný formát e-mailu."),
+  inviteCode: z.string().optional(),
+  subjects: z.union([z.array(z.string()), z.string()]).optional(),
+});
+
+const teacherPutSchema = z.object({
+  id: z.string().optional(),
+  action: z.string().optional(),
+  type: z.string().optional(),
+  amount: z.number().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  subjects: z.array(z.string()).optional(),
+  education: z.string().optional(),
+  yearsOfExperience: z.number().optional(),
+  currentPassword: z.string().optional(),
+  password: z.string().optional(),
+  schoolName: z.string().optional(),
+});
 
 export async function POST(request: Request) {
   try {
     await dbConnect();
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = teacherPostSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
+
     let schoolId = "";
 
     if (body.isTrialRegistration) {
@@ -119,7 +152,12 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Přístup odepřen." }, { status: 403 });
     }
 
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parseResult = teacherPutSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      return NextResponse.json({ success: false, error: "Neplatná data", details: parseResult.error.errors }, { status: 400 });
+    }
+    const body = parseResult.data;
 
     if ((body.action === "activatePremium" || body.action === "deactivatePremium" || body.action === "addCredits") && session.role !== "admin") {
       return NextResponse.json({ success: false, error: "Pouze administrátor může spravovat předplatné a kredity." }, { status: 403 });
