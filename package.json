@@ -46,7 +46,7 @@
     "jsonwebtoken": "^9.0.3",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
-    "lucide-react": "^0.475.0",
+    "lucide-react": "^0.292.0",
     "mongoose": "^9.6.2",
     "next": "15.5.9",
     "patch-package": "^8.0.0",
