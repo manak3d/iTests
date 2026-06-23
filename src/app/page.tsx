@@ -4343,6 +4343,8 @@ export default function ITestApp() {
           onLogout={() => store.logout()} 
           onUpgradeClick={() => setIsUpgradeModalOpen(true)} 
           onProfileClick={() => setIsProfileModalOpen(true)}
+          showPortalLink={true}
+          onPortalClick={() => setTeacherMode('hub')}
         />
 
         <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8 space-y-8 animate-fade-in">

@@ -8,20 +8,37 @@ export function Navbar({
   user, 
   onLogout, 
   onUpgradeClick,
-  onProfileClick 
+  onProfileClick,
+  showPortalLink,
+  onPortalClick
 }: { 
   user: User; 
   onLogout: () => void; 
   onUpgradeClick?: () => void;
   onProfileClick?: () => void;
+  showPortalLink?: boolean;
+  onPortalClick?: () => void;
 }) {
   return (
     <nav className="border-b bg-white px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-      <div className="flex items-center gap-2">
-        <div className="bg-primary p-1.5 rounded-lg shadow-sm">
-          <BookOpen className="text-white w-6 h-6" />
+      <div className="flex items-center gap-4">
+        {showPortalLink && onPortalClick && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onPortalClick}
+            className="hidden md:flex text-slate-500 hover:text-slate-800 mr-2"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5"><path d="m15 18-6-6 6-6"/></svg>
+            Zpět na rozcestník
+          </Button>
+        )}
+        <div className="flex items-center gap-2">
+          <div className="bg-primary p-1.5 rounded-lg shadow-sm">
+            <BookOpen className="text-white w-6 h-6" />
+          </div>
+          <span className="font-headline text-2xl font-bold tracking-tight text-primary">iTest</span>
         </div>
-        <span className="font-headline text-2xl font-bold tracking-tight text-primary">iTest</span>
       </div>
 
       <div className="flex items-center gap-6">
