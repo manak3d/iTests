@@ -6,6 +6,7 @@ import { Classroom } from "@/models/Classroom";
 import { Assignment } from "@/models/Assignment";
 import { Submission } from "@/models/Submission";
 import { Feedback } from "@/models/Feedback";
+import { AiLog } from "@/models/AiLog";
 
 import { getUserSession } from "@/lib/auth";
 
@@ -21,7 +22,8 @@ export async function GET() {
         classes: [], 
         assignments: [], 
         submissions: [],
-        feedbacks: []
+        feedbacks: [],
+        aiLogs: []
       });
     }
 
@@ -69,6 +71,7 @@ export async function GET() {
     let assignments: any[] = [];
     let submissions: any[] = [];
     let feedbacks: any[] = [];
+    let aiLogs: any[] = [];
 
     if (session.role === 'admin') {
       // Admin vidí všechno ze všech škol
@@ -78,6 +81,7 @@ export async function GET() {
       assignments = await Assignment.find({}).lean();
       submissions = await Submission.find({}).lean();
       feedbacks = await Feedback.find({}).sort({ createdAt: -1 }).lean();
+      aiLogs = await AiLog.find({}).sort({ createdAt: -1 }).lean();
     } else {
       // Běžný učitel / student vidí jen data své školy
       const schoolId = session.schoolId || "";
@@ -92,6 +96,7 @@ export async function GET() {
           ]
         }).lean();
         feedbacks = await Feedback.find({ teacherId: session.id }).sort({ createdAt: -1 }).lean();
+        aiLogs = await AiLog.find({ teacherId: session.id }).sort({ createdAt: -1 }).lean();
       } else {
         assignments = await Assignment.find({ schoolId }).lean();
       }
@@ -130,6 +135,7 @@ export async function GET() {
     const mappedClasses = classes.map(c => ({ ...c, id: c._id }));
     const mappedAssignments = assignments.map(a => ({ ...a, id: a._id }));
     const mappedFeedbacks = feedbacks.map(f => ({ ...f, id: f._id }));
+    const mappedAiLogs = aiLogs.map(l => ({ ...l, id: l._id }));
     // Helper: Mongoose Map → plain object
     const mapToObj = (m: any): Record<string, any> => {
       if (!m) return {};
@@ -152,9 +158,11 @@ export async function GET() {
       classes: mappedClasses, 
       assignments: mappedAssignments, 
       submissions: mappedSubmissions,
-      feedbacks: mappedFeedbacks
+      feedbacks: mappedFeedbacks,
+      aiLogs: mappedAiLogs
     });
   } catch (error: any) {
+    console.error("Sync error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -64,7 +64,18 @@ Nepoužívej složité markdown značky, dokument bude exportován. Běžné for
       throw new Error("AI nevrátilo žádný text.");
     }
 
-    return NextResponse.json({ success: true, text: response.text });
+    // Uložíme log do databáze
+    const { AiLog } = await import("@/models/AiLog");
+    const aiLog = await AiLog.create({
+      teacherId: session.id,
+      schoolId: session.schoolId || 'unknown',
+      prompt: prompt,
+      contextText: contextText || '',
+      fileName: file?.name || '',
+      response: response.text
+    });
+
+    return NextResponse.json({ success: true, text: response.text, log: aiLog });
   } catch (error: any) {
     console.error("[API /api/ai/pedagog POST] Error:", error.message);
     return NextResponse.json({ error: "SERVER_ERROR", message: error.message }, { status: 500 });

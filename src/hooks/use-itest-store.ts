@@ -48,6 +48,7 @@ export function useITestStore() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [aiLogs, setAiLogs] = useState<any[]>([]);
   
   const [loadingStates, setLoadingStates] = useState({
     users: true,
@@ -75,6 +76,7 @@ export function useITestStore() {
           setAssignments(data.assignments);
           setSubmissions(data.submissions);
           setFeedbacks(data.feedbacks || []);
+          setAiLogs(data.aiLogs || []);
         }
       })
       .catch(console.error);
@@ -955,7 +957,7 @@ export function useITestStore() {
   }, [db, toast, classes]);
 
   return {
-    isLoaded, currentUser, classes, users, assignments, submissions, feedbacks,
+    isLoaded, currentUser, classes, users, assignments, submissions, feedbacks, aiLogs, setAiLogs,
     login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, deleteSubmission, submitWork, gradeSubmission,
     assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh, updateProfile, sendFeedback, updateFeedbackStatus, deleteFeedback
   };

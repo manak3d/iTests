@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 interface AiPedagogDashboardProps {
   onBack: () => void;
   userName: string;
+  aiLogs?: any[];
+  setAiLogs?: (logs: any[]) => void;
 }
 
 interface Message {
@@ -16,7 +18,7 @@ interface Message {
   timestamp: Date;
 }
 
-export function AiPedagogDashboard({ onBack, userName }: AiPedagogDashboardProps) {
+export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs }: AiPedagogDashboardProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [contextText, setContextText] = useState('');
@@ -108,12 +110,18 @@ export function AiPedagogDashboard({ onBack, userName }: AiPedagogDashboardProps
 
       const data = await res.json();
       
+      const aiMessageId = (Date.now() + 1).toString();
       setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
+        id: aiMessageId,
         role: 'ai',
         content: data.text,
         timestamp: new Date()
       }]);
+      
+      // Add the new log to the store history
+      if (data.log && setAiLogs) {
+        setAiLogs([data.log, ...aiLogs]);
+      }
       
       // Clear context after sending so it's not reused accidentally
       setContextText('');
@@ -417,15 +425,50 @@ export function AiPedagogDashboard({ onBack, userName }: AiPedagogDashboardProps
         {/* RIGHT COLUMN: History & Saved */}
         <div className="w-72 flex flex-col gap-6 shrink-0 h-full overflow-y-auto pb-6 custom-scrollbar hidden xl:flex">
           
-          <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden">
-            <CardHeader className="pb-3 border-b border-slate-50/50">
+          <Card className="border-none shadow-sm rounded-2xl bg-white flex-1 flex flex-col overflow-hidden">
+            <CardHeader className="pb-3 border-b border-slate-50/50 shrink-0">
               <CardTitle className="text-sm font-bold flex items-center gap-2 text-indigo-900">
                 <History className="w-4 h-4 text-indigo-500" />
-                Minulé promty
+                Minulé prompty
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 px-4">
-              <p className="text-xs text-slate-400 italic text-center">Žádné předchozí dotazy.</p>
+            <CardContent className="pt-4 px-2 flex-1 overflow-y-auto custom-scrollbar">
+              {aiLogs.length === 0 ? (
+                <p className="text-xs text-slate-400 italic text-center py-6">Žádné předchozí dotazy.</p>
+              ) : (
+                <div className="space-y-1">
+                  {aiLogs.map((log) => (
+                    <button 
+                      key={log._id || log.id}
+                      onClick={() => {
+                        setMessages([
+                          {
+                            id: `user-${log._id || log.id}`,
+                            role: 'user',
+                            content: log.prompt,
+                            timestamp: new Date(log.createdAt)
+                          },
+                          {
+                            id: `ai-${log._id || log.id}`,
+                            role: 'ai',
+                            content: log.response,
+                            timestamp: new Date(log.createdAt)
+                          }
+                        ]);
+                        if (log.contextText) setContextText(log.contextText);
+                      }}
+                      className="w-full text-left p-3 hover:bg-slate-50 rounded-xl transition-colors group flex flex-col gap-1"
+                    >
+                      <span className="text-xs font-bold text-slate-700 truncate block group-hover:text-indigo-600 transition-colors">
+                        {log.prompt}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {new Date(log.createdAt).toLocaleDateString('cs-CZ')} {new Date(log.createdAt).toLocaleTimeString('cs-CZ', {hour: '2-digit', minute:'2-digit'})}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
