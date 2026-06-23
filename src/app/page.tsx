@@ -3975,7 +3975,12 @@ export default function ITestApp() {
       <LiveMonitor
         assignmentId={monitorAssignmentId}
         store={store}
-        onClose={() => window.close()}
+        onClose={() => {
+          setMonitorAssignmentId(null);
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', '/');
+          }
+        }}
       />
     );
   }
@@ -8839,7 +8844,12 @@ export default function ITestApp() {
                           variant="outline" 
                           size="sm"
                           className="h-9 text-xs font-bold text-red-700 border-red-200 hover:bg-red-50 rounded-full flex items-center gap-1.5"
-                          onClick={() => window.open(`/?monitor=${selAssignment.id}`, '_blank')}
+                          onClick={() => {
+                            setMonitorAssignmentId(selAssignment.id);
+                            if (typeof window !== 'undefined') {
+                              window.history.pushState({}, '', `/?monitor=${selAssignment.id}`);
+                            }
+                          }}
                         >
                           <Activity className="w-4 h-4 text-red-500 animate-pulse" /> Sledovat test (Live)
                         </Button>
