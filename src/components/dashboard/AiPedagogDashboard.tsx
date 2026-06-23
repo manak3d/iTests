@@ -196,8 +196,9 @@ export function AiPedagogDashboard({ onBack, userName }: AiPedagogDashboardProps
       {/* Top Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 sticky top-0 z-10 shadow-sm">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack} className="rounded-full hover:bg-slate-100">
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          <Button variant="outline" onClick={onBack} className="rounded-full hover:bg-slate-50 font-bold text-slate-700 mr-2 border-slate-200">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Zpět na rozcestník
           </Button>
           <div>
             <h1 className="text-xl font-bold text-indigo-900 flex items-center gap-2">

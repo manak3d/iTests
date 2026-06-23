@@ -2212,7 +2212,7 @@ export default function ITestApp() {
       <div className="h-svh flex flex-col items-center justify-center gap-4 bg-background">
         <Loader2 className="w-12 h-12 text-primary animate-spin" />
         <div className="font-headline text-2xl text-primary font-bold animate-pulse text-center px-4">
-          Synchronizace iTest Cloudu...<br/>
+          Synchronizace: MANAK3D<br/>
           <span className="text-sm font-normal text-muted-foreground">Stahuji vaše data z databáze</span>
         </div>
       </div>
@@ -7044,6 +7044,18 @@ export default function ITestApp() {
 
         {teacherMode === 'itest' && (
           <>
+            {/* Navigace zpět na rozcestník (Hub) */}
+            <div className="max-w-7xl w-full mx-auto px-4 md:px-6 pt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => setTeacherMode('hub')}
+                className="rounded-full hover:bg-slate-50 font-bold text-slate-700 border-slate-200"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Zpět na rozcestník
+              </Button>
+            </div>
+
             {/* Banner o předplatném */}
             <div className="max-w-7xl w-full mx-auto px-4 md:px-6 mt-4">
               {isPremium ? (
