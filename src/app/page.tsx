@@ -6406,8 +6406,10 @@ export default function ITestApp() {
     );
   }
 
-  if (currentUser.role === 'teacher') {
-    const teacherClasses = store.classes.filter(c => c.teacherId === currentUser.id);
+  if (currentUser.role === 'admin' || currentUser.role === 'teacher') {
+    const teacherClasses = currentUser.role === 'admin' 
+      ? store.classes 
+      : store.classes.filter(c => c.teacherId === currentUser.id);
     const selectedClass = store.classes.find(c => c.id === selectedClassId);
     const unfilteredTemplates = store.assignments.filter(a => a.isPublicTemplate === true);
     const publicTemplates = unfilteredTemplates.filter(a => {
@@ -6437,7 +6439,7 @@ export default function ITestApp() {
     const isTrialExpired = !isPremium && (timeSinceCreation > trialDurationMs);
     const premiumDaysLeft = currentUser.premiumExpiresAt ? Math.max(0, Math.ceil((new Date(currentUser.premiumExpiresAt).getTime() - now.getTime()) / (24 * 60 * 60 * 1000))) : 0;
 
-    if (isTrialExpired) {
+    if (currentUser.role === 'teacher' && isTrialExpired) {
       return (
         <div className="min-h-screen flex flex-col bg-background">
           <Navbar 
