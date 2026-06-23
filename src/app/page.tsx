@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap, Settings, MessageSquare, Search, Key, Shield, ShieldAlert, Send, History, Bookmark, Volume2 } from 'lucide-react';
+import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap, Settings, MessageSquare, Search, Key, Shield, ShieldAlert, Send, History, Bookmark, Volume2, ArrowLeft } from 'lucide-react';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
