@@ -393,7 +393,7 @@ export default function ITestApp() {
   const [inviteCode, setInviteCode] = useState('');
 
   // AI Pedagog and Portal state
-  const [teacherMode, setTeacherMode] = useState<'hub' | 'itest' | 'ai'>('hub');
+  const [teacherMode, setTeacherMode] = useState<'hub' | 'itest' | 'ai' | 'admin-dashboard'>('hub');
   const [aiPedagogMessage, setAiPedagogMessage] = useState('');
   const [aiPedagogHistory, setAiPedagogHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [aiPedagogContext, setAiPedagogContext] = useState('');
@@ -4238,7 +4238,10 @@ export default function ITestApp() {
         <TeacherHub 
           userName={currentUser.name} 
           onSelectMode={setTeacherMode} 
-          onLogout={() => store.logout()} 
+          onLogout={() => store.logout()}
+          isAdmin={currentUser.role === 'admin'}
+          aiLogs={store.aiLogs}
+          users={store.users}
         />
       );
     }
@@ -4248,12 +4251,14 @@ export default function ITestApp() {
         <AiPedagogDashboard 
           userName={currentUser.name}
           onBack={() => setTeacherMode('hub')}
+          aiLogs={store.aiLogs}
+          setAiLogs={store.setAiLogs}
         />
       );
     }
   }
 
-  if (currentUser.role === 'admin') {
+  if (currentUser.role === 'admin' && teacherMode === 'admin-dashboard') {
     const rawTeachers = store.users.filter(u => u.role === 'teacher');
     const rawStudents = store.users.filter(u => u.role === 'student');
     const rawClassrooms = store.classes;
@@ -4354,8 +4359,18 @@ export default function ITestApp() {
                 Přehled a správa všech učitelů, tříd, žáků a úkolů v systému iTest.
               </p>
             </div>
-            <div className="bg-primary/10 border border-primary/20 text-primary font-bold px-4 py-2 rounded-full text-sm">
-              Root administrátorský přístup
+            <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setTeacherMode('hub')}
+                className="rounded-full bg-white hover:bg-slate-50 font-bold text-slate-700 border-slate-200 shadow-sm"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Zpět na rozcestník
+              </Button>
+              <div className="bg-primary/10 border border-primary/20 text-primary font-bold px-4 py-2 rounded-full text-sm">
+                Root administrátorský přístup
+              </div>
             </div>
           </div>
 

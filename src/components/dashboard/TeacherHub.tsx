@@ -4,7 +4,7 @@ import { GraduationCap, Sparkles, LogOut, ChevronRight, Crown, ShieldAlert, File
 import { Button } from "@/components/ui/button";
 
 interface TeacherHubProps {
-  onSelectMode: (mode: 'itest' | 'ai') => void;
+  onSelectMode: (mode: 'itest' | 'ai' | 'admin-dashboard') => void;
   onLogout: () => void;
   userName: string;
   isAdmin?: boolean;
@@ -64,7 +64,7 @@ export function TeacherHub({ onSelectMode, onLogout, userName, isAdmin, aiLogs =
         </div>
 
         {/* Cards */}
-        <div className={`grid grid-cols-1 ${isAdmin ? 'md:grid-cols-3 max-w-6xl' : 'md:grid-cols-2 max-w-4xl'} gap-8 w-full`}>
+        <div className={`grid grid-cols-1 ${isAdmin ? 'md:grid-cols-2 lg:grid-cols-4 max-w-7xl' : 'md:grid-cols-2 max-w-4xl'} gap-8 w-full`}>
           {/* Card 1: iTest Cloud */}
           <Card 
             className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden hover:shadow-2xl transition-all cursor-pointer group bg-white flex flex-col"
@@ -152,6 +152,36 @@ export function TeacherHub({ onSelectMode, onLogout, userName, isAdmin, aiLogs =
                 </div>
                 <div className="pt-6 border-t border-gray-100 flex items-center justify-between text-sm font-bold text-red-600 group-hover:text-red-700 transition-colors">
                   <span>Otevřít protokoly</span>
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Card 4: System Management (Only visible to Admin) */}
+          {isAdmin && (
+            <Card 
+              className="border-none shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden hover:shadow-2xl transition-all cursor-pointer group bg-slate-900 flex flex-col relative"
+              onClick={() => onSelectMode('admin-dashboard')}
+            >
+              <CardContent className="p-8 flex flex-col h-full">
+                <div className="bg-slate-800 w-14 h-14 rounded-2xl flex items-center justify-center mb-6">
+                  <Crown className="w-7 h-7 text-amber-400" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-3">Správa systému</h2>
+                <p className="text-sm text-slate-400 mb-8 leading-relaxed">
+                  Hlavní administrátorský panel. Přidávejte školy, spravujte všechny učitelské účty a kontrolujte databázi z nejvyšší úrovně.
+                </p>
+                <div className="space-y-3 mb-8 flex-1">
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
+                    <span className="text-amber-400">⚙️</span> Kompletní kontrola
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-300">
+                    <span className="text-amber-400">⚙️</span> Správa oprávnění
+                  </div>
+                </div>
+                <div className="pt-6 border-t border-slate-800 flex items-center justify-between text-sm font-bold text-amber-400 group-hover:text-amber-300 transition-colors">
+                  <span>Vstoupit do administrace</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
               </CardContent>
