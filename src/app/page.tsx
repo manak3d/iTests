@@ -21,6 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { LiveMonitor } from '@/components/itest/LiveMonitor';
+import { TeacherHub } from '@/components/dashboard/TeacherHub';
+import { AiPedagogDashboard } from '@/components/dashboard/AiPedagogDashboard';
 
 const safeLocalStorage = {
   getItem: (key: string): string | null => {
@@ -391,7 +393,7 @@ export default function ITestApp() {
   const [inviteCode, setInviteCode] = useState('');
 
   // AI Pedagog and Portal state
-  const [teacherMode, setTeacherMode] = useState<'portal' | 'itest' | 'ai-pedagog'>('portal');
+  const [teacherMode, setTeacherMode] = useState<'hub' | 'itest' | 'ai'>('hub');
   const [aiPedagogMessage, setAiPedagogMessage] = useState('');
   const [aiPedagogHistory, setAiPedagogHistory] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [aiPedagogContext, setAiPedagogContext] = useState('');
@@ -4224,6 +4226,28 @@ export default function ITestApp() {
 
   const currentUser = store.currentUser;
 
+
+  if (currentUser.role === 'admin' || currentUser.role === 'teacher') {
+    if (teacherMode === 'hub') {
+      return (
+        <TeacherHub 
+          userName={currentUser.name} 
+          onSelectMode={setTeacherMode} 
+          onLogout={() => store.logout()} 
+        />
+      );
+    }
+    
+    if (teacherMode === 'ai') {
+      return (
+        <AiPedagogDashboard 
+          userName={currentUser.name}
+          onBack={() => setTeacherMode('hub')}
+        />
+      );
+    }
+  }
+
   if (currentUser.role === 'admin') {
     const rawTeachers = store.users.filter(u => u.role === 'teacher');
     const rawStudents = store.users.filter(u => u.role === 'student');
@@ -7004,18 +7028,14 @@ export default function ITestApp() {
           onLogout={() => store.logout()} 
           onUpgradeClick={() => setIsUpgradeModalOpen(true)} 
           onProfileClick={() => setIsProfileModalOpen(true)}
-          showPortalLink={teacherMode !== 'portal'}
+          showPortalLink={true}
           onPortalClick={() => {
-            setTeacherMode('portal');
+            setTeacherMode('hub');
             setAiPedagogHistory([]);
             setAiPedagogContext('');
             setAiPedagogFileName('');
           }}
         />
-
-        {teacherMode === 'portal' && renderPortalView()}
-
-        {teacherMode === 'ai-pedagog' && renderAiPedagogView()}
 
         {teacherMode === 'itest' && (
           <>
