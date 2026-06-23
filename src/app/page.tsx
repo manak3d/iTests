@@ -3977,9 +3977,6 @@ export default function ITestApp() {
         store={store}
         onClose={() => {
           setMonitorAssignmentId(null);
-          if (typeof window !== 'undefined') {
-            window.history.pushState({}, '', '/');
-          }
         }}
       />
     );
@@ -8875,9 +8872,6 @@ export default function ITestApp() {
                           className="h-9 text-xs font-bold text-red-700 border-red-200 hover:bg-red-50 rounded-full flex items-center gap-1.5"
                           onClick={() => {
                             setMonitorAssignmentId(selAssignment.id);
-                            if (typeof window !== 'undefined') {
-                              window.history.pushState({}, '', `/?monitor=${selAssignment.id}`);
-                            }
                           }}
                         >
                           <Activity className="w-4 h-4 text-red-500 animate-pulse" /> Sledovat test (Live)
