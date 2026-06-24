@@ -6446,6 +6446,13 @@ export default function ITestApp() {
             onLogout={() => store.logout()} 
             onUpgradeClick={() => setIsUpgradeModalOpen(true)} 
             onProfileClick={() => setIsProfileModalOpen(true)}
+            showPortalLink={true}
+            onPortalClick={() => {
+              setTeacherMode('hub');
+              setAiPedagogHistory([]);
+              setAiPedagogContext('');
+              setAiPedagogFileName('');
+            }}
           />
           <div className="flex-1 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-100 shadow-2xl space-y-6 text-center animate-scale-up animate-fade-in">
