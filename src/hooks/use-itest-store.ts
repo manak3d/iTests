@@ -179,6 +179,10 @@ export function useITestStore() {
     }
   }, [db, classes]);
 
+  const addTeacher = useCallback((teacherData: any) => {
+    setUsers(prev => [...prev, teacherData]);
+  }, []);
+
   const addAssignment = useCallback((assignment: Omit<Assignment, 'id'>) => {
     const id = Math.random().toString(36).substring(2, 11);
     const newAssignment = { ...assignment, id, teacherId: currentUser?.id };
@@ -958,7 +962,7 @@ export function useITestStore() {
 
   return {
     isLoaded, currentUser, classes, users, assignments, submissions, feedbacks, aiLogs, setAiLogs,
-    login, forceLogin, register, logout, addClass, addStudent, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, deleteSubmission, submitWork, gradeSubmission,
+    login, forceLogin, register, logout, addClass, addStudent, addTeacher, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, deleteSubmission, submitWork, gradeSubmission,
     assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh, updateProfile, sendFeedback, updateFeedbackStatus, deleteFeedback
   };
 }

@@ -67,13 +67,8 @@ Projekt obsahuje integrované skripty a workflow definované v adresáři `.agen
 
 ## 🚀 Bezprostřední Roadmapa pro Další Agenty
 
-Následující úkol byl definován uživatelem a je připraven k implementaci:
+Následující úkoly byly úspěšně dokončeny:
+- **Zápis žáků z Administrátorského dashboardu**: Administrátor může zapsat žáka z libovolné třídy přes centrální formulář na své nástěnce.
+- **Správa Učitelů z Admin rozhraní**: Administrátor může zakládat nové učitelské účty a přidělovat jim spárované školy.
 
-### 📍 Úkol: Zápis žáků přímo z Administrátorského dashboardu
-* **Kontext**: Administrátor má ve svém dashboardu záložku **"Žáci"** (students), kde vidí seznam všech studentů.
-* **Požadavek**: Umožnit administrátorovi přidávat nové studenty (buď jednotlivě, přiřazením stávajícího, nebo importem z CSV souboru) přímo z této záložky.
-* **Návod k implementaci**:
-  1. Do záhlaví sekce seznamu žáků v administrátorském rozhraní (`adminTab === 'students'`) přidejte tlačítko **"Zapsat žáka"** s ikonou `<UserPlus className="w-4 h-4" />`.
-  2. Implementujte dialog (modal) podobný tomu, který používá učitel, s přepínačem akcí (Vytvořit, Přiřadit, Z CSV).
-  3. Vzhledem k tomu, že administrátor vidí žáky globálně, dialog musí navíc obsahovat **výběrové pole (select dropdown) pro volbu cílové třídy** (`targetClassId`) ze všech dostupných tříd v `store.classes`.
-  4. Po vytvoření/importu se musí data okamžitě zapsat do MongoDB a reaktivně obnovit v seznamu.
+Zatím nebyly uživatelem definovány další konkrétní úkoly. Agenti by měli čekat na další pokyny.

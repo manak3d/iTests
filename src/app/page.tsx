@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Plus, Users, ClipboardList, CheckCircle2, ChevronRight, GraduationCap, School, Loader2, BookOpen, PenTool, Trash2, Upload, LayoutDashboard, Activity, ChevronUp, ChevronDown, Edit3, UserPlus, Crown, Check, Sparkles, Download, Printer, Zap, Settings, MessageSquare, Search, Key, Shield, ShieldAlert, Send, History, Bookmark, Volume2, ArrowLeft } from 'lucide-react';
+import { AddTeacherDialog } from '@/components/dashboard/AddTeacherDialog';
 import { AssignmentCreator } from '@/components/itest/AssignmentCreator';
 import { DrawingPad } from '@/components/itest/DrawingPad';
 import { GradePicker } from '@/components/itest/GradePicker';
@@ -568,6 +569,7 @@ export default function ITestApp() {
   const [newClassName, setNewClassName] = useState('');
 
   const [isAddingStudent, setIsAddingStudent] = useState(false);
+  const [isAddingTeacher, setIsAddingTeacher] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentUsername, setNewStudentUsername] = useState('');
   const [newStudentPassword, setNewStudentPassword] = useState('');
@@ -4520,9 +4522,17 @@ export default function ITestApp() {
 
               {adminTab === 'teachers' && (
                 <div className="space-y-6 animate-fade-in">
-                  <div>
-                    <h3 className="text-2xl font-headline font-bold text-gray-800">Seznam Učitelů</h3>
-                    <p className="text-muted-foreground text-sm">Správa a přehled všech registrovaných učitelských účtů.</p>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h3 className="text-2xl font-headline font-bold text-gray-800">Seznam Učitelů</h3>
+                      <p className="text-muted-foreground text-sm">Správa a přehled všech registrovaných učitelských účtů.</p>
+                    </div>
+                    <Button 
+                      className="rounded-full shadow-md bg-accent hover:bg-accent/90"
+                      onClick={() => setIsAddingTeacher(true)}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" /> Přidat učitele
+                    </Button>
                   </div>
 
                   {/* Unified Search, Filter and Sort Bar */}
@@ -9722,6 +9732,13 @@ export default function ITestApp() {
             </TabsContent>
 
           </Tabs>
+
+          <AddTeacherDialog
+            isAddingTeacher={isAddingTeacher}
+            setIsAddingTeacher={setIsAddingTeacher}
+            schools={schools}
+            onTeacherAdded={(newTeacher: any) => store.addTeacher(newTeacher)}
+          />
 
           <Dialog open={isAddingStudent} onOpenChange={(open) => {
             setIsAddingStudent(open);
