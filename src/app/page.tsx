@@ -4359,14 +4359,6 @@ export default function ITestApp() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setTeacherMode('hub')}
-                className="rounded-full bg-white hover:bg-slate-50 font-bold text-slate-700 border-slate-200 shadow-sm"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Zpět na rozcestník
-              </Button>
               <div className="bg-primary/10 border border-primary/20 text-primary font-bold px-4 py-2 rounded-full text-sm">
                 Root administrátorský přístup
               </div>
@@ -7067,18 +7059,6 @@ export default function ITestApp() {
 
         {teacherMode === 'itest' && (
           <>
-            {/* Navigace zpět na rozcestník (Hub) */}
-            <div className="max-w-7xl w-full mx-auto px-4 md:px-6 pt-6">
-              <Button 
-                variant="outline" 
-                onClick={() => setTeacherMode('hub')}
-                className="rounded-full hover:bg-slate-50 font-bold text-slate-700 border-slate-200"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Zpět na rozcestník
-              </Button>
-            </div>
-
             {/* Banner o předplatném */}
             <div className="max-w-7xl w-full mx-auto px-4 md:px-6 mt-4">
               {isPremium ? (
