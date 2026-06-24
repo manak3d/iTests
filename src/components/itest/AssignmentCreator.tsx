@@ -21,12 +21,14 @@ export function AssignmentCreator({
   students = [], 
   classes = [], 
   allStudents = [],
+  initialQuestions = [],
   onSave 
 }: { 
   classId: string; 
   students?: User[]; 
   classes?: Class[]; 
   allStudents?: User[]; 
+  initialQuestions?: Question[];
   onSave: (a: Omit<Assignment, 'id'>) => void 
 }) {
   const [targetClassId, setTargetClassId] = useState(classId);
@@ -37,7 +39,7 @@ export function AssignmentCreator({
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('Matematika');
   const [description, setDescription] = useState('');
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<Question[]>(initialQuestions || []);
   const [fileUri, setFileUri] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();

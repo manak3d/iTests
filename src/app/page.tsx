@@ -814,6 +814,49 @@ export default function ITestApp() {
   const [adminViewingAssignmentId, setAdminViewingAssignmentId] = useState<string | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
+  const [generatedQuestions, setGeneratedQuestions] = useState<Question[] | null>(null);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+
+  const handleGenerateTestFromAi = async (text: string) => {
+    if (!text.trim()) {
+      toast({ title: "Chyba", description: "Nelze generovat test z prázdného textu.", variant: "destructive" });
+      return;
+    }
+
+    setIsGeneratingQuestions(true);
+    toast({ title: "Generuji test", description: "AI analyzuje text a generuje otázky. Může to trvat několik sekund..." });
+
+    try {
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate',
+          extractedText: text,
+          numMultipleChoice: 2,
+          numTrueFalse: 1,
+          numShortAnswer: 1,
+          numCloze: 1,
+          generationMode: 'ai-pedagog'
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Při generování testu došlo k chybě.");
+      }
+
+      setGeneratedQuestions(data.questions);
+      setTeacherMode('itest');
+      setIsCreatingAssignment(true);
+      toast({ title: "Test vygenerován", description: "Otázky byly úspěšně přidány do nového testu." });
+    } catch (error: any) {
+      toast({ title: "Chyba generování", description: error.message, variant: "destructive" });
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
   const [viewingAssignment, setViewingAssignment] = useState<string | null>(null);
   const [viewingSubmission, setViewingSubmission] = useState<string | null>(null);
   const [viewingAssignmentSubs, setViewingAssignmentSubs] = useState<string | null>(null);
@@ -4252,6 +4295,8 @@ export default function ITestApp() {
           onBack={() => setTeacherMode('hub')}
           aiLogs={store.aiLogs}
           setAiLogs={store.setAiLogs}
+          onGenerateTest={handleGenerateTestFromAi}
+          isGeneratingQuestions={isGeneratingQuestions}
         />
       );
     }
@@ -8093,15 +8138,17 @@ export default function ITestApp() {
                 </div>
               ) : isCreatingAssignment ? (
                 <div className="space-y-4">
-                  <Button variant="ghost" className="rounded-full" onClick={() => setIsCreatingAssignment(false)}>← Zpět</Button>
+                  <Button variant="ghost" className="rounded-full" onClick={() => { setIsCreatingAssignment(false); setGeneratedQuestions(null); }}>← Zpět</Button>
                   <AssignmentCreator 
                     classId={selectedClassId!} 
                     students={store.users.filter(u => u.role === 'student' && u.classId === selectedClassId)}
                     classes={store.classes}
                     allStudents={store.users}
+                    initialQuestions={generatedQuestions || undefined}
                     onSave={(a) => {
                       store.addAssignment(a);
                       setIsCreatingAssignment(false);
+                      setGeneratedQuestions(null);
                     }} 
                   />
                 </div>

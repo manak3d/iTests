@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Upload, History, Bookmark, Sparkles, Send, ArrowLeft, Loader2, FileText, Image as ImageIcon, Download } from 'lucide-react';
+import { BookOpen, Upload, History, Bookmark, Sparkles, Send, ArrowLeft, Loader2, FileText, Image as ImageIcon, Download, Wand2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -9,6 +9,8 @@ interface AiPedagogDashboardProps {
   userName: string;
   aiLogs?: any[];
   setAiLogs?: (logs: any[]) => void;
+  onGenerateTest?: (text: string) => void;
+  isGeneratingQuestions?: boolean;
 }
 
 interface Message {
@@ -18,7 +20,7 @@ interface Message {
   timestamp: Date;
 }
 
-export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs }: AiPedagogDashboardProps) {
+export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions }: AiPedagogDashboardProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [contextText, setContextText] = useState('');
@@ -360,6 +362,22 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs }:
                             <Download className="w-3.5 h-3.5 mr-1.5" />
                             Stáhnout jako PDF
                           </Button>
+                          {onGenerateTest && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="h-8 text-xs bg-indigo-600 text-white hover:bg-indigo-700 ml-2 border-indigo-600"
+                              onClick={() => onGenerateTest(msg.content)}
+                              disabled={isGeneratingQuestions}
+                            >
+                              {isGeneratingQuestions ? (
+                                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                              ) : (
+                                <Wand2 className="w-3.5 h-3.5 mr-1.5" />
+                              )}
+                              Vytvořit iTest z textu
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
