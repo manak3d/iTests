@@ -64,7 +64,15 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
     } else if (template === "Řád odborné učebny") {
       prompt = "Vypracuj návrh řádu odborné učebny, který bude v souladu s bezpečnostními předpisy a platnou legislativou.";
     } else if (template === "Kázeňský prohřešek") {
-      prompt = "Navrhni postup a formulaci zápisu o kázeňském prohřešku žáka podle školního řádu.";
+      prompt = "Zformuluj profesionální a objektivní záznam o kázeňském prohřešku žáka pro školní matriku nebo informování rodičů.";
+    } else if (template === "Příprava na hodinu") {
+      prompt = "Vytvoř strukturovaný plán 45minutové vyučovací hodiny pro základní školu na zadané téma. Zahrň fázi evokace, uvědomění a reflexe.";
+    } else if (template === "Slovní hodnocení žáka") {
+      prompt = "Přeformuluj mé poznámky o žákovi do profesionálního, motivujícího a konstruktivního formativního hodnocení na vysvědčení nebo pro rodiče.";
+    } else if (template === "Skupinový projekt") {
+      prompt = "Navrhni kreativní náměty na skupinovou práci nebo menší projekt do výuky na zadané téma. Rozepiš role pro žáky a způsob hodnocení.";
+    } else if (template === "Oficiální pochvala") {
+      prompt = "Zformuluj text oficiální pochvaly třídního učitele nebo ředitele školy pro žáka za mimořádnou aktivitu nebo úspěch.";
     }
     setInputValue(prompt);
   };
@@ -265,6 +273,18 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
                   </Button>
                   <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Kázeňský prohřešek")}>
                     <span className="mr-2">⚠️</span> Kázeňský prohřešek
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Příprava na hodinu")}>
+                    <span className="mr-2">📝</span> Příprava na hodinu
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Slovní hodnocení žáka")}>
+                    <span className="mr-2">💬</span> Slovní hodnocení žáka
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Skupinový projekt")}>
+                    <span className="mr-2">💡</span> Skupinový projekt
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Oficiální pochvala")}>
+                    <span className="mr-2">🏆</span> Oficiální pochvala
                   </Button>
                 </div>
               </div>
