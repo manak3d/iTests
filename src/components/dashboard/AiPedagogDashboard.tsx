@@ -26,6 +26,7 @@ interface Message {
   role: 'user' | 'ai';
   content: string;
   timestamp: Date;
+  isError?: boolean;
 }
 
 export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions, assignments = [], customAiTemplates = [], onAddCustomTemplate }: AiPedagogDashboardProps) {
@@ -168,7 +169,8 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
         id: (Date.now() + 1).toString(),
         role: 'ai',
         content: "Omlouvám se, ale při komunikaci se serverem došlo k chybě. Zkontrolujte prosím své připojení a API klíč.",
-        timestamp: new Date()
+        timestamp: new Date(),
+        isError: true
       }]);
     } finally {
       setIsTyping(false);
@@ -397,7 +399,7 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
                         {msg.content}
                       </div>
 
-                      {msg.role === 'ai' && (
+                      {msg.role === 'ai' && !msg.isError && (
                         <div className="mt-4 pt-3 border-t border-slate-200 flex justify-end">
                           <Button 
                             variant="outline" 

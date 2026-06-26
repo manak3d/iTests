@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import dbConnect from "@/lib/mongodb";
 import { getUserSession } from "@/lib/auth";
 import { ai } from "@/ai/genkit";
 
@@ -65,6 +66,7 @@ Nepoužívej složité markdown značky, dokument bude exportován. Běžné for
     }
 
     // Uložíme log do databáze
+    await dbConnect();
     const { AiLog } = await import("@/models/AiLog");
     const aiLog = await AiLog.create({
       teacherId: session.id,
