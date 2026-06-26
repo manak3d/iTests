@@ -4313,6 +4313,8 @@ export default function ITestApp() {
           onGenerateTest={handleGenerateTestFromAi}
           isGeneratingQuestions={isGeneratingQuestions}
           assignments={store.assignments.filter(a => a.teacherId === currentUser.id || !a.teacherId)}
+          customAiTemplates={currentUser.customAiTemplates}
+          onAddCustomTemplate={store.addCustomAiTemplate}
         />
       );
     }

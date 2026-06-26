@@ -960,9 +960,41 @@ export function useITestStore() {
     });
   }, [db, toast, classes]);
 
+  const addCustomAiTemplate = useCallback(async (title: string, prompt: string) => {
+    if (!currentUser || currentUser.role !== 'teacher') return false;
+
+    try {
+      const response = await fetch(`/api/teachers/${currentUser.id}/templates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, prompt })
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        // Update local user state immediately
+        setMongoUser(prev => {
+          if (!prev) return prev;
+          const updated = { ...prev, customAiTemplates: data.customAiTemplates };
+          sessionStorage.setItem('itest_mongo_user', JSON.stringify(updated));
+          return updated;
+        });
+        toast({ title: "Uloženo", description: "Vlastní šablona byla úspěšně přidána." });
+        return true;
+      } else {
+        toast({ title: "Chyba", description: data.error || "Nepodařilo se uložit šablonu.", variant: "destructive" });
+        return false;
+      }
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Chyba sítě", description: "Nelze se spojit se serverem.", variant: "destructive" });
+      return false;
+    }
+  }, [currentUser, toast]);
+
   return {
     isLoaded, currentUser, classes, users, assignments, submissions, feedbacks, aiLogs, setAiLogs,
     login, forceLogin, register, logout, addClass, addStudent, addTeacher, addAssignment, deleteAssignment, deleteClassroom, deleteStudent, deleteTeacher, deleteSubmission, submitWork, gradeSubmission,
-    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh, updateProfile, sendFeedback, updateFeedbackStatus, deleteFeedback
+    assignClass, assignStudent, changeStudentPassword, renameClassroom, updateAssignment, toggleUserPremium, addTeacherCredits, startAssignmentTimer, saveDraft, refresh, updateProfile, sendFeedback, updateFeedbackStatus, deleteFeedback, addCustomAiTemplate
   };
 }

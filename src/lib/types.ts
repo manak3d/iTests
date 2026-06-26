@@ -18,6 +18,7 @@ export interface User {
   aiCreditsResetDate?: string;
   education?: string;
   yearsOfExperience?: number;
+  customAiTemplates?: { title: string; prompt: string }[];
 }
 
 export interface Class {

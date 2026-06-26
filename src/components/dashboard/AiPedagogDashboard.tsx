@@ -17,6 +17,8 @@ interface AiPedagogDashboardProps {
   onGenerateTest?: (text: string, config: { numMultipleChoice: number; numTrueFalse: number; numShortAnswer: number; numCloze: number; targetAssignmentId?: string }) => void;
   isGeneratingQuestions?: boolean;
   assignments?: Assignment[];
+  customAiTemplates?: { title: string; prompt: string }[];
+  onAddCustomTemplate?: (title: string, prompt: string) => Promise<boolean>;
 }
 
 interface Message {
@@ -26,9 +28,15 @@ interface Message {
   timestamp: Date;
 }
 
-export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions, assignments = [] }: AiPedagogDashboardProps) {
+export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions, assignments = [], customAiTemplates = [], onAddCustomTemplate }: AiPedagogDashboardProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
+  
+  // Custom Template State
+  const [isAddTemplateDialogOpen, setIsAddTemplateDialogOpen] = useState(false);
+  const [newTemplateTitle, setNewTemplateTitle] = useState('');
+  const [newTemplatePrompt, setNewTemplatePrompt] = useState('');
+  const [isAddingTemplate, setIsAddingTemplate] = useState(false);
   
   // Test Generation Config State
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
@@ -532,14 +540,36 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
           </Card>
 
           <Card className="border-none shadow-sm rounded-2xl bg-white overflow-hidden">
-            <CardHeader className="pb-3 border-b border-slate-50/50">
+            <CardHeader className="pb-3 border-b border-slate-50/50 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-bold flex items-center gap-2 text-indigo-900">
                 <Bookmark className="w-4 h-4 text-indigo-500" />
                 Uložené šablony
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 px-4">
-              <p className="text-xs text-slate-400 italic text-center">Žádné uložené šablony.</p>
+            <CardContent className="pt-4 px-4 space-y-4">
+              {customAiTemplates.length === 0 ? (
+                <p className="text-xs text-slate-400 italic text-center py-2">Žádné uložené šablony.</p>
+              ) : (
+                <div className="space-y-2">
+                  {customAiTemplates.map((tpl, i) => (
+                    <Button 
+                      key={i}
+                      variant="outline" 
+                      className="w-full justify-start text-xs font-medium text-slate-600 bg-indigo-50/50 border-indigo-100 hover:bg-indigo-100 rounded-xl h-auto py-2 whitespace-normal text-left" 
+                      onClick={() => setInputValue(tpl.prompt)}
+                    >
+                      <span className="mr-2">⭐</span> {tpl.title}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              <Button 
+                variant="ghost" 
+                className="w-full text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                onClick={() => setIsAddTemplateDialogOpen(true)}
+              >
+                + Vytvořit novou šablonu
+              </Button>
             </CardContent>
           </Card>
 
@@ -647,6 +677,63 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
             }}>
               <Wand2 className="w-4 h-4 mr-2" />
               Generovat test
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Custom Template Dialog */}
+      <Dialog open={isAddTemplateDialogOpen} onOpenChange={setIsAddTemplateDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Vytvořit vlastní šablonu</DialogTitle>
+            <DialogDescription>
+              Uložte si často používaný dotaz jako rychlou volbu pro příště.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="templateTitle">Název tlačítka</Label>
+              <Input 
+                id="templateTitle" 
+                placeholder="Např. Vysvětlení pro prvňáka" 
+                value={newTemplateTitle}
+                onChange={(e) => setNewTemplateTitle(e.target.value)}
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="templatePrompt">Text příkazu (Prompt)</Label>
+              <Textarea 
+                id="templatePrompt" 
+                placeholder="Napiš to tak jednoduše, aby to pochopilo i 6leté dítě..." 
+                className="min-h-[100px]"
+                value={newTemplatePrompt}
+                onChange={(e) => setNewTemplatePrompt(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddTemplateDialogOpen(false)} disabled={isAddingTemplate}>Zrušit</Button>
+            <Button 
+              disabled={isAddingTemplate || !newTemplateTitle.trim() || !newTemplatePrompt.trim()}
+              onClick={async () => {
+                if (onAddCustomTemplate) {
+                  setIsAddingTemplate(true);
+                  const success = await onAddCustomTemplate(newTemplateTitle, newTemplatePrompt);
+                  setIsAddingTemplate(false);
+                  if (success) {
+                    setIsAddTemplateDialogOpen(false);
+                    setNewTemplateTitle('');
+                    setNewTemplatePrompt('');
+                  }
+                }
+              }}
+            >
+              {isAddingTemplate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Uložit šablonu
             </Button>
           </DialogFooter>
         </DialogContent>

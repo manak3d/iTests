@@ -126,7 +126,8 @@ export async function GET() {
         aiCreditsMax: t.aiCreditsMax,
         aiExtraCredits: t.aiExtraCredits,
         premiumType: t.premiumType,
-        aiCreditsResetDate: t.aiCreditsResetDate
+        aiCreditsResetDate: t.aiCreditsResetDate,
+        customAiTemplates: t.customAiTemplates
       })),
       ...students.map(s => ({ id: s._id, name: `${s.firstName} ${s.lastName}`, username: s.username, role: s.role, classId: s.classroomId, password: s.passwordPlain, schoolId: s.schoolId }))
     ];

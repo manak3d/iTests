@@ -19,6 +19,7 @@ export interface ITeacher extends Document {
   aiCreditsResetDate?: Date | null;
   education?: string;
   yearsOfExperience?: number;
+  customAiTemplates?: { title: string; prompt: string }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +44,7 @@ const TeacherSchema: Schema = new Schema(
     aiCreditsResetDate: { type: Date, default: null },
     education: { type: String },
     yearsOfExperience: { type: Number },
+    customAiTemplates: [{ title: String, prompt: String }],
   },
   {
     timestamps: true,
