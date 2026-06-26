@@ -3,14 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Upload, History, Bookmark, Sparkles, Send, ArrowLeft, Loader2, FileText, Image as ImageIcon, Download, Wand2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Assignment } from '@/lib/types';
 
 interface AiPedagogDashboardProps {
   onBack: () => void;
   userName: string;
   aiLogs?: any[];
   setAiLogs?: (logs: any[]) => void;
-  onGenerateTest?: (text: string) => void;
+  onGenerateTest?: (text: string, config: { numMultipleChoice: number; numTrueFalse: number; numShortAnswer: number; numCloze: number; targetAssignmentId?: string }) => void;
   isGeneratingQuestions?: boolean;
+  assignments?: Assignment[];
 }
 
 interface Message {
@@ -20,9 +26,20 @@ interface Message {
   timestamp: Date;
 }
 
-export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions }: AiPedagogDashboardProps) {
+export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions, assignments = [] }: AiPedagogDashboardProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
+  
+  // Test Generation Config State
+  const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const [selectedTextForTest, setSelectedTextForTest] = useState('');
+  const [testConfig, setTestConfig] = useState({
+    numMultipleChoice: 2,
+    numTrueFalse: 1,
+    numShortAnswer: 1,
+    numCloze: 1,
+    targetAssignmentId: 'new'
+  });
   const [contextText, setContextText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{name: string, type: string, base64: string} | null>(null);
@@ -202,6 +219,7 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
   };
 
   return (
+    <>
     <div className="min-h-screen bg-[#F0F4F8] flex flex-col font-sans text-slate-800">
       {/* Top Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shrink-0 sticky top-0 z-10 shadow-sm">
@@ -367,7 +385,10 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
                               variant="outline" 
                               size="sm" 
                               className="h-8 text-xs bg-indigo-600 text-white hover:bg-indigo-700 ml-2 border-indigo-600"
-                              onClick={() => onGenerateTest(msg.content)}
+                              onClick={() => {
+                                setSelectedTextForTest(msg.content);
+                                setIsConfigDialogOpen(true);
+                              }}
                               disabled={isGeneratingQuestions}
                             >
                               {isGeneratingQuestions ? (
@@ -506,5 +527,110 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
         
       </div>
     </div>
+
+      {/* Test Generation Config Dialog */}
+      <Dialog open={isConfigDialogOpen} onOpenChange={setIsConfigDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Konfigurace generování testu</DialogTitle>
+            <DialogDescription>
+              Nastavte si parametry pro generování otázek z textu AI Pedagoga.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="target" className="text-right">Kam uložit</Label>
+              <Select 
+                value={testConfig.targetAssignmentId} 
+                onValueChange={(val) => setTestConfig(prev => ({ ...prev, targetAssignmentId: val }))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Vyberte cíl..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">🌟 Vytvořit novou práci</SelectItem>
+                  {assignments.map(ass => (
+                    <SelectItem key={ass.id} value={ass.id}>Přidat do: {ass.title || "Nepojmenovaný test"}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="numMultipleChoice" className="text-right">ABCD (MCQ)</Label>
+              <Input 
+                id="numMultipleChoice" 
+                type="number" 
+                min={0} 
+                max={10} 
+                className="col-span-3"
+                value={testConfig.numMultipleChoice}
+                onChange={(e) => setTestConfig(prev => ({ ...prev, numMultipleChoice: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="numTrueFalse" className="text-right">Ano / Ne</Label>
+              <Input 
+                id="numTrueFalse" 
+                type="number" 
+                min={0} 
+                max={10} 
+                className="col-span-3"
+                value={testConfig.numTrueFalse}
+                onChange={(e) => setTestConfig(prev => ({ ...prev, numTrueFalse: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="numShortAnswer" className="text-right">Krátká odpověď</Label>
+              <Input 
+                id="numShortAnswer" 
+                type="number" 
+                min={0} 
+                max={10} 
+                className="col-span-3"
+                value={testConfig.numShortAnswer}
+                onChange={(e) => setTestConfig(prev => ({ ...prev, numShortAnswer: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="numCloze" className="text-right">Doplňovačka</Label>
+              <Input 
+                id="numCloze" 
+                type="number" 
+                min={0} 
+                max={10} 
+                className="col-span-3"
+                value={testConfig.numCloze}
+                onChange={(e) => setTestConfig(prev => ({ ...prev, numCloze: parseInt(e.target.value) || 0 }))}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfigDialogOpen(false)}>Zrušit</Button>
+            <Button onClick={() => {
+              if (onGenerateTest) {
+                const targetId = testConfig.targetAssignmentId === 'new' ? undefined : testConfig.targetAssignmentId;
+                onGenerateTest(selectedTextForTest, {
+                  numMultipleChoice: testConfig.numMultipleChoice,
+                  numTrueFalse: testConfig.numTrueFalse,
+                  numShortAnswer: testConfig.numShortAnswer,
+                  numCloze: testConfig.numCloze,
+                  targetAssignmentId: targetId
+                });
+                setIsConfigDialogOpen(false);
+              }
+            }}>
+              <Wand2 className="w-4 h-4 mr-2" />
+              Generovat test
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -817,7 +817,7 @@ export default function ITestApp() {
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[] | null>(null);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
 
-  const handleGenerateTestFromAi = async (text: string) => {
+  const handleGenerateTestFromAi = async (text: string, config: { numMultipleChoice: number; numTrueFalse: number; numShortAnswer: number; numCloze: number; targetAssignmentId?: string }) => {
     if (!text.trim()) {
       toast({ title: "Chyba", description: "Nelze generovat test z prázdného textu.", variant: "destructive" });
       return;
@@ -833,10 +833,10 @@ export default function ITestApp() {
         body: JSON.stringify({
           action: 'generate',
           extractedText: text,
-          numMultipleChoice: 2,
-          numTrueFalse: 1,
-          numShortAnswer: 1,
-          numCloze: 1,
+          numMultipleChoice: config.numMultipleChoice,
+          numTrueFalse: config.numTrueFalse,
+          numShortAnswer: config.numShortAnswer,
+          numCloze: config.numCloze,
           generationMode: 'ai-pedagog'
         })
       });
@@ -846,10 +846,25 @@ export default function ITestApp() {
         throw new Error(data.error || "Při generování testu došlo k chybě.");
       }
 
-      setGeneratedQuestions(data.questions);
       setTeacherMode('itest');
-      setIsCreatingAssignment(true);
-      toast({ title: "Test vygenerován", description: "Otázky byly úspěšně přidány do nového testu." });
+      
+      if (config.targetAssignmentId) {
+        // Append to existing assignment
+        const existingAss = store.assignments.find(a => a.id === config.targetAssignmentId);
+        if (existingAss) {
+          store.updateAssignment(config.targetAssignmentId, { 
+            questions: [...existingAss.questions, ...data.questions] 
+          });
+          setEditingAssignmentId(config.targetAssignmentId);
+          toast({ title: "Úspěch", description: `Přidáno ${data.questions.length} otázek do testu.` });
+        }
+      } else {
+        // Create new assignment
+        setGeneratedQuestions(data.questions);
+        setIsCreatingAssignment(true);
+        toast({ title: "Test vygenerován", description: "Otázky byly úspěšně přidány do nového testu." });
+      }
+
     } catch (error: any) {
       toast({ title: "Chyba generování", description: error.message, variant: "destructive" });
     } finally {
@@ -4297,6 +4312,7 @@ export default function ITestApp() {
           setAiLogs={store.setAiLogs}
           onGenerateTest={handleGenerateTestFromAi}
           isGeneratingQuestions={isGeneratingQuestions}
+          assignments={store.assignments.filter(a => a.teacherId === currentUser.id || !a.teacherId)}
         />
       );
     }
