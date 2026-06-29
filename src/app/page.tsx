@@ -847,20 +847,47 @@ export default function ITestApp() {
       }
 
       setTeacherMode('itest');
+
+      const mappedQuestions = data.questions.map((q: any) => {
+        let type = 'short_answer';
+        if (q.type === 'multiple_choice') type = 'multiple_choice';
+        else if (q.type === 'true_false') type = 'true_false';
+        else if (q.type === 'matching') type = 'matching';
+        else if (q.type === 'cloze') type = 'cloze';
+
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          type,
+          text: q.questionText || '',
+          clozeText: type === 'cloze' ? (q.clozeText || '') : undefined,
+          points: 1,
+          options: type === 'matching' ? q.options : (type === 'multiple_choice' ? q.options : undefined),
+          correctAnswer: type === 'matching'
+            ? (() => {
+                const map: Record<string, number> = {};
+                q.options?.forEach((_: any, idx: number) => { map[String(idx)] = idx; });
+                return map;
+              })()
+            : (type === 'multiple_choice' ? q.correctAnswerIndex : (type === 'true_false' ? q.correctAnswer : undefined)),
+          numPracticeQuestions: 0,
+          useAiForPractice: false,
+          practiceQuestions: []
+        };
+      });
       
       if (config.targetAssignmentId) {
         // Append to existing assignment
         const existingAss = store.assignments.find(a => a.id === config.targetAssignmentId);
         if (existingAss) {
           store.updateAssignment(config.targetAssignmentId, { 
-            questions: [...existingAss.questions, ...data.questions] 
+            questions: [...existingAss.questions, ...mappedQuestions] 
           });
           setEditingAssignmentId(config.targetAssignmentId);
           toast({ title: "Úspěch", description: `Přidáno ${data.questions.length} otázek do testu.` });
         }
       } else {
         // Create new assignment
-        setGeneratedQuestions(data.questions);
+        setGeneratedQuestions(mappedQuestions);
         setIsCreatingAssignment(true);
         toast({ title: "Test vygenerován", description: "Otázky byly úspěšně přidány do nového testu." });
       }
