@@ -56,8 +56,20 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
   const [isTyping, setIsTyping] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<{name: string, type: string, base64: string} | null>(null);
   
+  // PDF Settings State
+  const [isPdfSettingsOpen, setIsPdfSettingsOpen] = useState(false);
+  const [pdfHeaderLine1, setPdfHeaderLine1] = useState('iTest Cloud - AI Pedagog');
+  const [pdfHeaderLine2, setPdfHeaderLine2] = useState('Vygenerováno úřední AI asistencí');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const savedLine1 = localStorage.getItem('aiPedagogPdfHeader1');
+    const savedLine2 = localStorage.getItem('aiPedagogPdfHeader2');
+    if (savedLine1) setPdfHeaderLine1(savedLine1);
+    if (savedLine2) setPdfHeaderLine2(savedLine2);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -229,8 +241,8 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
         <body>
           <div class="header">
             <div>
-              <strong>iTest Cloud - AI Pedagog</strong><br/>
-              Vygenerováno úřední AI asistencí
+              <strong>${pdfHeaderLine1}</strong><br/>
+              ${pdfHeaderLine2}
             </div>
             <div>
               Datum: ${new Date().toLocaleDateString('cs-CZ')}<br/>
@@ -438,7 +450,16 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
                       </div>
 
                       {msg.role === 'ai' && !msg.isError && (
-                        <div className="mt-4 pt-3 border-t border-slate-200 flex justify-end">
+                        <div className="mt-4 pt-3 border-t border-slate-200 flex justify-end gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon" 
+                            title="Nastavení záhlaví PDF dokumentu"
+                            className="h-8 w-8 bg-white text-slate-500 hover:text-slate-700 hover:bg-slate-100 border-slate-200"
+                            onClick={() => setIsPdfSettingsOpen(true)}
+                          >
+                            <Settings className="w-4 h-4" />
+                          </Button>
                           <Button 
                             variant="outline" 
                             size="sm" 
@@ -823,6 +844,44 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
               {isAddingTemplate && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Uložit šablonu
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* PDF Settings Dialog */}
+      <Dialog open={isPdfSettingsOpen} onOpenChange={setIsPdfSettingsOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Nastavení záhlaví PDF</DialogTitle>
+            <DialogDescription>
+              Změňte si text, který se bude tisknout v záhlaví dokumentu (např. název vaší školy). Nastavení se uloží do vašeho prohlížeče.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="pdfLine1">Název školy / Hlavní nadpis</Label>
+              <Input 
+                id="pdfLine1" 
+                value={pdfHeaderLine1}
+                onChange={(e) => setPdfHeaderLine1(e.target.value)}
+                placeholder="Základní škola a Mateřská škola..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pdfLine2">Podtitul</Label>
+              <Input 
+                id="pdfLine2" 
+                value={pdfHeaderLine2}
+                onChange={(e) => setPdfHeaderLine2(e.target.value)}
+                placeholder="Vygenerováno úřední AI asistencí"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => {
+              localStorage.setItem('aiPedagogPdfHeader1', pdfHeaderLine1);
+              localStorage.setItem('aiPedagogPdfHeader2', pdfHeaderLine2);
+              setIsPdfSettingsOpen(false);
+            }}>Uložit a zavřít</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
