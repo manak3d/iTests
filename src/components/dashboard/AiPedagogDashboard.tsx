@@ -14,9 +14,10 @@ interface AiPedagogDashboardProps {
   userName: string;
   aiLogs?: any[];
   setAiLogs?: (logs: any[]) => void;
-  onGenerateTest?: (text: string, config: { numMultipleChoice: number; numTrueFalse: number; numShortAnswer: number; numCloze: number; targetAssignmentId?: string }) => void;
+  onGenerateTest?: (text: string, config: { numMultipleChoice: number; numTrueFalse: number; numShortAnswer: number; numCloze: number; targetAssignmentId?: string; targetClassId?: string; targetSubject?: string }) => void;
   isGeneratingQuestions?: boolean;
   assignments?: Assignment[];
+  classes?: any[];
   customAiTemplates?: { title: string; prompt: string }[];
   onAddCustomTemplate?: (title: string, prompt: string) => Promise<boolean>;
 }
@@ -29,7 +30,7 @@ interface Message {
   isError?: boolean;
 }
 
-export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions, assignments = [], customAiTemplates = [], onAddCustomTemplate }: AiPedagogDashboardProps) {
+export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, onGenerateTest, isGeneratingQuestions, assignments = [], classes = [], customAiTemplates = [], onAddCustomTemplate }: AiPedagogDashboardProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   
@@ -47,7 +48,9 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
     numTrueFalse: 1,
     numShortAnswer: 1,
     numCloze: 1,
-    targetAssignmentId: 'new'
+    targetAssignmentId: 'new',
+    targetClassId: '',
+    targetSubject: 'Matematika'
   });
   const [contextText, setContextText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -609,6 +612,52 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
               </Select>
             </div>
 
+            {testConfig.targetAssignmentId === 'new' && (
+              <>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="targetClass" className="text-right">Třída</Label>
+                  <Select 
+                    value={testConfig.targetClassId} 
+                    onValueChange={(val) => setTestConfig(prev => ({ ...prev, targetClassId: val }))}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Vyberte třídu (volitelné)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nevybírat (později)</SelectItem>
+                      {classes.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="targetSubject" className="text-right">Předmět</Label>
+                  <Select 
+                    value={testConfig.targetSubject} 
+                    onValueChange={(val) => setTestConfig(prev => ({ ...prev, targetSubject: val }))}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Vyberte předmět" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Matematika">Matematika</SelectItem>
+                      <SelectItem value="Český jazyk">Český jazyk</SelectItem>
+                      <SelectItem value="Anglický jazyk">Anglický jazyk</SelectItem>
+                      <SelectItem value="Přírodověda">Přírodověda</SelectItem>
+                      <SelectItem value="Vlastivěda">Vlastivěda</SelectItem>
+                      <SelectItem value="Dějepis">Dějepis</SelectItem>
+                      <SelectItem value="Zeměpis">Zeměpis</SelectItem>
+                      <SelectItem value="Přírodopis">Přírodopis</SelectItem>
+                      <SelectItem value="Fyzika">Fyzika</SelectItem>
+                      <SelectItem value="Chemie">Chemie</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="numMultipleChoice" className="text-right">ABCD (MCQ)</Label>
               <Input 
@@ -672,7 +721,9 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
                   numTrueFalse: testConfig.numTrueFalse,
                   numShortAnswer: testConfig.numShortAnswer,
                   numCloze: testConfig.numCloze,
-                  targetAssignmentId: targetId
+                  targetAssignmentId: targetId,
+                  targetClassId: testConfig.targetAssignmentId === 'new' ? testConfig.targetClassId : undefined,
+                  targetSubject: testConfig.targetAssignmentId === 'new' ? testConfig.targetSubject : undefined
                 });
                 setIsConfigDialogOpen(false);
               }

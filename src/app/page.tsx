@@ -815,9 +815,11 @@ export default function ITestApp() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [isCreatingAssignment, setIsCreatingAssignment] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[] | null>(null);
+  const [generatedClassId, setGeneratedClassId] = useState<string | undefined>();
+  const [generatedSubject, setGeneratedSubject] = useState<string | undefined>();
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
 
-  const handleGenerateTestFromAi = async (text: string, config: { numMultipleChoice: number; numTrueFalse: number; numShortAnswer: number; numCloze: number; targetAssignmentId?: string }) => {
+  const handleGenerateTestFromAi = async (text: string, config: { numMultipleChoice: number; numTrueFalse: number; numShortAnswer: number; numCloze: number; targetAssignmentId?: string; targetClassId?: string; targetSubject?: string }) => {
     if (!text.trim()) {
       toast({ title: "Chyba", description: "Nelze generovat test z prázdného textu.", variant: "destructive" });
       return;
@@ -888,6 +890,8 @@ export default function ITestApp() {
       } else {
         // Create new assignment
         setGeneratedQuestions(mappedQuestions);
+        setGeneratedClassId(config.targetClassId !== 'none' ? config.targetClassId : undefined);
+        setGeneratedSubject(config.targetSubject);
         setIsCreatingAssignment(true);
         toast({ title: "Test vygenerován", description: "Otázky byly úspěšně přidány do nového testu." });
       }
@@ -4340,6 +4344,7 @@ export default function ITestApp() {
           onGenerateTest={handleGenerateTestFromAi}
           isGeneratingQuestions={isGeneratingQuestions}
           assignments={store.assignments.filter(a => a.teacherId === currentUser.id || !a.teacherId)}
+          classes={store.classes}
           customAiTemplates={currentUser.customAiTemplates}
           onAddCustomTemplate={store.addCustomAiTemplate}
         />
@@ -8185,11 +8190,12 @@ export default function ITestApp() {
                 <div className="space-y-4">
                   <Button variant="ghost" className="rounded-full" onClick={() => { setIsCreatingAssignment(false); setGeneratedQuestions(null); }}>← Zpět</Button>
                   <AssignmentCreator 
-                    classId={selectedClassId!} 
-                    students={store.users.filter(u => u.role === 'student' && u.classId === selectedClassId)}
+                    classId={generatedClassId || selectedClassId!} 
+                    students={store.users.filter(u => u.role === 'student' && u.classId === (generatedClassId || selectedClassId))}
                     classes={store.classes}
                     allStudents={store.users}
                     initialQuestions={generatedQuestions || undefined}
+                    initialSubject={generatedSubject}
                     onSave={(a) => {
                       store.addAssignment(a);
                       setIsCreatingAssignment(false);

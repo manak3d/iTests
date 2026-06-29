@@ -22,6 +22,7 @@ export function AssignmentCreator({
   classes = [], 
   allStudents = [],
   initialQuestions = [],
+  initialSubject,
   onSave 
 }: { 
   classId: string; 
@@ -29,6 +30,7 @@ export function AssignmentCreator({
   classes?: Class[]; 
   allStudents?: User[]; 
   initialQuestions?: Question[];
+  initialSubject?: string;
   onSave: (a: Omit<Assignment, 'id'>) => void 
 }) {
   const [targetClassId, setTargetClassId] = useState(classId);
@@ -37,7 +39,7 @@ export function AssignmentCreator({
     ? allStudents.filter(u => u.role === 'student' && u.classId === targetClassId)
     : students;
   const [title, setTitle] = useState('');
-  const [subject, setSubject] = useState('Matematika');
+  const [subject, setSubject] = useState(initialSubject || 'Matematika');
   const [description, setDescription] = useState('');
   const [questions, setQuestions] = useState<Question[]>(initialQuestions || []);
   const [fileUri, setFileUri] = useState<string | undefined>();
