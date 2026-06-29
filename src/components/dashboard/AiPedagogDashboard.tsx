@@ -85,6 +85,20 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
       prompt = "Navrhni kreativní náměty na skupinovou práci nebo menší projekt do výuky na zadané téma. Rozepiš role pro žáky a způsob hodnocení.";
     } else if (template === "Oficiální pochvala") {
       prompt = "Zformuluj text oficiální pochvaly třídního učitele nebo ředitele školy pro žáka za mimořádnou aktivitu nebo úspěch.";
+    } else if (template === "Podklady pro PPP / IVP") {
+      prompt = "Sestav profesionální pedagogickou zprávu pro pedagogicko-psychologickou poradnu. Na základě mých poznámek popiš silné a slabé stránky žáka, chování v kolektivu a dosavadní podpůrná opatření.";
+    } else if (template === "Hodnoticí rubrika") {
+      prompt = "Vytvoř hodnoticí rubriku s tabulkou (1-5 bodů nebo známky) pro zadanou slohovou práci nebo projekt. Jasně popiš, co je vyžadováno pro každou známku.";
+    } else if (template === "Zápis z třídní schůzky") {
+      prompt = "Převeď mé heslovité poznámky ze schůzky do formálního, přátelského a přehledného shrnutí, které můžu poslat e-mailem rodičům.";
+    } else if (template === "Plán třídnické hodiny") {
+      prompt = "Navrhni plán na 45minutovou třídnickou hodinu. Zahrň aktivity na prolomení ledů, témata k diskuzi a způsob, jak řešit aktuální problém ve třídě.";
+    } else if (template === "Diferenciace textu") {
+      prompt = "Vezmi přiložený studijní text a přepiš ho do jednodušší češtiny, aby mu porozuměl žák-cizinec nebo žák s SPU. Zachovej klíčové informace, ale použij kratší věty a jednodušší slovní zásobu.";
+    } else if (template === "Zpráva pro OSPOD") {
+      prompt = "Zformuluj velmi citlivé, ale maximálně objektivní, věcné a formální oznámení pro orgán sociálně-právní ochrany dětí týkající se problémů žáka. Zohledni pouze fakta popsaná v kontextu.";
+    } else if (template === "Zápis z porad") {
+      prompt = "Na základě mých poznámek vytvoř profesionální, strukturovaný a přehledný zápis z pedagogické rady nebo porady vedení školy, včetně přidělených úkolů a termínů.";
     }
     setInputValue(prompt);
   };
@@ -298,6 +312,27 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
                   </Button>
                   <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Oficiální pochvala")}>
                     <span className="mr-2">🏆</span> Oficiální pochvala
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Podklady pro PPP / IVP")}>
+                    <span className="mr-2">📄</span> Podklady pro PPP / IVP
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Hodnoticí rubrika")}>
+                    <span className="mr-2">📊</span> Hodnoticí rubrika
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Zápis z třídní schůzky")}>
+                    <span className="mr-2">💬</span> Zápis z třídní schůzky
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Plán třídnické hodiny")}>
+                    <span className="mr-2">🤝</span> Plán třídnické hodiny
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Diferenciace textu")}>
+                    <span className="mr-2">🌍</span> Diferenciace textu
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Zpráva pro OSPOD")}>
+                    <span className="mr-2">⚖️</span> Zpráva pro OSPOD
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start text-xs font-medium text-slate-600 bg-slate-50 border-slate-100 hover:bg-slate-100 rounded-xl h-10" onClick={() => handleTemplateClick("Zápis z porad")}>
+                    <span className="mr-2">📌</span> Zápis z porad
                   </Button>
                 </div>
               </div>
