@@ -70,35 +70,35 @@ export function AiPedagogDashboard({ onBack, userName, aiLogs = [], setAiLogs, o
   const handleTemplateClick = (template: string) => {
     let prompt = "";
     if (template === "Odpověď rodičům") {
-      prompt = "Napiš diplomatickou a vstřícnou odpověď rodičům, kteří mají stížnost nebo dotaz. Použij přiložený kontext.";
+      prompt = "Napiš vysoce profesionální, diplomatickou a empatickou odpověď rodičům na jejich stížnost nebo dotaz (viz kontext). Odpověď musí být věcná, chránit zájmy školy i žáka a působit maximálně seriózně. V případě potřeby se odkaž na školní řád nebo školský zákon (č. 561/2004 Sb.).";
     } else if (template === "Reakce na ČŠI") {
-      prompt = "Připrav formální reakci nebo zprávu pro Českou školní inspekci (ČŠI) na základě poskytnutých informací a platných vyhlášek MŠMT.";
+      prompt = "Vypracuj vysoce formální a právně podloženou reakci nebo zprávu pro Českou školní inspekci (ČŠI) na základě dodaných informací. Odpověď musí být strukturovaná, respektovat terminologii MŠMT a přímo se odkazovat na příslušné paragrafy školského zákona (č. 561/2004 Sb.) a související vyhlášky.";
     } else if (template === "Řád odborné učebny") {
-      prompt = "Vypracuj návrh řádu odborné učebny, který bude v souladu s bezpečnostními předpisy a platnou legislativou.";
+      prompt = "Vytvoř striktní a formální návrh řádu odborné učebny. Dokument musí být v souladu s předpisy o bezpečnosti a ochraně zdraví při práci (BOZP), požární ochranou a platnou legislativou MŠMT. Použij odrážky, jasné formulace zákazů a povinností žáků i vyučujících.";
     } else if (template === "Kázeňský prohřešek") {
-      prompt = "Zformuluj profesionální a objektivní záznam o kázeňském prohřešku žáka pro školní matriku nebo informování rodičů.";
+      prompt = "Zformuluj úřední a zcela objektivní záznam o kázeňském prohřešku žáka pro školní matriku nebo úřední dopis pro rodiče. Nepoužívej emoce, pouze suchá fakta. Zohledni paragrafy týkající se výchovných opatření (§ 31 školského zákona) a dodržuj formální štábní kulturu dokumentu.";
     } else if (template === "Příprava na hodinu") {
-      prompt = "Vytvoř strukturovaný plán 45minutové vyučovací hodiny pro základní školu na zadané téma. Zahrň fázi evokace, uvědomění a reflexe.";
+      prompt = "Vytvoř precizní, moderní a pedagogicky vysoce kvalitní plán 45minutové vyučovací hodiny. Postupuj podle modelu E-U-R (evokace, uvědomění si významu, reflexe) nebo konstruktivistického přístupu. Zahrň přesné časové dotace, cíle hodiny v jazyce žáka a metody formativního hodnocení.";
     } else if (template === "Slovní hodnocení žáka") {
-      prompt = "Přeformuluj mé poznámky o žákovi do profesionálního, motivujícího a konstruktivního formativního hodnocení na vysvědčení nebo pro rodiče.";
+      prompt = "Přeformuluj mé hrubé poznámky do vysoce profesionálního, motivujícího a formativního slovního hodnocení na vysvědčení. Text musí být v souladu s doporučeními MŠMT k formativnímu hodnocení, musí oceňovat pokrok žáka a citlivě, avšak jasně, definovat oblasti pro další rozvoj.";
     } else if (template === "Skupinový projekt") {
-      prompt = "Navrhni kreativní náměty na skupinovou práci nebo menší projekt do výuky na zadané téma. Rozepiš role pro žáky a způsob hodnocení.";
+      prompt = "Navrhni inovativní a komplexní metodiku pro skupinový projekt do výuky. Detailně rozepiš: edukativní cíle, konkrétní role jednotlivých žáků, časový harmonogram, začlenění průřezových témat (RVP) a přesnou analytickou rubriku pro hodnocení procesu i výstupu.";
     } else if (template === "Oficiální pochvala") {
-      prompt = "Zformuluj text oficiální pochvaly třídního učitele nebo ředitele školy pro žáka za mimořádnou aktivitu nebo úspěch.";
+      prompt = "Zformuluj slavnostní a vysoce formální text oficiální pochvaly třídního učitele nebo ředitele školy. Text musí mít úřední náležitosti, působit důstojně a přesně odůvodňovat udělení pochvaly (např. reprezentace školy, mimořádný lidský čin) v souladu se školním řádem.";
     } else if (template === "Podklady pro PPP / IVP") {
-      prompt = "Sestav profesionální pedagogickou zprávu pro pedagogicko-psychologickou poradnu. Na základě mých poznámek popiš silné a slabé stránky žáka, chování v kolektivu a dosavadní podpůrná opatření.";
+      prompt = "Sestav odbornou pedagogickou zprávu pro pedagogicko-psychologickou poradnu (PPP) či SPC. Používej exaktní speciálně-pedagogickou a psychologickou terminologii. Analyzuj kognitivní schopnosti, sociální chování a podrobně vypiš dosud uplatňovaná podpůrná opatření (PO 1. stupně) v rámci školy.";
     } else if (template === "Hodnoticí rubrika") {
-      prompt = "Vytvoř hodnoticí rubriku s tabulkou (1-5 bodů nebo známky) pro zadanou slohovou práci nebo projekt. Jasně popiš, co je vyžadováno pro každou známku.";
+      prompt = "Vytvoř sofistikovanou analytickou hodnoticí rubriku pro zadaný úkol. Rozděl kritéria do tabulky s deskriptory pro jednotlivé úrovně výkonu (např. 1–5 bodů nebo známky). Rubrika musí být transparentní, validní a odpovídat standardům moderního formativního hodnocení.";
     } else if (template === "Zápis z třídní schůzky") {
-      prompt = "Převeď mé heslovité poznámky ze schůzky do formálního, přátelského a přehledného shrnutí, které můžu poslat e-mailem rodičům.";
+      prompt = "Zpracuj mé poznámky do oficiálního, strukturovaného a úředně vyhlížejícího zápisu z třídní schůzky. Dokument musí obsahovat formální náležitosti (datum, program, přijatá usnesení) a být připraven k rozeslání rodičům přes školní informační systém (Bakaláři/EduPage).";
     } else if (template === "Plán třídnické hodiny") {
-      prompt = "Navrhni plán na 45minutovou třídnickou hodinu. Zahrň aktivity na prolomení ledů, témata k diskuzi a způsob, jak řešit aktuální problém ve třídě.";
+      prompt = "Navrhni profesionální metodiku pro třídnickou hodinu zaměřenou na budování bezpečného klimatu, prevenci rizikového chování nebo řešení konkrétního problému. Zahrň psychologicky ověřené techniky, pravidla bezpečné komunikace a postupy doporučené metodiky prevence MŠMT.";
     } else if (template === "Diferenciace textu") {
-      prompt = "Vezmi přiložený studijní text a přepiš ho do jednodušší češtiny, aby mu porozuměl žák-cizinec nebo žák s SPU. Zachovej klíčové informace, ale použij kratší věty a jednodušší slovní zásobu.";
+      prompt = "Proveď didaktickou transformaci přiloženého studijního textu pro účely inkluze (žák s SPU nebo s odlišným mateřským jazykem). Text zjednoduš na úroveň jazyka B1, zkrať souvětí, zvýrazni klíčové pojmy, ale zachovej plnou faktickou správnost a vzdělávací hodnotu materiálu.";
     } else if (template === "Zpráva pro OSPOD") {
-      prompt = "Zformuluj velmi citlivé, ale maximálně objektivní, věcné a formální oznámení pro orgán sociálně-právní ochrany dětí týkající se problémů žáka. Zohledni pouze fakta popsaná v kontextu.";
+      prompt = "Zformuluj úřední oznámení či zprávu pro orgán sociálně-právní ochrany dětí (OSPOD) v souladu se zákonem č. 359/1999 Sb. Text musí být striktně faktický, bez dohadů či emocí, a musí obsahovat výčet konkrétních pozorování, termínů a realizovaných intervencí ze strany školy.";
     } else if (template === "Zápis z porad") {
-      prompt = "Na základě mých poznámek vytvoř profesionální, strukturovaný a přehledný zápis z pedagogické rady nebo porady vedení školy, včetně přidělených úkolů a termínů.";
+      prompt = "Vytvoř oficiální, reprezentativní a strukturovaný zápis z pedagogické rady nebo provozní porady vedení školy. Pečlivě rozděl text na projednávané body, usnesení a úkoly s přiřazenou zodpovědností a termíny plnění. Text musí splňovat náležitosti úředního dokumentu.";
     }
     setInputValue(prompt);
   };
